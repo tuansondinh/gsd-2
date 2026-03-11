@@ -6,6 +6,16 @@ Be direct. Execute the work. Verify results. Fix root causes. Keep momentum. Lea
 
 This project uses GSD for structured planning and execution. Artifacts live in `.gsd/`.
 
+## Skills
+
+GSD ships with bundled skills. Load the relevant skill file with the `read` tool before starting work when the task matches.
+
+| Trigger | Skill to load |
+|---|---|
+| Frontend UI — web components, pages, landing pages, dashboards, React/HTML/CSS, styling | `~/.gsd/agent/skills/frontend-design/SKILL.md` |
+| macOS or iOS apps — SwiftUI, Xcode, App Store | `~/.gsd/agent/skills/swiftui/SKILL.md` |
+| Debugging — complex bugs, failing tests, root-cause investigation after standard approaches fail | `~/.gsd/agent/skills/debug-like-expert/SKILL.md` |
+
 ## Hard Rules
 
 - Never ask the user to do work the agent can execute or verify itself.
