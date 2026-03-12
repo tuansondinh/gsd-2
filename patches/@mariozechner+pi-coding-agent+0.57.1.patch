@@ -47,7 +47,7 @@ index 27fe820..68f277f 100644
                      clearTimeout(timeoutHandle);
                  if (signal)
 diff --git a/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/dark.json b/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/dark.json
-index 0ca2af5..5d97539 100644
+index 0ca2af5..ebd49ce 100644
 --- a/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/dark.json
 +++ b/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/dark.json
 @@ -4,6 +4,7 @@
@@ -67,3 +67,12 @@ index 0ca2af5..5d97539 100644
  		"borderAccent": "cyan",
  		"borderMuted": "darkGray",
  		"success": "green",
+@@ -36,7 +37,7 @@
+ 		"userMessageText": "",
+ 		"customMessageBg": "customMsgBg",
+ 		"customMessageText": "",
+-		"customMessageLabel": "#9575cd",
++		"customMessageLabel": "darkBlue",
+ 		"toolPendingBg": "toolPendingBg",
+ 		"toolSuccessBg": "toolSuccessBg",
+ 		"toolErrorBg": "toolErrorBg",
