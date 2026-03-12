@@ -23,30 +23,31 @@ test('resolveWorkflowConfig values are all booleans', () => {
 
 // With ~/.gsd/preferences.md having planning_depth: standard and
 // workflow overrides, verify the merge logic works:
-// - planning_depth: standard sets skip_milestone_research, skip_slice_research, skip_plan_self_audit to true
-// - explicit workflow.skip_milestone_research: true confirms override
-// - explicit workflow.skip_slice_research: false overrides standard default
-// - explicit workflow.skip_plan_self_audit: false overrides standard default
+// - planning_depth: standard sets skip_slice_research, skip_plan_self_audit to true (NOT milestone research)
+// - explicit workflow.skip_milestone_research: false confirms standard default (false)
+// - explicit workflow.skip_slice_research: true confirms standard default (true)
+// - explicit workflow.skip_plan_self_audit: true confirms standard default (true)
+// - explicit workflow.skip_reassessment: false confirms standard default (false)
 test('resolveWorkflowConfig respects global preferences with overrides', () => {
   const wf = resolveWorkflowConfig();
 
-  // planning_depth: standard → skip_milestone_research defaults true,
-  // workflow.skip_milestone_research: true confirms it
-  assert.equal(wf.skip_milestone_research, true);
+  // planning_depth: standard → skip_milestone_research defaults false,
+  // workflow.skip_milestone_research: false confirms it
+  assert.equal(wf.skip_milestone_research, false);
 
   // planning_depth: standard → skip_slice_research defaults true,
-  // but workflow.skip_slice_research: false overrides it
-  assert.equal(wf.skip_slice_research, false);
+  // workflow.skip_slice_research: true confirms it
+  assert.equal(wf.skip_slice_research, true);
 
   // planning_depth: standard → skip_plan_self_audit defaults true,
-  // but workflow.skip_plan_self_audit: false overrides it
-  assert.equal(wf.skip_plan_self_audit, false);
+  // workflow.skip_plan_self_audit: true confirms it
+  assert.equal(wf.skip_plan_self_audit, true);
 
   // planning_depth: standard → skip_reassessment defaults false,
   // workflow.skip_reassessment: false confirms it
   assert.equal(wf.skip_reassessment, false);
 
   // planning_depth: standard → skip_observability defaults false,
-  // workflow.skip_observability: false confirms it
+  // no explicit override, uses standard default (false)
   assert.equal(wf.skip_observability, false);
 });

@@ -53,11 +53,12 @@ flowchart TD
     style M fill:#c0392b,color:#fff
 ```
 
-### Standard — skip research + self-audit
+### Standard — skip slice research + self-audit
 
 ```mermaid
 flowchart TD
-    A[CONTEXT.md exists] --> C[Plan Milestone]
+    A[CONTEXT.md exists] --> B[Research Milestone]
+    B -->|writes RESEARCH.md| C[Plan Milestone]
     C -->|writes ROADMAP.md| D{For each slice}
 
     D --> F[Plan Slice]
@@ -78,6 +79,7 @@ flowchart TD
     O -->|no| P[Complete Milestone]
     P -->|writes milestone SUMMARY.md| Q((Done))
 
+    style B fill:#4a9eff,color:#fff
     style C fill:#7c5cbf,color:#fff
     style F fill:#7c5cbf,color:#fff
     style I fill:#27ae60,color:#fff
@@ -305,12 +307,12 @@ Removes observability/diagnostics sections from planning prompts and suppresses 
 | Scenario | Config | Why |
 |----------|--------|-----|
 | Large unfamiliar codebase, high stakes | `planning_depth: thorough` | Research catches pitfalls. Self-audit prevents bad plans. Worth the extra sessions. |
-| Familiar codebase, medium features | `planning_depth: standard` | You already know the code. Skip research and self-audit. Planning still writes proper artifacts. |
+| Familiar codebase, medium features | `planning_depth: standard` | You already know the code. Milestone research kept, but slice research and self-audit skipped. Planning still writes proper artifacts. |
 | Small features, bug fixes, quick iterations | `planning_depth: minimal` | Get to execution fast. No research, no self-audit, no reassessment, no observability overhead. |
 | Greenfield project, first milestone | `thorough` + `skip_plan_self_audit: true` | Research is valuable when nothing exists yet. But the 10-point audit is overkill for initial scaffolding. |
-| Familiar codebase, risky integration | `standard` + `skip_reassessment: false` | Skip research (you know the code), but keep reassessment because cross-boundary work can drift. |
+| Familiar codebase, risky integration | `standard` + `skip_reassessment: false` | Skip slice research (you know the code), but keep reassessment because cross-boundary work can drift. |
 | Solo dev, fast iteration | `planning_depth: minimal` | You're the quality gate. Let the agent plan and execute. |
-| Team project with PRs | `planning_depth: standard` | PR review replaces the self-audit. Research is redundant if the team already discussed the approach. |
+| Team project with PRs | `planning_depth: standard` | PR review replaces the self-audit. Slice research is redundant if the team already discussed the approach. Milestone research still runs for broad context. |
 
 ## Examples
 
