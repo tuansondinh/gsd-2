@@ -1,6 +1,6 @@
 {
-  "name": "gsd-pi",
-  "version": "2.6.0",
+  "name": "@tuan_son.dinh/gsd",
+  "version": "2.6.1",
   "description": "GSD — Get Shit Done coding agent",
   "license": "MIT",
   "repository": {
