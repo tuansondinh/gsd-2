@@ -47,7 +47,7 @@ index 27fe820..68f277f 100644
                      clearTimeout(timeoutHandle);
                  if (signal)
 diff --git a/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/dark.json b/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/dark.json
-index 0ca2af5..ebd49ce 100644
+index 0ca2af5..cee5c65 100644
 --- a/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/dark.json
 +++ b/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/dark.json
 @@ -4,6 +4,7 @@
@@ -76,3 +76,38 @@ index 0ca2af5..ebd49ce 100644
  		"toolPendingBg": "toolPendingBg",
  		"toolSuccessBg": "toolSuccessBg",
  		"toolErrorBg": "toolErrorBg",
+@@ -72,8 +73,8 @@
+ 		"thinkingMinimal": "#6e6e6e",
+ 		"thinkingLow": "#5f87af",
+ 		"thinkingMedium": "#81a2be",
+-		"thinkingHigh": "#b294bb",
+-		"thinkingXhigh": "#d183e8",
++		"thinkingHigh": "#1e4d8c",
++		"thinkingXhigh": "#2d6db0",
+ 
+ 		"bashMode": "green"
+ 	},
+diff --git a/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/light.json b/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/light.json
+index 58ab93e..5b769e7 100644
+--- a/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/light.json
++++ b/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/light.json
+@@ -35,7 +35,7 @@
+ 		"userMessageText": "",
+ 		"customMessageBg": "customMsgBg",
+ 		"customMessageText": "",
+-		"customMessageLabel": "#7e57c2",
++		"customMessageLabel": "#1e4d8c",
+ 		"toolPendingBg": "toolPendingBg",
+ 		"toolSuccessBg": "toolSuccessBg",
+ 		"toolErrorBg": "toolErrorBg",
+@@ -71,8 +71,8 @@
+ 		"thinkingMinimal": "#767676",
+ 		"thinkingLow": "blue",
+ 		"thinkingMedium": "teal",
+-		"thinkingHigh": "#875f87",
+-		"thinkingXhigh": "#8b008b",
++		"thinkingHigh": "#1e4d8c",
++		"thinkingXhigh": "#2d6db0",
+ 
+ 		"bashMode": "green"
+ 	},
