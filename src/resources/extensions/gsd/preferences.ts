@@ -440,10 +440,13 @@ function parseFrontmatterBlock(frontmatter: string): GSDPreferences {
 }
 
 function parseScalar(value: string): string | number | boolean {
-  if (value === "true") return true;
-  if (value === "false") return false;
-  if (/^-?\d+$/.test(value)) return Number(value);
-  return value.replace(/^['\"]|['\"]$/g, "");
+  // Strip inline comments: "true  # some comment" → "true"
+  // Preserve # inside quoted strings by only stripping when unquoted.
+  const stripped = /^['"]/.test(value) ? value : value.replace(/\s+#.*$/, "");
+  if (stripped === "true") return true;
+  if (stripped === "false") return false;
+  if (/^-?\d+$/.test(stripped)) return Number(stripped);
+  return stripped.replace(/^['\"]|['\"]$/g, "");
 }
 
 /**
