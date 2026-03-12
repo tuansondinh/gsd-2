@@ -164,7 +164,7 @@ export default function (pi: ExtensionAPI) {
       const version = process.env.GSD_VERSION || "0.0.0";
 
       const logoText = GSD_LOGO_LINES.map((line) => theme.fg("accent", line)).join("\n");
-      const titleLine = `  ${theme.bold("Get Shit Done")} ${theme.fg("dim", `v${version}`)}`;
+      const titleLine = `  ${theme.bold("Get Shit Done")} ${theme.fg("dim", `v${version}`)} ${theme.fg("dim", "— Lucent")}`;
 
       const headerContent = `${logoText}\n${titleLine}`;
       ctx.ui.setHeader((_ui, _theme) => new Text(headerContent, 1, 0));

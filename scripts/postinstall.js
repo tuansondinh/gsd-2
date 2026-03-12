@@ -47,7 +47,7 @@ const banner =
   '   ╚═════╝ ╚══════╝╚═════╝ ' +
   reset + '\n' +
   '\n' +
-  `  Get Shit Done ${dim}v${pkg.version}${reset}\n`
+  `  Get Shit Done ${dim}v${pkg.version} — Lucent${reset}\n`
 
 // ---------------------------------------------------------------------------
 // Main — wrapped in async IIFE, with graceful fallback if clack fails
