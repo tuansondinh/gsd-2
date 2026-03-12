@@ -27,28 +27,22 @@ Then:
    - For simple slices: executable commands or script assertions are fine.
    - If the project is non-trivial and has no test framework, the first task should set one up.
    - If this slice establishes a boundary contract, verification must exercise that contract.
-4. **For non-trivial slices only** — plan observability, proof level, and integration closure:
-   - Include `Observability / Diagnostics` for backend, integration, async, stateful, or UI slices where failure diagnosis matters.
-   - Fill `Proof Level` and `Integration Closure` when the slice crosses runtime boundaries or has meaningful integration concerns.
-   - **Omit these sections entirely for simple slices** where they would all be "none" or trivially obvious.
-5. Decompose the slice into tasks, each fitting one context window. Each task needs:
+{{observabilityStep}}
+5. Fill the `Proof Level` and `Integration Closure` sections truthfully:
+   - State whether the slice proves contract, integration, operational, or final-assembly behavior.
+   - Say whether real runtime or human/UAT is required.
+   - Name the wiring introduced in this slice and what still remains before the milestone is truly usable end-to-end.
+6. Decompose the slice into tasks, each fitting one context window. Each task needs:
    - a concrete, action-oriented title
    - the inline task entry fields defined in the plan.md template (Why / Files / Do / Verify / Done when)
    - a matching task plan file with description, steps, must-haves, verification, inputs, and expected output
    - Observability Impact section **only if the task touches runtime boundaries, async flows, or error paths** — omit it otherwise
-6. Write `{{outputPath}}`
-7. Write individual task plans in `{{sliceAbsPath}}/tasks/`: `T01-PLAN.md`, `T02-PLAN.md`, etc.
-8. **Self-audit the plan.** Walk through each check — if any fail, fix the plan files before moving on:
-    - **Completion semantics:** If every task were completed exactly as written, the slice goal/demo should actually be true.
-    - **Requirement coverage:** Every must-have in the slice maps to at least one task. No must-have is orphaned. If `REQUIREMENTS.md` exists, every Active requirement this slice owns maps to at least one task.
-    - **Task completeness:** Every task has steps, must-haves, verification, inputs, and expected output — none are blank or vague.
-    - **Dependency correctness:** Task ordering is consistent. No task references work from a later task.
-    - **Key links planned:** For every pair of artifacts that must connect, there is an explicit step that wires them.
-    - **Scope sanity:** Target 2–5 steps and 3–8 files per task. 10+ steps or 12+ files — must split. Each task must be completable in a single fresh context window.
-    - **Feature completeness:** Every task produces real, user-facing progress — not just internal scaffolding.
-9. If planning produced structural decisions, append them to `.gsd/DECISIONS.md`
-10. Commit: `docs({{sliceId}}): add slice plan`
-11. Update `.gsd/STATE.md`
+7. Write `{{outputPath}}`
+8. Write individual task plans in `{{sliceAbsPath}}/tasks/`: `T01-PLAN.md`, `T02-PLAN.md`, etc.
+{{selfAuditStep}}
+10. If planning produced structural decisions (e.g. verification strategy, observability strategy, technology choices, patterns to follow), append them to `.gsd/DECISIONS.md`
+11. Commit: `docs({{sliceId}}): add slice plan`
+12. Update `.gsd/STATE.md`
 
 The slice directory and tasks/ subdirectory already exist. Do NOT mkdir. You are on the slice branch; all work stays here.
 

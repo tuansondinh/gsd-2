@@ -60,5 +60,6 @@ If the roadmap has only one slice, also write the slice plan and task plans inli
 This eliminates a separate research-slice + plan-slice cycle when the work is straightforward.
 
 **You MUST write the file `{{outputAbsPath}}` before finishing.**
+{{skipObservabilityNote}}
 
 When done, say: "Milestone {{milestoneId}} planned."

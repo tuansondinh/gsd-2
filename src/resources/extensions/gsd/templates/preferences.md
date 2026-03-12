@@ -15,6 +15,8 @@ git:
   snapshots:
   pre_merge_check:
   commit_type:
+planning_depth:
+workflow: {}
 ---
 
 # GSD Skill Preferences

@@ -39,7 +39,7 @@ import {
   readUnitRuntimeRecord,
   writeUnitRuntimeRecord,
 } from "./unit-runtime.js";
-import { resolveAutoSupervisorConfig, resolveModelForUnit, resolveSkillDiscoveryMode, loadEffectiveGSDPreferences } from "./preferences.js";
+import { resolveAutoSupervisorConfig, resolveModelForUnit, resolveSkillDiscoveryMode, loadEffectiveGSDPreferences, resolveWorkflowConfig } from "./preferences.js";
 import type { GSDPreferences } from "./preferences.js";
 import {
   validatePlanBoundary,
@@ -1105,7 +1105,8 @@ async function dispatchNextUnit(
   } else {
     // ── Adaptive Replanning: check if last completed slice needs reassessment ──
     // Computed here (after summarizing guard) so complete-slice always runs first.
-    const needsReassess = await checkNeedsReassessment(basePath, mid, state);
+    const wfReassess = resolveWorkflowConfig();
+    const needsReassess = wfReassess.skip_reassessment ? null : await checkNeedsReassessment(basePath, mid, state);
     if (needsRunUat) {
       const { sliceId, uatType } = needsRunUat;
       unitType = "run-uat";
@@ -1136,11 +1137,12 @@ async function dispatchNextUnit(
         return;
       }
 
-      // Research before roadmap if no research exists
+      // Research before roadmap if no research exists (unless skipped by workflow config)
       const researchFile = resolveMilestoneFile(basePath, mid, "RESEARCH");
       const hasResearch = !!(researchFile && await loadFile(researchFile));
+      const wfConfig = resolveWorkflowConfig();
 
-      if (!hasResearch) {
+      if (!hasResearch && !wfConfig.skip_milestone_research) {
         unitType = "research-milestone";
         unitId = mid;
         prompt = await buildResearchMilestonePrompt(mid, midTitle!, basePath);
@@ -1151,26 +1153,17 @@ async function dispatchNextUnit(
       }
 
     } else if (state.phase === "planning") {
-      // Slice needs planning — but research first if no research exists
+      // Slice needs planning — but research first if no research exists (unless skipped)
       const sid = state.activeSlice!.id;
       const sTitle = state.activeSlice!.title;
       const researchFile = resolveSliceFile(basePath, mid, sid, "RESEARCH");
       const hasResearch = !!(researchFile && await loadFile(researchFile));
+      const wfConfig = resolveWorkflowConfig();
 
-      if (!hasResearch) {
-        // Skip slice research for S01 when milestone research already exists —
-        // the milestone research already covers the same ground for the first slice.
-        const milestoneResearchFile = resolveMilestoneFile(basePath, mid, "RESEARCH");
-        const hasMilestoneResearch = !!(milestoneResearchFile && await loadFile(milestoneResearchFile));
-        if (hasMilestoneResearch && sid === "S01") {
-          unitType = "plan-slice";
-          unitId = `${mid}/${sid}`;
-          prompt = await buildPlanSlicePrompt(mid, midTitle!, sid, sTitle, basePath);
-        } else {
-          unitType = "research-slice";
-          unitId = `${mid}/${sid}`;
-          prompt = await buildResearchSlicePrompt(mid, midTitle!, sid, sTitle, basePath);
-        }
+      if (!hasResearch && !wfConfig.skip_slice_research) {
+        unitType = "research-slice";
+        unitId = `${mid}/${sid}`;
+        prompt = await buildResearchSlicePrompt(mid, midTitle!, sid, sTitle, basePath);
       } else {
         unitType = "plan-slice";
         unitId = `${mid}/${sid}`;
@@ -1634,6 +1627,12 @@ async function buildPlanMilestonePrompt(mid: string, midTitle: string, base: str
 
   const outputRelPath = relMilestoneFile(base, mid, "ROADMAP");
   const outputAbsPath = resolveMilestoneFile(base, mid, "ROADMAP") ?? join(base, outputRelPath);
+
+  const wf = resolveWorkflowConfig();
+  const skipObservabilityNote = wf.skip_observability
+    ? "\n\n> **Note:** Observability planning is disabled in preferences. Skip observability/diagnostics sections in slice plans."
+    : "";
+
   return loadPrompt("plan-milestone", {
     milestoneId: mid, milestoneTitle: midTitle,
     milestonePath: relMilestonePath(base, mid),
@@ -1642,6 +1641,7 @@ async function buildPlanMilestonePrompt(mid: string, midTitle: string, base: str
     outputPath: outputRelPath,
     outputAbsPath,
     inlinedContext,
+    skipObservabilityNote,
   });
 }
 
@@ -1710,6 +1710,27 @@ async function buildPlanSlicePrompt(
   const outputRelPath = relSliceFile(base, mid, sid, "PLAN");
   const outputAbsPath = resolveSliceFile(base, mid, sid, "PLAN") ?? join(base, outputRelPath);
   const sliceAbsPath = resolveSlicePath(base, mid, sid) ?? join(base, relSlicePath(base, mid, sid));
+
+  const wf = resolveWorkflowConfig();
+
+  const observabilityStep = wf.skip_observability ? "" : `4. Plan observability and diagnostics explicitly:
+   - For non-trivial backend, integration, async, stateful, or UI slices, include an \`Observability / Diagnostics\` section in the slice plan.
+   - Define how a future agent will inspect state, detect failure, and localize the problem.
+   - Prefer structured logs/events, stable error codes/types, status surfaces, and persisted failure state over ad hoc debug text.
+   - Include at least one verification check for a diagnostic or failure-path signal when relevant.`;
+
+  const selfAuditStep = wf.skip_plan_self_audit ? "" : `12. **Self-audit the plan before continuing.** Walk through each check — if any fail, fix the plan files before moving on:
+    - **Completion semantics:** If every task were completed exactly as written, the slice goal/demo should actually be true at the claimed proof level. Do not allow a task plan that only scaffolds toward a future working state.
+    - **Requirement coverage:** Every must-have in the slice maps to at least one task. No must-have is orphaned.
+    - **Task completeness:** Every task has steps, must-haves, verification, observability impact, inputs, and expected output — none are blank or vague.
+    - **Dependency correctness:** Task ordering is consistent. No task references work from a later task.
+    - **Key links planned:** For every pair of artifacts that must connect (component → API, API → database, form → handler), there is an explicit step that wires them — not just "create X" and "create Y" in separate tasks with no connection step.
+    - **Scope sanity:** Target 2–5 steps and 3–8 files per task. 6–8 steps or 8–10 files is a warning — consider splitting. 10+ steps or 12+ files — must split. Each task must be completable in a single fresh context window.
+    - **Context compliance:** If context/research artifacts or \`.gsd/DECISIONS.md\` exist, the plan honors locked decisions and doesn't include deferred or out-of-scope items.
+    - **Requirement coverage:** If \`REQUIREMENTS.md\` exists, every Active requirement this slice owns (per the roadmap) maps to at least one task with verification that proves the requirement is met. No owned requirement is left without a task. No task claims to satisfy a requirement that is Deferred or Out of Scope.
+    - **Proof honesty:** The \`Proof Level\` and \`Integration Closure\` sections match what this slice will actually prove, and they do not imply live end-to-end completion if only fixture or contract proof is planned.
+    - **Feature completeness:** Every task produces real, user-facing progress — not just internal scaffolding. If the slice has a UI surface, at least one task builds the real UI (not a placeholder). If the slice has an API, at least one task connects it to a real data source (not hardcoded returns). If every task were completed and you showed the result to a non-technical stakeholder, they should see real product progress, not developer artifacts.`;
+
   return loadPrompt("plan-slice", {
     milestoneId: mid, sliceId: sid, sliceTitle: sTitle,
     slicePath: relSlicePath(base, mid, sid),
@@ -1720,6 +1741,8 @@ async function buildPlanSlicePrompt(
     outputAbsPath,
     inlinedContext,
     dependencySummaries: depContent,
+    observabilityStep,
+    selfAuditStep,
   });
 }
 
@@ -2278,6 +2301,9 @@ async function emitObservabilityWarnings(
   unitType: string,
   unitId: string,
 ): Promise<void> {
+  const wfConfig = resolveWorkflowConfig();
+  if (wfConfig.skip_observability) return;
+
   const parts = unitId.split("/");
   const mid = parts[0];
   const sid = parts[1];

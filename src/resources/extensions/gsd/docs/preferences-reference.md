@@ -49,6 +49,18 @@ Full documentation for `~/.gsd/preferences.md` (global) and `.gsd/preferences.md
   - `commit_type`: string — override the conventional commit type prefix. Must be one of: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`, `build`, `style`. Default: inferred from diff content.
   - `main_branch`: string — the primary branch name for new git repos (e.g., `"main"`, `"master"`, `"trunk"`). Also used by `getMainBranch()` as the preferred branch when auto-detection is ambiguous. Default: `"main"`.
 
+- `planning_depth`: controls how much research and verification happens before execution. Valid values:
+  - `thorough` — (default) full research, planning with self-audit, observability, and reassessment.
+  - `standard` — skip separate research units, skip plan self-audit. Planning still does inline codebase exploration.
+  - `minimal` — all of standard, plus skip reassessment and observability planning.
+
+- `workflow`: fine-grained overrides for the planning pipeline. Individual keys override `planning_depth`. Keys:
+  - `skip_milestone_research`: skip the research-milestone unit (default: false).
+  - `skip_slice_research`: skip the research-slice unit (default: false).
+  - `skip_plan_self_audit`: remove the 10-point self-audit from slice planning (default: false).
+  - `skip_reassessment`: skip roadmap reassessment after each slice (default: false).
+  - `skip_observability`: remove observability/diagnostics from plans and suppress warnings (default: false).
+
 ---
 
 ## Best Practices
@@ -129,3 +141,36 @@ git:
 ```
 
 All git fields are optional. Omit any field to use the default behavior. Project-level preferences override global preferences on a per-field basis.
+
+---
+
+## Workflow Examples
+
+**Standard depth — skip research, streamline planning:**
+
+```yaml
+---
+version: 1
+planning_depth: standard
+---
+```
+
+**Minimal depth — fastest pipeline, skip everything optional:**
+
+```yaml
+---
+version: 1
+planning_depth: minimal
+---
+```
+
+**Custom mix — skip research but keep self-audit:**
+
+```yaml
+---
+version: 1
+planning_depth: standard
+workflow:
+  skip_plan_self_audit: false
+---
+```

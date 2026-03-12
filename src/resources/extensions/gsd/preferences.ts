@@ -24,6 +24,16 @@ export interface GSDModelConfig {
   completion?: string; // e.g. "claude-sonnet-4-6"
 }
 
+export type PlanningDepth = "thorough" | "standard" | "minimal";
+
+export interface GSDWorkflowConfig {
+  skip_milestone_research?: boolean;
+  skip_slice_research?: boolean;
+  skip_plan_self_audit?: boolean;
+  skip_reassessment?: boolean;
+  skip_observability?: boolean;
+}
+
 export type SkillDiscoveryMode = "auto" | "suggest" | "off";
 
 export interface AutoSupervisorConfig {
@@ -54,6 +64,8 @@ export interface GSDPreferences {
   budget_ceiling?: number;
   remote_questions?: RemoteQuestionsConfig;
   git?: GitPreferences;
+  workflow?: GSDWorkflowConfig;
+  planning_depth?: PlanningDepth;
 }
 
 export interface LoadedGSDPreferences {
@@ -498,6 +510,34 @@ export function resolveAutoSupervisorConfig(): AutoSupervisorConfig {
   };
 }
 
+/**
+ * Resolve workflow configuration from effective preferences.
+ * Individual workflow.* overrides always win over planning_depth shortcut.
+ */
+export function resolveWorkflowConfig(): Required<GSDWorkflowConfig> {
+  const prefs = loadEffectiveGSDPreferences();
+  const depth = prefs?.preferences.planning_depth ?? "thorough";
+  const wf = prefs?.preferences.workflow ?? {};
+
+  // Expand planning_depth into defaults
+  const defaults: Required<GSDWorkflowConfig> = {
+    skip_milestone_research: depth === "standard" || depth === "minimal",
+    skip_slice_research: depth === "standard" || depth === "minimal",
+    skip_plan_self_audit: depth === "standard" || depth === "minimal",
+    skip_reassessment: depth === "minimal",
+    skip_observability: depth === "minimal",
+  };
+
+  // Individual overrides win
+  return {
+    skip_milestone_research: wf.skip_milestone_research ?? defaults.skip_milestone_research,
+    skip_slice_research: wf.skip_slice_research ?? defaults.skip_slice_research,
+    skip_plan_self_audit: wf.skip_plan_self_audit ?? defaults.skip_plan_self_audit,
+    skip_reassessment: wf.skip_reassessment ?? defaults.skip_reassessment,
+    skip_observability: wf.skip_observability ?? defaults.skip_observability,
+  };
+}
+
 function mergePreferences(base: GSDPreferences, override: GSDPreferences): GSDPreferences {
   return {
     version: override.version ?? base.version,
@@ -517,6 +557,8 @@ function mergePreferences(base: GSDPreferences, override: GSDPreferences): GSDPr
     git: (base.git || override.git)
       ? { ...(base.git ?? {}), ...(override.git ?? {}) }
       : undefined,
+    workflow: { ...(base.workflow ?? {}), ...(override.workflow ?? {}) },
+    planning_depth: override.planning_depth ?? base.planning_depth,
   };
 }
 
@@ -650,6 +692,43 @@ function validatePreferences(preferences: GSDPreferences): {
 
     if (Object.keys(git).length > 0) {
       validated.git = git as GitPreferences;
+    }
+  }
+
+  // planning_depth
+  const validPlanningDepths = new Set(["thorough", "standard", "minimal"]);
+  if (preferences.planning_depth) {
+    if (validPlanningDepths.has(preferences.planning_depth)) {
+      validated.planning_depth = preferences.planning_depth;
+    } else {
+      errors.push(`invalid planning_depth value: ${preferences.planning_depth}`);
+    }
+  }
+
+  // workflow
+  if (preferences.workflow && typeof preferences.workflow === "object") {
+    const validWorkflow: GSDWorkflowConfig = {};
+    const boolKeys: Array<keyof GSDWorkflowConfig> = [
+      "skip_milestone_research",
+      "skip_slice_research",
+      "skip_plan_self_audit",
+      "skip_reassessment",
+      "skip_observability",
+    ];
+    for (const key of boolKeys) {
+      const raw = (preferences.workflow as Record<string, unknown>)[key];
+      if (raw !== undefined) {
+        if (typeof raw === "boolean") {
+          validWorkflow[key] = raw;
+        } else if (raw === "true" || raw === "false") {
+          validWorkflow[key] = raw === "true";
+        } else {
+          errors.push(`workflow.${key} must be a boolean`);
+        }
+      }
+    }
+    if (Object.keys(validWorkflow).length > 0) {
+      validated.workflow = validWorkflow;
     }
   }
 
