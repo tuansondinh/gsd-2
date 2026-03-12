@@ -47,10 +47,10 @@ index 27fe820..68f277f 100644
                      clearTimeout(timeoutHandle);
                  if (signal)
 diff --git a/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/dark.json b/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/dark.json
-index 0ca2af5..cee5c65 100644
+index 0ca2af5..fe7a426 100644
 --- a/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/dark.json
 +++ b/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/dark.json
-@@ -4,6 +4,7 @@
+@@ -4,13 +4,14 @@
  	"vars": {
  		"cyan": "#00d7ff",
  		"blue": "#5f87ff",
@@ -58,6 +58,14 @@ index 0ca2af5..cee5c65 100644
  		"green": "#b5bd68",
  		"red": "#cc6666",
  		"yellow": "#ffff00",
+ 		"gray": "#808080",
+ 		"dimGray": "#666666",
+ 		"darkGray": "#505050",
+-		"accent": "#8abeb7",
++		"accent": "#5fafff",
+ 		"selectedBg": "#3a3a4a",
+ 		"userMsgBg": "#343541",
+ 		"toolPendingBg": "#282832",
 @@ -20,7 +21,7 @@
  	},
  	"colors": {
@@ -76,22 +84,43 @@ index 0ca2af5..cee5c65 100644
  		"toolPendingBg": "toolPendingBg",
  		"toolSuccessBg": "toolSuccessBg",
  		"toolErrorBg": "toolErrorBg",
-@@ -72,8 +73,8 @@
+@@ -44,7 +45,7 @@
+ 		"toolOutput": "gray",
+ 
+ 		"mdHeading": "#f0c674",
+-		"mdLink": "#81a2be",
++		"mdLink": "#5fafff",
+ 		"mdLinkUrl": "dimGray",
+ 		"mdCode": "accent",
+ 		"mdCodeBlock": "green",
+@@ -70,10 +71,10 @@
+ 
+ 		"thinkingOff": "darkGray",
  		"thinkingMinimal": "#6e6e6e",
- 		"thinkingLow": "#5f87af",
- 		"thinkingMedium": "#81a2be",
+-		"thinkingLow": "#5f87af",
+-		"thinkingMedium": "#81a2be",
 -		"thinkingHigh": "#b294bb",
 -		"thinkingXhigh": "#d183e8",
++		"thinkingLow": "#3a7abf",
++		"thinkingMedium": "#2d6db0",
 +		"thinkingHigh": "#1e4d8c",
-+		"thinkingXhigh": "#2d6db0",
++		"thinkingXhigh": "#1a3a6e",
  
  		"bashMode": "green"
  	},
 diff --git a/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/light.json b/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/light.json
-index 58ab93e..5b769e7 100644
+index 58ab93e..21f1f32 100644
 --- a/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/light.json
 +++ b/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/light.json
-@@ -35,7 +35,7 @@
+@@ -4,6 +4,7 @@
+ 	"vars": {
+ 		"teal": "#5a8080",
+ 		"blue": "#547da7",
++		"darkBlue": "#1e4d8c",
+ 		"green": "#588458",
+ 		"red": "#aa5555",
+ 		"yellow": "#9a7326",
+@@ -35,7 +36,7 @@
  		"userMessageText": "",
  		"customMessageBg": "customMsgBg",
  		"customMessageText": "",
@@ -100,12 +129,16 @@ index 58ab93e..5b769e7 100644
  		"toolPendingBg": "toolPendingBg",
  		"toolSuccessBg": "toolSuccessBg",
  		"toolErrorBg": "toolErrorBg",
-@@ -71,8 +71,8 @@
+@@ -69,10 +70,10 @@
+ 
+ 		"thinkingOff": "lightGray",
  		"thinkingMinimal": "#767676",
- 		"thinkingLow": "blue",
- 		"thinkingMedium": "teal",
+-		"thinkingLow": "blue",
+-		"thinkingMedium": "teal",
 -		"thinkingHigh": "#875f87",
 -		"thinkingXhigh": "#8b008b",
++		"thinkingLow": "darkBlue",
++		"thinkingMedium": "darkBlue",
 +		"thinkingHigh": "#1e4d8c",
 +		"thinkingXhigh": "#2d6db0",
  
