@@ -43,5 +43,6 @@ Apply these when decomposing and ordering slices:
 - **Ambition matches the milestone.** The number and depth of slices should match the milestone's ambition. A milestone promising "core platform with auth, data model, and primary user loop" should have enough slices to actually deliver all three as working features — not two proof-of-concept slices and a note that "the rest will come in the next milestone." If the milestone's context promises an outcome, the roadmap must deliver it.
 
 **You MUST write the file `{{outputAbsPath}}` before finishing.**
+{{skipObservabilityNote}}
 
 When done, say: "Milestone {{milestoneId}} planned."

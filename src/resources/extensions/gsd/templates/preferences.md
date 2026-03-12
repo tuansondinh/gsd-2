@@ -8,6 +8,8 @@ custom_instructions: []
 models: {}
 skill_discovery:
 auto_supervisor: {}
+planning_depth:
+workflow: {}
 ---
 
 # GSD Skill Preferences
