@@ -12,6 +12,122 @@ research-milestone → plan-milestone → research-slice → plan-slice → exec
 
 For a milestone with 3 slices, that's **8 research/planning sessions** before execution starts. Each planning session also includes a 10-point self-audit, observability planning, and post-slice reassessment — all useful for large projects, but overhead for smaller or familiar work.
 
+## Pipeline Diagram
+
+### Thorough (default) — full pipeline
+
+```mermaid
+flowchart TD
+    A[CONTEXT.md exists] --> B[Research Milestone]
+    B -->|writes RESEARCH.md| C[Plan Milestone]
+    C -->|writes ROADMAP.md| D{For each slice}
+
+    D --> E[Research Slice]
+    E -->|writes slice RESEARCH.md| F[Plan Slice]
+    F -->|writes PLAN.md + T0x-PLAN.md| G[10-Point Self-Audit]
+    G -->|fixes plan if checks fail| H{For each task}
+
+    H --> I[Execute Task]
+    I -->|writes code + T0x-SUMMARY.md| J{More tasks?}
+    J -->|yes| H
+    J -->|no| K[Complete Slice]
+
+    K -->|writes SUMMARY.md + UAT.md| L{Blocker found?}
+    L -->|yes| M[Replan Slice]
+    M -->|rewrites PLAN.md| H
+    L -->|no| N[Reassess Roadmap]
+
+    N -->|writes ASSESSMENT.md| O{More slices?}
+    O -->|yes| D
+    O -->|no| P[Complete Milestone]
+    P -->|writes milestone SUMMARY.md| Q((Done))
+
+    style B fill:#4a9eff,color:#fff
+    style E fill:#4a9eff,color:#fff
+    style C fill:#7c5cbf,color:#fff
+    style F fill:#7c5cbf,color:#fff
+    style G fill:#e67e22,color:#fff
+    style I fill:#27ae60,color:#fff
+    style K fill:#8e44ad,color:#fff
+    style N fill:#e74c3c,color:#fff
+    style M fill:#c0392b,color:#fff
+```
+
+### Standard — skip research + self-audit
+
+```mermaid
+flowchart TD
+    A[CONTEXT.md exists] --> C[Plan Milestone]
+    C -->|writes ROADMAP.md| D{For each slice}
+
+    D --> F[Plan Slice]
+    F -->|writes PLAN.md + T0x-PLAN.md| H{For each task}
+
+    H --> I[Execute Task]
+    I -->|writes code + T0x-SUMMARY.md| J{More tasks?}
+    J -->|yes| H
+    J -->|no| K[Complete Slice]
+
+    K -->|writes SUMMARY.md + UAT.md| L{Blocker found?}
+    L -->|yes| M[Replan Slice]
+    M -->|rewrites PLAN.md| H
+    L -->|no| N[Reassess Roadmap]
+
+    N -->|writes ASSESSMENT.md| O{More slices?}
+    O -->|yes| D
+    O -->|no| P[Complete Milestone]
+    P -->|writes milestone SUMMARY.md| Q((Done))
+
+    style C fill:#7c5cbf,color:#fff
+    style F fill:#7c5cbf,color:#fff
+    style I fill:#27ae60,color:#fff
+    style K fill:#8e44ad,color:#fff
+    style N fill:#e74c3c,color:#fff
+    style M fill:#c0392b,color:#fff
+```
+
+### Minimal — fastest pipeline
+
+```mermaid
+flowchart TD
+    A[CONTEXT.md exists] --> C[Plan Milestone]
+    C -->|writes ROADMAP.md| D{For each slice}
+
+    D --> F[Plan Slice - lightweight]
+    F -->|writes PLAN.md + T0x-PLAN.md| H{For each task}
+
+    H --> I[Execute Task]
+    I -->|writes code + T0x-SUMMARY.md| J{More tasks?}
+    J -->|yes| H
+    J -->|no| K[Complete Slice]
+
+    K -->|writes SUMMARY.md| L{Blocker found?}
+    L -->|yes| M[Replan Slice]
+    M -->|rewrites PLAN.md| H
+    L -->|no| O{More slices?}
+
+    O -->|yes| D
+    O -->|no| P[Complete Milestone]
+    P -->|writes milestone SUMMARY.md| Q((Done))
+
+    style C fill:#7c5cbf,color:#fff
+    style F fill:#7c5cbf,color:#fff
+    style I fill:#27ae60,color:#fff
+    style K fill:#8e44ad,color:#fff
+    style M fill:#c0392b,color:#fff
+```
+
+### Legend
+
+| Color | Phase type |
+|-------|-----------|
+| Blue | Research (skippable) |
+| Purple | Planning |
+| Orange | Self-audit (skippable) |
+| Green | Execution |
+| Dark purple | Completion |
+| Red | Reassessment / Replan (skippable) |
+
 ## The Full Pipeline Explained
 
 Here's every phase a milestone goes through, in order, and exactly what each one does:
