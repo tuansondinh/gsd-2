@@ -451,15 +451,18 @@ function parseFrontmatterBlock(frontmatter: string): GSDPreferences {
 }
 
 function parseScalar(value: string): string | number | boolean {
-  if (value === "true") return true;
-  if (value === "false") return false;
-  if (/^-?\d+$/.test(value)) {
-    const n = Number(value);
+  // Strip inline comments: "true  # some comment" → "true"
+  // Preserve # inside quoted strings by only stripping when unquoted.
+  const stripped = /^['"]/.test(value) ? value : value.replace(/\s+#.*$/, "");
+  if (stripped === "true") return true;
+  if (stripped === "false") return false;
+  if (/^-?\d+$/.test(stripped)) {
+    const n = Number(stripped);
     // Keep large integers (e.g. Discord channel IDs) as strings to avoid precision loss
     if (Number.isSafeInteger(n)) return n;
-    return value;
+    return stripped;
   }
-  return value.replace(/^['\"]|['\"]$/g, "");
+  return stripped.replace(/^['\"]|['\"]$/g, "");
 }
 
 /**
@@ -521,7 +524,7 @@ export function resolveWorkflowConfig(): Required<GSDWorkflowConfig> {
 
   // Expand planning_depth into defaults
   const defaults: Required<GSDWorkflowConfig> = {
-    skip_milestone_research: depth === "standard" || depth === "minimal",
+    skip_milestone_research: depth === "minimal",
     skip_slice_research: depth === "standard" || depth === "minimal",
     skip_plan_self_audit: depth === "standard" || depth === "minimal",
     skip_reassessment: depth === "minimal",

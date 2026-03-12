@@ -26,9 +26,9 @@ planning_depth: standard
 
 | Value | Research | Self-Audit | Reassessment | Observability |
 |-------|----------|------------|--------------|---------------|
-| `thorough` (default) | separate session | 10-point check | after each slice | full planning |
-| `standard` | skipped | skipped | kept | kept |
-| `minimal` | skipped | skipped | skipped | skipped |
+| `thorough` (default) | all separate sessions | 10-point check | after each slice | full planning |
+| `standard` | milestone kept, slice skipped | skipped | kept | kept |
+| `minimal` | all skipped | skipped | skipped | skipped |
 
 ### `workflow` — Fine-Grained Control
 
@@ -54,7 +54,7 @@ Individual `workflow.*` flags always override `planning_depth`.
 
 Skips the `research-milestone` unit. Instead of a separate session exploring the codebase and writing a RESEARCH.md, the planning session proceeds directly.
 
-**Default:** `false` (thorough), `true` (standard/minimal)
+**Default:** `false` (thorough/standard), `true` (minimal)
 
 ### `skip_slice_research`
 
