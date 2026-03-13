@@ -2770,28 +2770,7 @@ export function resolveExpectedArtifactPath(unitType: string, unitId: string, ba
 function verifyExpectedArtifact(unitType: string, unitId: string, base: string): boolean {
   const absPath = resolveExpectedArtifactPath(unitType, unitId, base);
   if (!absPath) return true;
-  if (!existsSync(absPath)) return false;
-
-  // complete-slice also requires the slice to be marked [x] in the roadmap,
-  // otherwise state.phase stays "summarizing" and the unit re-dispatches forever.
-  if (unitType === "complete-slice") {
-    const parts = unitId.split("/");
-    const mid = parts[0];
-    const sid = parts[1];
-    if (mid && sid) {
-      const roadmapFile = resolveMilestoneFile(base, mid, "ROADMAP");
-      if (roadmapFile && existsSync(roadmapFile)) {
-        try {
-          const content = readFileSync(roadmapFile, "utf-8");
-          const roadmap = parseRoadmap(content);
-          const sliceEntry = roadmap.slices.find(s => s.id === sid);
-          if (!sliceEntry?.done) return false;
-        } catch { /* if we can't parse, fall through and assume ok */ }
-      }
-    }
-  }
-
-  return true;
+  return existsSync(absPath);
 }
 
 /**
