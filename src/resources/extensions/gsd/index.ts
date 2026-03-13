@@ -21,8 +21,8 @@
 import type {
   ExtensionAPI,
   ExtensionContext,
-} from "@mariozechner/pi-coding-agent";
-import { createBashTool, createWriteTool, createReadTool, createEditTool } from "@mariozechner/pi-coding-agent";
+} from "@gsd/pi-coding-agent";
+import { createBashTool, createWriteTool, createReadTool, createEditTool } from "@gsd/pi-coding-agent";
 
 import { registerGSDCommand } from "./commands.js";
 import { registerWorktreeCommand, getWorktreeOriginalCwd, getActiveWorktreeName } from "./worktree-command.js";
@@ -44,11 +44,11 @@ import {
   relSliceFile, relSlicePath, relTaskFile,
   buildSliceFileName, gsdRoot,
 } from "./paths.js";
-import { Key } from "@mariozechner/pi-tui";
+import { Key } from "@gsd/pi-tui";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 import { shortcutDesc } from "../shared/terminal.js";
-import { Text } from "@mariozechner/pi-tui";
+import { Text } from "@gsd/pi-tui";
 
 // ── ASCII logo ────────────────────────────────────────────────────────────
 const GSD_LOGO_LINES = [
@@ -64,9 +64,20 @@ export default function (pi: ExtensionAPI) {
   registerGSDCommand(pi);
   registerWorktreeCommand(pi);
 
-  // ── /exit — kill the process immediately ──────────────────────────────
+  // ── /exit — graceful exit (cleanup auto-mode, save state) ──────────────
   pi.registerCommand("exit", {
-    description: "Exit GSD immediately",
+    description: "Exit GSD gracefully (saves auto-mode state)",
+    handler: async (_ctx) => {
+      // Gracefully stop auto-mode if running (saves activity log, clears locks)
+      const { stopAuto } = await import("./auto.js");
+      await stopAuto(_ctx, pi);
+      process.exit(0);
+    },
+  });
+
+  // ── /kill — immediate exit (bypass cleanup) ─────────────────────────────
+  pi.registerCommand("kill", {
+    description: "Exit GSD immediately (no cleanup)",
     handler: async (_ctx) => {
       process.exit(0);
     },

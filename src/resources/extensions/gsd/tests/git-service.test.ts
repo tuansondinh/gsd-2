@@ -453,6 +453,49 @@ async function main(): Promise<void> {
     rmSync(repo, { recursive: true, force: true });
   }
 
+  // ─── GitServiceImpl: autoCommit with extraExclusions ───────────────────
+
+  console.log("\n=== GitServiceImpl: autoCommit with extraExclusions ===");
+
+  {
+    const repo = initTempRepo();
+    const svc = new GitServiceImpl(repo);
+
+    // Create both a .gsd/ planning file and a regular source file
+    createFile(repo, ".gsd/milestones/M001/M001-ROADMAP.md", "- [x] S01");
+    createFile(repo, "src/feature.ts", "export const y = 2;");
+
+    // Auto-commit with .gsd/ excluded (simulates pre-switch)
+    const msg = svc.autoCommit("pre-switch", "main", [".gsd/"]);
+    assertEq(msg, "chore(main): auto-commit after pre-switch", "pre-switch autoCommit with .gsd/ exclusion commits");
+
+    // Verify .gsd/ file was NOT committed
+    const show = run("git show --stat HEAD", repo);
+    assert(!show.includes("ROADMAP"), ".gsd/ files excluded from pre-switch auto-commit");
+    assert(show.includes("feature.ts"), "non-.gsd/ files included in pre-switch auto-commit");
+
+    rmSync(repo, { recursive: true, force: true });
+  }
+
+  // ─── GitServiceImpl: autoCommit extraExclusions — only .gsd/ dirty ────
+
+  console.log("\n=== GitServiceImpl: autoCommit extraExclusions — only .gsd/ dirty ===");
+
+  {
+    const repo = initTempRepo();
+    const svc = new GitServiceImpl(repo);
+
+    // Create only .gsd/ planning files
+    createFile(repo, ".gsd/milestones/M001/M001-ROADMAP.md", "- [x] S01");
+    createFile(repo, ".gsd/STATE.md", "state content");
+
+    // Auto-commit with .gsd/ excluded — nothing else to commit
+    const result = svc.autoCommit("pre-switch", "main", [".gsd/"]);
+    assertEq(result, null, "autoCommit returns null when only .gsd/ files are dirty and excluded");
+
+    rmSync(repo, { recursive: true, force: true });
+  }
+
   // ─── GitServiceImpl: commit returns null when nothing staged ───────────
 
   console.log("\n=== GitServiceImpl: commit empty ===");

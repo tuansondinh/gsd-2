@@ -6,7 +6,7 @@
  * No execution state, no hooks, no tools — the LLM does the rest.
  */
 
-import type { ExtensionAPI, ExtensionContext, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ExtensionCommandContext } from "@gsd/pi-coding-agent";
 import { showNextAction } from "../shared/next-action-ui.js";
 import { loadFile, parseRoadmap } from "./files.js";
 import { loadPrompt } from "./prompt-loader.js";
@@ -611,8 +611,9 @@ export async function showSmartEntry(
       });
 
       if (choice === "plan") {
+        const secretsOutputPath = relMilestoneFile(basePath, milestoneId, "SECRETS");
         dispatchWorkflow(pi, loadPrompt("guided-plan-milestone", {
-          milestoneId, milestoneTitle,
+          milestoneId, milestoneTitle, secretsOutputPath,
         }));
       } else if (choice === "discuss") {
         dispatchWorkflow(pi, loadPrompt("guided-discuss-milestone", {

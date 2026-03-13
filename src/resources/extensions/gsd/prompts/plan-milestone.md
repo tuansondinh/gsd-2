@@ -59,6 +59,23 @@ If the roadmap has only one slice, also write the slice plan and task plans inli
 
 This eliminates a separate research-slice + plan-slice cycle when the work is straightforward.
 
+## Secret Forecasting
+
+After writing the roadmap, analyze the slices and their boundary maps for external service dependencies (third-party APIs, SaaS platforms, cloud providers, databases requiring credentials, OAuth providers, etc.).
+
+If this milestone requires any external API keys or secrets:
+
+1. Read the template at `~/.gsd/agent/extensions/gsd/templates/secrets-manifest.md` for the expected format
+2. Write `{{secretsOutputPath}}` listing every predicted secret as an H3 section with:
+   - **Service** — the external service name
+   - **Dashboard** — direct URL to the console/dashboard page where the key is created (not a generic homepage)
+   - **Format hint** — what the key looks like (e.g. `sk-...`, `ghp_...`, 40-char hex, UUID)
+   - **Status** — always `pending` during planning
+   - **Destination** — `dotenv`, `vercel`, or `convex` depending on where the key will be consumed
+   - Numbered step-by-step guidance for obtaining the key (navigate to dashboard → create project → generate key → copy)
+
+If this milestone does not require any external API keys or secrets, skip this step entirely — do not create an empty manifest.
+
 **You MUST write the file `{{outputAbsPath}}` before finishing.**
 {{skipObservabilityNote}}
 

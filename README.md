@@ -224,6 +224,7 @@ On first run, GSD launches a branded setup wizard that walks you through LLM pro
 | `Ctrl+Alt+V` | Toggle voice transcription |
 | `Ctrl+Alt+B` | Show background shell processes |
 | `gsd config` | Re-run the setup wizard (LLM provider + tool keys) |
+| `gsd --continue` (`-c`) | Resume the most recent session for the current directory |
 
 ---
 

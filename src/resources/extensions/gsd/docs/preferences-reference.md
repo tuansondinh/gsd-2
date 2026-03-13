@@ -27,7 +27,10 @@ Full documentation for `~/.gsd/preferences.md` (global) and `.gsd/preferences.md
 
 - `custom_instructions`: extra durable instructions related to skill use.
 
-- `models`: per-stage model selection for auto-mode. Keys: `research`, `planning`, `execution`, `completion`. Values: model IDs (e.g. `claude-sonnet-4-6`, `claude-opus-4-6`). Omit a key to use whatever model is currently active.
+- `models`: per-stage model selection for auto-mode. Keys: `research`, `planning`, `execution`, `completion`. Values can be:
+  - Simple string: `"claude-sonnet-4-6"` — single model, no fallbacks
+  - Object with fallbacks: `{ model: "claude-opus-4-6", fallbacks: ["glm-5", "minimax-m2.5"] }` — tries fallbacks in order if primary fails
+  - Omit a key to use whatever model is currently active. Fallbacks are tried when model switching fails (provider unavailable, rate limited, etc.).
 
 - `skill_discovery`: controls how GSD discovers and applies skills during auto-mode. Valid values:
   - `auto` — skills are found and applied automatically without prompting.
@@ -86,6 +89,47 @@ models:
 ```
 
 Opus for planning (where architectural decisions matter most), Sonnet for everything else (faster, cheaper). Omit any key to use the currently selected model.
+
+## Models with Fallbacks Example
+
+```yaml
+---
+version: 1
+models:
+  research:
+    model: openrouter/deepseek/deepseek-r1
+    fallbacks:
+      - openrouter/minimax/minimax-m2.5
+  planning:
+    model: claude-opus-4-6
+    fallbacks:
+      - openrouter/z-ai/glm-5
+      - openrouter/moonshotai/kimi-k2.5
+  execution:
+    model: openrouter/z-ai/glm-5
+    fallbacks:
+      - openrouter/minimax/minimax-m2.5
+  completion: openrouter/minimax/minimax-m2.5
+---
+```
+
+When a model fails to switch (provider unavailable, rate limited, credits exhausted), GSD automatically tries the next model in the `fallbacks` list. This ensures auto-mode continues even when your preferred provider hits limits.
+
+**Cost-optimized example** — use cheap models with expensive ones as fallback for critical phases:
+
+```yaml
+---
+version: 1
+models:
+  research: openrouter/deepseek/deepseek-r1  # $0.28/$0.42 per 1M tokens
+  planning:
+    model: claude-opus-4-6                   # $5/$25 — best for architecture
+    fallbacks:
+      - openrouter/z-ai/glm-5                # $1/$3.20 — strong alternative
+  execution: openrouter/minimax/minimax-m2.5 # $0.30/$1.20 — cheapest quality
+  completion: openrouter/minimax/minimax-m2.5
+---
+```
 
 ---
 

@@ -14,13 +14,14 @@ import type {
   ExtensionAPI,
   ExtensionContext,
   ExtensionCommandContext,
-} from "@mariozechner/pi-coding-agent";
+} from "@gsd/pi-coding-agent";
 
 import { deriveState } from "./state.js";
 import type { GSDState } from "./types.js";
-import { loadFile, parseContinue, parsePlan, parseRoadmap, parseSummary, extractUatType, inlinePriorMilestoneSummary } from "./files.js";
+import { loadFile, parseContinue, parsePlan, parseRoadmap, parseSummary, extractUatType, inlinePriorMilestoneSummary, getManifestStatus } from "./files.js";
 export { inlinePriorMilestoneSummary };
 import type { UatType } from "./files.js";
+import { collectSecretsFromManifest } from "../get-secrets-from-user.js";
 import { loadPrompt } from "./prompt-loader.js";
 import {
   gsdRoot, resolveMilestoneFile, resolveSliceFile, resolveSlicePath,
@@ -39,7 +40,7 @@ import {
   readUnitRuntimeRecord,
   writeUnitRuntimeRecord,
 } from "./unit-runtime.js";
-import { resolveAutoSupervisorConfig, resolveModelForUnit, resolveSkillDiscoveryMode, loadEffectiveGSDPreferences, resolveWorkflowConfig } from "./preferences.js";
+import { resolveAutoSupervisorConfig, resolveModelForUnit, resolveModelWithFallbacksForUnit, resolveSkillDiscoveryMode, loadEffectiveGSDPreferences, resolveWorkflowConfig } from "./preferences.js";
 import type { GSDPreferences } from "./preferences.js";
 import {
   validatePlanBoundary,
@@ -68,7 +69,7 @@ import {
 } from "./worktree.ts";
 import { GitServiceImpl } from "./git-service.ts";
 import type { GitPreferences } from "./git-service.ts";
-import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import { truncateToWidth, visibleWidth } from "@gsd/pi-tui";
 import { makeUI, GLYPH, INDENT } from "../shared/ui.js";
 import { showNextAction } from "../shared/next-action-ui.js";
 
@@ -474,6 +475,24 @@ export async function startAuto(
     : "Will loop until milestone complete.";
   ctx.ui.notify(`${modeLabel} started. ${scopeMsg}`, "info");
 
+  // Secrets collection gate — collect pending secrets before first dispatch
+  const mid = state.activeMilestone.id;
+  try {
+    const manifestStatus = await getManifestStatus(base, mid);
+    if (manifestStatus && manifestStatus.pending.length > 0) {
+      const result = await collectSecretsFromManifest(base, mid, ctx);
+      ctx.ui.notify(
+        `Secrets collected: ${result.applied.length} applied, ${result.skipped.length} skipped, ${result.existingSkipped.length} already set.`,
+        "info",
+      );
+    }
+  } catch (err) {
+    ctx.ui.notify(
+      `Secrets collection error: ${err instanceof Error ? err.message : String(err)}`,
+      "warning",
+    );
+  }
+
   // Self-heal: clear stale runtime records where artifacts already exist
   await selfHealRuntimeRecords(base, ctx);
 
@@ -507,14 +526,15 @@ export async function handleAgentEnd(
     }
 
     // Post-hook: fix mechanical bookkeeping the LLM may have skipped.
-    // 1. Doctor handles: checkbox marking, stub summaries/UATs.
+    // 1. Doctor handles: checkbox marking (task-level bookkeeping).
     // 2. STATE.md is always rebuilt from disk state (purely derived, no LLM needed).
-    // This is more reliable than prompt instructions for mechanical tasks.
-    // Scope to slice level (M001/S01) so doctor checks all tasks within the slice.
+    // fixLevel:"task" ensures doctor only fixes task-level issues (e.g. marking
+    // checkboxes). Slice/milestone completion transitions (summary stubs,
+    // roadmap [x] marking) are left for the complete-slice dispatch unit.
     try {
       const scopeParts = currentUnit.id.split("/").slice(0, 2);
       const doctorScope = scopeParts.join("/");
-      const report = await runGSDDoctor(basePath, { fix: true, scope: doctorScope });
+      const report = await runGSDDoctor(basePath, { fix: true, scope: doctorScope, fixLevel: "task" });
       if (report.fixesApplied.length > 0) {
         ctx.ui.notify(`Post-hook: applied ${report.fixesApplied.length} fix(es).`, "info");
       }
@@ -1023,14 +1043,35 @@ async function dispatchNextUnit(
             midTitle = state.activeMilestone?.title;
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
+
+            // Safety net: if mergeSliceToMain failed to clean up (or the error
+            // came from switchToMain), ensure the working tree isn't left in a
+            // conflicted/dirty merge state. Without this, state derivation reads
+            // conflict-marker-filled files, produces a corrupt phase, and
+            // dispatch loops forever (see: merge-bug-fix).
+            try {
+              const { runGit } = await import("./git-service.ts");
+              const status = runGit(basePath, ["status", "--porcelain"], { allowFailure: true });
+              if (status && (status.includes("UU ") || status.includes("AA ") || status.includes("UD "))) {
+                runGit(basePath, ["reset", "--hard", "HEAD"], { allowFailure: true });
+                ctx.ui.notify(
+                  `Cleaned up conflicted merge state after failed squash-merge.`,
+                  "warning",
+                );
+              }
+            } catch { /* best-effort cleanup */ }
+
             ctx.ui.notify(
-              `Slice merge failed: ${message}`,
+              `Slice merge failed — stopping auto-mode. Fix conflicts manually and restart.\n${message}`,
               "error",
             );
-            // Re-derive state so dispatch can figure out what to do
-            state = await deriveState(basePath);
-            mid = state.activeMilestone?.id;
-            midTitle = state.activeMilestone?.title;
+            if (currentUnit) {
+              const modelId = ctx.model?.id ?? "unknown";
+              snapshotUnitMetrics(ctx, currentUnit.type, currentUnit.id, currentUnit.startedAt, modelId);
+              saveActivityLog(ctx, basePath, currentUnit.type, currentUnit.id);
+            }
+            await stopAuto(ctx, pi);
+            return;
           }
         }
       }
@@ -1327,28 +1368,69 @@ async function dispatchNextUnit(
 
   // On crash recovery, prepend the full recovery briefing
   // On retry (stuck detection), prepend deep diagnostic from last attempt
+  // Cap injected content to prevent unbounded prompt growth → OOM
+  const MAX_RECOVERY_CHARS = 50_000;
   let finalPrompt = prompt;
   if (pendingCrashRecovery) {
-    finalPrompt = `${pendingCrashRecovery}\n\n---\n\n${finalPrompt}`;
+    const capped = pendingCrashRecovery.length > MAX_RECOVERY_CHARS
+      ? pendingCrashRecovery.slice(0, MAX_RECOVERY_CHARS) + "\n\n[...recovery briefing truncated to prevent memory exhaustion]"
+      : pendingCrashRecovery;
+    finalPrompt = `${capped}\n\n---\n\n${finalPrompt}`;
     pendingCrashRecovery = null;
   } else if ((unitDispatchCount.get(`${unitType}/${unitId}`) ?? 0) > 1) {
     const diagnostic = getDeepDiagnostic(basePath);
     if (diagnostic) {
-      finalPrompt = `**RETRY — your previous attempt did not produce the required artifact.**\n\nDiagnostic from previous attempt:\n${diagnostic}\n\nFix whatever went wrong and make sure you write the required file this time.\n\n---\n\n${finalPrompt}`;
+      const cappedDiag = diagnostic.length > MAX_RECOVERY_CHARS
+        ? diagnostic.slice(0, MAX_RECOVERY_CHARS) + "\n\n[...diagnostic truncated to prevent memory exhaustion]"
+        : diagnostic;
+      finalPrompt = `**RETRY — your previous attempt did not produce the required artifact.**\n\nDiagnostic from previous attempt:\n${cappedDiag}\n\nFix whatever went wrong and make sure you write the required file this time.\n\n---\n\n${finalPrompt}`;
     }
   }
 
   // Switch model if preferences specify one for this unit type
-  const preferredModelId = resolveModelForUnit(unitType);
-  if (preferredModelId) {
-    // Try to find the model across all providers
+  // Try primary model, then fallbacks in order if setting fails
+  const modelConfig = resolveModelWithFallbacksForUnit(unitType);
+  if (modelConfig) {
     const allModels = ctx.modelRegistry.getAll();
-    const model = allModels.find(m => m.id === preferredModelId);
-    if (model) {
+    const modelsToTry = [modelConfig.primary, ...modelConfig.fallbacks];
+    let modelSet = false;
+
+    for (const modelId of modelsToTry) {
+      const model = allModels.find(m => m.id === modelId);
+      if (!model) {
+        ctx.ui.notify(`Model ${modelId} not found in registry, trying fallback.`, "warning");
+        continue;
+      }
+
       const ok = await pi.setModel(model, { persist: false });
       if (ok) {
-        ctx.ui.notify(`Model: ${preferredModelId}`, "info");
+        const fallbackNote = modelId === modelConfig.primary
+          ? ""
+          : ` (fallback from ${modelConfig.primary})`;
+        ctx.ui.notify(`Model: ${modelId}${fallbackNote}`, "info");
+        modelSet = true;
+        break;
+      } else {
+        const nextModel = modelsToTry[modelsToTry.indexOf(modelId) + 1];
+        if (nextModel) {
+          ctx.ui.notify(
+            `Failed to set model ${modelId}, trying fallback ${nextModel}...`,
+            "warning",
+          );
+        } else {
+          ctx.ui.notify(
+            `Failed to set model ${modelId} and all fallbacks exhausted. Using default model.`,
+            "warning",
+          );
+        }
       }
+    }
+
+    if (!modelSet) {
+      ctx.ui.notify(
+        `Could not set any preferred model for ${unitType}. Continuing with default.`,
+        "warning",
+      );
     }
   }
 
@@ -1628,6 +1710,8 @@ async function buildPlanMilestonePrompt(mid: string, midTitle: string, base: str
   const outputRelPath = relMilestoneFile(base, mid, "ROADMAP");
   const outputAbsPath = resolveMilestoneFile(base, mid, "ROADMAP") ?? join(base, outputRelPath);
 
+  const secretsOutputPath = relMilestoneFile(base, mid, "SECRETS");
+
   const wf = resolveWorkflowConfig();
   const skipObservabilityNote = wf.skip_observability
     ? "\n\n> **Note:** Observability planning is disabled in preferences. Skip observability/diagnostics sections in slice plans."
@@ -1640,6 +1724,7 @@ async function buildPlanMilestonePrompt(mid: string, midTitle: string, base: str
     researchPath: researchRel,
     outputPath: outputRelPath,
     outputAbsPath,
+    secretsOutputPath,
     inlinedContext,
     skipObservabilityNote,
   });
