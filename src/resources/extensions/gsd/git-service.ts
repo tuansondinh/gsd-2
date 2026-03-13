@@ -487,21 +487,26 @@ export class GitServiceImpl {
       commitType, milestoneId, sliceId, sliceTitle, mainBranch, branch,
     );
 
-    // Squash merge — abort cleanly on conflict so the working tree is never
-    // left in a half-merged state (see: merge-bug-fix).
+    // Squash merge — on conflict, retry with -X theirs (prefer slice changes)
+    // so auto-mode is never interrupted by merge conflicts.
     try {
       this.git(["merge", "--squash", branch]);
-    } catch (mergeError) {
-      // git merge --squash exits non-zero on conflict. The working tree now
-      // has conflict markers and a dirty index. Reset to restore a clean state.
+    } catch {
+      // First attempt had conflicts — reset and retry preferring slice branch.
       this.git(["reset", "--hard", "HEAD"], { allowFailure: true });
-      const msg = mergeError instanceof Error ? mergeError.message : String(mergeError);
-      throw new Error(
-        `Squash-merge of "${branch}" into "${mainBranch}" failed with conflicts. ` +
-        `Working tree has been reset to a clean state. ` +
-        `Resolve manually: git checkout ${mainBranch} && git merge --squash ${branch}\n` +
-        `Original error: ${msg}`,
-      );
+      try {
+        this.git(["merge", "--squash", "-X", "theirs", branch]);
+      } catch (retryError) {
+        // Both strategies failed — reset and surface for manual resolution.
+        this.git(["reset", "--hard", "HEAD"], { allowFailure: true });
+        const msg = retryError instanceof Error ? retryError.message : String(retryError);
+        throw new Error(
+          `Squash-merge of "${branch}" into "${mainBranch}" failed even with -X theirs. ` +
+          `Working tree has been reset to a clean state. ` +
+          `Resolve manually: git checkout ${mainBranch} && git merge --squash ${branch}\n` +
+          `Original error: ${msg}`,
+        );
+      }
     }
 
     // Commit with rich message via stdin pipe
