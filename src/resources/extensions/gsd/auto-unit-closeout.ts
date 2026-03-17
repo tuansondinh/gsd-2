@@ -13,6 +13,7 @@ export interface CloseoutOptions {
   baselineCharCount?: number;
   tier?: string;
   modelDowngraded?: boolean;
+  continueHereFired?: boolean;
 }
 
 /**
