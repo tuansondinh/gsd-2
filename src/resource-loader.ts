@@ -1,6 +1,6 @@
 import { DefaultResourceLoader } from '@gsd/pi-coding-agent'
 import { homedir } from 'node:os'
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { compareSemver } from './update-check.js'
@@ -151,28 +151,41 @@ export function getNewerManagedResourceVersion(agentDir: string, currentVersion:
 export function initResources(agentDir: string): void {
   mkdirSync(agentDir, { recursive: true })
 
-  // Skip resource sync when versions match — saves ~128ms of cpSync per launch
-  const currentVersion = getBundledGsdVersion()
-  const managedVersion = readManagedResourceVersion(agentDir)
-  if (managedVersion && managedVersion === currentVersion) {
-    return
-  }
-
-  // Sync extensions — overwrite so updates land on next launch
+  // Sync extensions — clean bundled subdirs first to remove stale leftover files,
+  // then overwrite so updates land on next launch. Only bundled subdirs are removed;
+  // user-created extension directories are preserved.
   const destExtensions = join(agentDir, 'extensions')
+  for (const entry of readdirSync(bundledExtensionsDir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      const target = join(destExtensions, entry.name)
+      if (existsSync(target)) rmSync(target, { recursive: true, force: true })
+    }
+  }
   cpSync(bundledExtensionsDir, destExtensions, { recursive: true, force: true })
 
   // Sync agents
   const destAgents = join(agentDir, 'agents')
   const srcAgents = join(resourcesDir, 'agents')
   if (existsSync(srcAgents)) {
+    for (const entry of readdirSync(srcAgents, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        const target = join(destAgents, entry.name)
+        if (existsSync(target)) rmSync(target, { recursive: true, force: true })
+      }
+    }
     cpSync(srcAgents, destAgents, { recursive: true, force: true })
   }
 
-  // Sync skills — overwrite so updates land on next launch
+  // Sync skills
   const destSkills = join(agentDir, 'skills')
   const srcSkills = join(resourcesDir, 'skills')
   if (existsSync(srcSkills)) {
+    for (const entry of readdirSync(srcSkills, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        const target = join(destSkills, entry.name)
+        if (existsSync(target)) rmSync(target, { recursive: true, force: true })
+      }
+    }
     cpSync(srcSkills, destSkills, { recursive: true, force: true })
   }
 
