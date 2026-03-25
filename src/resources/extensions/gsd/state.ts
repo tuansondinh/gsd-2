@@ -49,6 +49,7 @@ import {
   getReplanHistory,
   getSlice,
   insertMilestone,
+  updateTaskStatus,
   type MilestoneRow,
   type SliceRow,
   type TaskRow,
@@ -629,7 +630,38 @@ export async function deriveStateFromDb(basePath: string): Promise<GSDState> {
   }
 
   // ── Get tasks from DB ────────────────────────────────────────────────
-  const tasks = getSliceTasks(activeMilestone.id, activeSlice.id);
+  let tasks = getSliceTasks(activeMilestone.id, activeSlice.id);
+
+  // ── Reconcile stale task status (#2514) ──────────────────────────────
+  // When a session disconnects after the agent writes SUMMARY + VERIFY
+  // artifacts but before postUnitPostVerification updates the DB, tasks
+  // remain "pending" in the DB despite being complete on disk. Without
+  // reconciliation, deriveState keeps returning the stale task as active,
+  // causing the dispatcher to re-dispatch the same completed task forever.
+  let reconciled = false;
+  for (const t of tasks) {
+    if (isStatusDone(t.status)) continue;
+    const summaryPath = resolveTaskFile(basePath, activeMilestone.id, activeSlice.id, t.id, "SUMMARY");
+    if (summaryPath && existsSync(summaryPath)) {
+      try {
+        updateTaskStatus(activeMilestone.id, activeSlice.id, t.id, "complete");
+        process.stderr.write(
+          `gsd-reconcile: task ${activeMilestone.id}/${activeSlice.id}/${t.id} had SUMMARY on disk but DB status was "${t.status}" — updated to "complete" (#2514)\n`,
+        );
+        reconciled = true;
+      } catch (e) {
+        // DB write failed — continue with stale status rather than crash
+        process.stderr.write(
+          `gsd-reconcile: failed to update task ${t.id}: ${(e as Error).message}\n`,
+        );
+      }
+    }
+  }
+  // Re-fetch tasks if any were reconciled so downstream logic sees fresh status
+  if (reconciled) {
+    tasks = getSliceTasks(activeMilestone.id, activeSlice.id);
+  }
+
   const taskProgress = {
     done: tasks.filter(t => isStatusDone(t.status)).length,
     total: tasks.length,
