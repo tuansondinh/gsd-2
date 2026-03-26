@@ -82,6 +82,8 @@ const ROOT_STATE_FILES = [
   "QUEUE.md",
   "completed-units.json",
   "metrics.json",
+  "preferences.md",  // #2684: without this, post_unit_hooks and all preference-driven
+                      // config silently stop working inside worktrees.
 ] as const;
 
 /**
@@ -946,6 +948,8 @@ function copyPlanningArtifacts(srcBase: string, wtPath: string): void {
     "STATE.md",
     "KNOWLEDGE.md",
     "OVERRIDES.md",
+    "preferences.md",  // #2684: must be seeded so post_unit_hooks and
+                        // preference-driven config work inside worktrees.
   ]) {
     safeCopy(join(srcGsd, file), join(dstGsd, file), { force: true });
   }
