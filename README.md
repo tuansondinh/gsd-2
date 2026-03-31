@@ -736,7 +736,7 @@ gsd (CLI binary)
               ├─ extensions/...     18 supporting extensions
               ├─ agents/            scout, researcher, worker
               ├─ AGENTS.md          Agent routing instructions
-              └─ GSD-WORKFLOW.md    Manual bootstrap protocol
+              └─ skills/            bundled skill content
 ```
 
 **Key design decisions:**

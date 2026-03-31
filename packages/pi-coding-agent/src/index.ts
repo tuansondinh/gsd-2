@@ -387,6 +387,7 @@ export {
 export {
 	getLanguageFromPath,
 	getMarkdownTheme,
+	getResolvedThemeColors,
 	getSelectListTheme,
 	getSettingsListTheme,
 	highlightCode,

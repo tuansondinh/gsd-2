@@ -1,6 +1,7 @@
 import type { ThinkingLevel } from "@gsd/pi-agent-core";
 import type { Transport } from "@gsd/pi-ai";
 import {
+	type Component,
 	Container,
 	getCapabilities,
 	type SelectItem,
@@ -24,6 +25,7 @@ export const THINKING_DESCRIPTIONS: Record<ThinkingLevel, string> = {
 
 export interface SettingsConfig {
 	autoCompact: boolean;
+	classifierModel: string;
 	showImages: boolean;
 	autoResizeImages: boolean;
 	blockImages: boolean;
@@ -46,10 +48,12 @@ export interface SettingsConfig {
 	quietStartup: boolean;
 	clearOnShrink: boolean;
 	timestampFormat: "date-time-iso" | "date-time-us";
+	classifierModelSubmenu?: (currentValue: string, done: (selectedValue?: string) => void) => Component;
 }
 
 export interface SettingsCallbacks {
 	onAutoCompactChange: (enabled: boolean) => void;
+	onClassifierModelChange: (modelRef: string) => void;
 	onShowImagesChange: (enabled: boolean) => void;
 	onAutoResizeImagesChange: (enabled: boolean) => void;
 	onBlockImagesChange: (blocked: boolean) => void;
@@ -154,6 +158,13 @@ export class SettingsSelectorComponent extends Container {
 				description: "Automatically compact context when it gets too large",
 				currentValue: config.autoCompact ? "true" : "false",
 				values: ["true", "false"],
+			},
+			{
+				id: "classifier-model",
+				label: "Classifier model",
+				description: "Model used for Auto permission mode approvals",
+				currentValue: config.classifierModel,
+				submenu: config.classifierModelSubmenu,
 			},
 			{
 				id: "steering-mode",
@@ -378,6 +389,9 @@ export class SettingsSelectorComponent extends Container {
 				switch (id) {
 					case "autocompact":
 						callbacks.onAutoCompactChange(newValue === "true");
+						break;
+					case "classifier-model":
+						callbacks.onClassifierModelChange(newValue);
 						break;
 					case "show-images":
 						callbacks.onShowImagesChange(newValue === "true");

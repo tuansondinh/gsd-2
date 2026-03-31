@@ -2877,6 +2877,7 @@ export class InteractiveMode {
 			const selector = new SettingsSelectorComponent(
 				{
 					autoCompact: this.session.autoCompactionEnabled,
+					classifierModel: this.settingsManager.getClassifierModel() ?? "default",
 					showImages: this.settingsManager.getShowImages(),
 					autoResizeImages: this.settingsManager.getImageAutoResize(),
 					blockImages: this.settingsManager.getBlockImages(),
@@ -2899,11 +2900,25 @@ export class InteractiveMode {
 					quietStartup: this.settingsManager.getQuietStartup(),
 					clearOnShrink: this.settingsManager.getClearOnShrink(),
 					timestampFormat: this.settingsManager.getTimestampFormat(),
+					classifierModelSubmenu: (_currentValue, submenuDone) =>
+						new ModelSelectorComponent(
+							this.ui,
+							undefined,
+							this.settingsManager,
+							this.session.modelRegistry,
+							[],
+							(model) => submenuDone(`${model.provider}/${model.id}`),
+							() => submenuDone(),
+						),
 				},
 				{
 					onAutoCompactChange: (enabled) => {
 						this.session.setAutoCompactionEnabled(enabled);
 						this.footer.setAutoCompactEnabled(enabled);
+					},
+					onClassifierModelChange: (modelRef) => {
+						this.settingsManager.setClassifierModel(modelRef);
+						this.showStatus(`Classifier model: ${modelRef}`);
 					},
 					onShowImagesChange: (enabled) => {
 						this.settingsManager.setShowImages(enabled);

@@ -649,11 +649,25 @@ async function generateModels() {
 	// Combine models (models.dev has priority)
 	const allModels = [...modelsDevModels, ...openRouterModels, ...aiGatewayModels].filter(
 		(model) =>
-			!((model.provider === "opencode" || model.provider === "opencode-go") && model.id === "gpt-5.3-codex-spark"),
+			!((model.provider === "opencode" || model.provider === "opencode-go") && model.id === "gpt-5.3-codex-spark") &&
+			// Exclude legacy/older Claude models — keep only current versions
+			// Keep: claude-3-7-sonnet (latest), claude-3-5-sonnet-20241022 (v2), claude-3-5-haiku-20241022, claude-4-5, claude-4-6
+			// Remove: claude-3-opus/*, claude-3-sonnet/*, claude-3-haiku/*, claude-3-5-sonnet-20240620 (v1), claude-4-0*, claude-4-1*
+			// Also removes OpenRouter-format IDs (e.g., anthropic/claude-3-haiku)
+			!/claude-3-opus-|claude-3-sonnet-|claude-3-haiku-/.test(model.id) &&
+			!/anthropic\/claude-3-opus($|[-/])|anthropic\/claude-3-sonnet($|[-/])|anthropic\/claude-3-haiku($|[-/])/.test(model.id) &&
+			!/claude-3-5-sonnet-20240620/.test(model.id) &&
+			!/claude-4-0|claude-4-1/.test(model.id) &&
+			// Exclude legacy OpenAI GPT models — keep only current versions
+			// Keep: gpt-4.1, gpt-4o, gpt-4o-mini, o1, o3-mini (latest)
+			// Remove: gpt-4 (non-4.1), gpt-4-turbo, gpt-3.5-turbo, gpt-4.5-preview, gpt-4o-preview, o1-preview, o1-mini (replaced by o3-mini)
+			!/^gpt-4($|[^.])/.test(model.id) &&
+			!/gpt-4-turbo|gpt-3\.5-turbo|gpt-4\.5-preview|gpt-4o-preview|o1-preview/.test(model.id) &&
+			// Exclude legacy Google Gemini models — keep only current versions
+			// Keep: gemini-2.0-flash, gemini-2.5-pro, gemini-2.5-flash (latest)
+			// Remove: gemini-1.0-pro (Deprecated), gemini-pro, gemini-pro-vision, gemini-1.5-*
+			!/^(gemini-1\.0-pro|gemini-pro($|[^-])|gemini-pro-vision|gemini-1\.5-)/.test(model.id),
 	);
-
-	// Fix incorrect cache pricing for Claude Opus 4.5 from models.dev
-	// models.dev has 3x the correct pricing (1.5/18.75 instead of 0.5/6.25)
 	const opus45 = allModels.find(m => m.provider === "anthropic" && m.id === "claude-opus-4-5");
 	if (opus45) {
 		opus45.cost.cacheRead = 0.5;
@@ -1371,42 +1385,6 @@ async function generateModels() {
 			cost: { input: 0.1, output: 0.4, cacheRead: 0.01, cacheWrite: 0 },
 			contextWindow: 1048576,
 			maxTokens: 65536,
-		},
-		{
-			id: "gemini-1.5-pro",
-			name: "Gemini 1.5 Pro (Vertex)",
-			api: "google-vertex",
-			provider: "google-vertex",
-			baseUrl: VERTEX_BASE_URL,
-			reasoning: false,
-			input: ["text", "image"],
-			cost: { input: 1.25, output: 5, cacheRead: 0.3125, cacheWrite: 0 },
-			contextWindow: 1000000,
-			maxTokens: 8192,
-		},
-		{
-			id: "gemini-1.5-flash",
-			name: "Gemini 1.5 Flash (Vertex)",
-			api: "google-vertex",
-			provider: "google-vertex",
-			baseUrl: VERTEX_BASE_URL,
-			reasoning: false,
-			input: ["text", "image"],
-			cost: { input: 0.075, output: 0.3, cacheRead: 0.01875, cacheWrite: 0 },
-			contextWindow: 1000000,
-			maxTokens: 8192,
-		},
-		{
-			id: "gemini-1.5-flash-8b",
-			name: "Gemini 1.5 Flash-8B (Vertex)",
-			api: "google-vertex",
-			provider: "google-vertex",
-			baseUrl: VERTEX_BASE_URL,
-			reasoning: false,
-			input: ["text", "image"],
-			cost: { input: 0.0375, output: 0.15, cacheRead: 0.01, cacheWrite: 0 },
-			contextWindow: 1000000,
-			maxTokens: 8192,
 		},
 	];
 	allModels.push(...vertexModels);

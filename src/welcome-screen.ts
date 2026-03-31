@@ -9,6 +9,7 @@
 import os from 'node:os'
 import chalk from 'chalk'
 import { GSD_LOGO } from './logo.js'
+import { accentHex } from './cli-theme.js'
 
 export interface WelcomeScreenOptions {
   version: string
@@ -92,11 +93,11 @@ export function printWelcomeScreen(opts: WelcomeScreenOptions): void {
   const out: string[] = ['']
 
   // Top bar — full-width accent separator, matches auto-mode widget ui.bar()
-  out.push(chalk.cyan(H.repeat(termWidth)))
+  out.push(chalk.hex(accentHex())(H.repeat(termWidth)))
 
   for (let i = 0; i < 8; i++) {
     const row      = leftRows[i] ?? ''
-    const lContent = rpad(row ? chalk.cyan(row) : '', LEFT_INNER)
+    const lContent = rpad(row ? chalk.hex(accentHex())(row) : '', LEFT_INNER)
     const rRow     = rightRows[i]
 
     if (rRow === null) {
@@ -109,7 +110,7 @@ export function printWelcomeScreen(opts: WelcomeScreenOptions): void {
   }
 
   // Bottom bar — full-width accent separator
-  out.push(chalk.cyan(H.repeat(termWidth)))
+  out.push(chalk.hex(accentHex())(H.repeat(termWidth)))
   out.push('')
 
   process.stderr.write(out.join('\n') + '\n')
