@@ -143,7 +143,7 @@ const SUBCOMMAND_HELP: Record<string, string> = {
   ].join('\n'),
 }
 
-// Alias: `gsd wt --help` → same as `gsd worktree --help`
+// Alias: `lsd wt --help` → same as `lsd worktree --help`
 SUBCOMMAND_HELP['wt'] = SUBCOMMAND_HELP['worktree']
 
 export function printHelp(version: string): void {
