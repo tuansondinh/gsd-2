@@ -66,7 +66,7 @@ interface CliFlags {
 }
 
 function exitIfManagedResourcesAreNewer(currentAgentDir: string): void {
-  const currentVersion = process.env.GSD_VERSION || '0.0.0'
+  const currentVersion = process.env.LSD_VERSION || '0.0.0'
   const managedVersion = getNewerManagedResourceVersion(currentAgentDir, currentVersion)
   if (!managedVersion) {
     return
@@ -74,8 +74,8 @@ function exitIfManagedResourcesAreNewer(currentAgentDir: string): void {
 
   process.stderr.write(
     `[lsd] ${chalk.yellow('Version mismatch detected')}\n` +
-    `[lsd] Synced resources are from ${chalk.bold(`v${managedVersion}`)}, but this `lsd` binary is ${chalk.dim(`v${currentVersion}`)}.\n` +
-    `[lsd] Run ${chalk.bold('npm install -g gsd-pi@latest')} or ${chalk.bold('gsd update')}, then try again.\n`,
+    `[lsd] Synced resources are from ${chalk.bold(`v${managedVersion}`)}, but this lsd binary is ${chalk.dim(`v${currentVersion}`)}.\n` +
+    `[lsd] Run ${chalk.bold('npm install -g lsd-pi@latest')} or ${chalk.bold('lsd update')}, then try again.\n`
   )
   process.exit(1)
 }

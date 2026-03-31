@@ -140,8 +140,8 @@ test("npm pack produces tarball with required files", async (t) => {
   // pkg/package.json must have piConfig
   const pkgJson = readFileSync(join(projectRoot, "pkg", "package.json"), "utf-8");
   const pkg = JSON.parse(pkgJson);
-  assert.equal(pkg.piConfig?.name, "gsd", "pkg/package.json piConfig.name is gsd");
-  assert.equal(pkg.piConfig?.configDir, ".gsd", "pkg/package.json piConfig.configDir is .gsd");
+  assert.equal(pkg.piConfig?.name, "lsd", "pkg/package.json piConfig.name is lsd");
+  assert.equal(pkg.piConfig?.configDir, ".lsd", "pkg/package.json piConfig.configDir is .lsd");
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -166,7 +166,7 @@ test("tarball installs and gsd binary resolves", async (t) => {
   assert.ok(existsSync(installedBin), `gsd binary exists in node_modules/.bin/ (${binName})`);
 
   // Verify loader.js is executable (has shebang)
-  const installedLoader = join(sandbox.installPrefix, "node_modules", "gsd-pi", "dist", "loader.js");
+  const installedLoader = join(sandbox.installPrefix, "node_modules", "lsd-pi", "dist", "loader.js");
   const loaderContent = readFileSync(installedLoader, "utf-8");
   if (process.platform !== "win32") {
     assert.ok(loaderContent.startsWith("#!/usr/bin/env node"), "loader.js has node shebang");
@@ -176,7 +176,7 @@ test("tarball installs and gsd binary resolves", async (t) => {
   const installedGsdExt = join(
     sandbox.installPrefix,
     "node_modules",
-    "gsd-pi",
+    "lsd-pi",
     "src",
     "resources",
     "extensions",
@@ -283,6 +283,6 @@ test("gsd exits early with a clear message when synced resources are newer than 
 
   assert.equal(result.code, 1, "startup exits with code 1 on version skew");
   assert.match(result.stderr, /Version mismatch detected/, "prints a friendly skew header");
-  assert.match(result.stderr, /npm install -g gsd-pi@latest|gsd update/, "prints upgrade guidance");
+  assert.match(result.stderr, /npm install -g lsd-pi@latest|lsd update/, "prints upgrade guidance");
   assert.doesNotMatch(result.stderr, /\[gsd\] Extension load error/, "fails before extension loading");
 });

@@ -387,7 +387,7 @@ function pruneRemovedBundledExtensions(
  *
  * Skips the copy when the managed-resources.json version matches the current
  * GSD version, avoiding ~128ms of synchronous cpSync on every startup.
- * After `npm update -g @glittercowboy/gsd`, versions will differ and the
+ * After `npm update -g lsd-pi`, versions will differ and the
  * copy runs once to land the new resources.
  *
  * Inspectable: `ls ~/.gsd/agent/extensions/`

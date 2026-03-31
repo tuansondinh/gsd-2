@@ -200,11 +200,11 @@ if (missingPackages.length > 0) {
   process.stderr.write(
     `\nError: GSD installation is broken — missing packages: ${missing}\n\n` +
     `This is usually caused by one of:\n` +
-    `  • An outdated version installed from npm (run: npm install -g gsd-pi@latest)\n` +
+    `  • An outdated version installed from npm (run: npm install -g lsd-pi@latest)\n` +
     `  • The packages/ directory was excluded from the installed tarball\n` +
     `  • A filesystem error prevented linking or copying the workspace packages\n\n` +
     `Fix it by reinstalling:\n\n` +
-    `  npm install -g gsd-pi@latest\n\n` +
+    `  npm install -g lsd-pi@latest\n\n` +
     `If the issue persists, please open an issue at:\n` +
     `  https://github.com/gsd-build/gsd-2/issues\n`
   )

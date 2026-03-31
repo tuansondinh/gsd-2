@@ -1,20 +1,19 @@
 {
   "name": "lsd-pi",
-  "version": "2.58.0",
+  "version": "1.0.0",
   "description": "LSD — Get Shit Done coding agent",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/gsd-build/gsd-2.git"
+    "url": "https://github.com/tuansondinh/lsd.git"
   },
-  "homepage": "https://github.com/gsd-build/gsd-2#readme",
+  "homepage": "https://github.com/tuansondinh/lsd#readme",
   "bugs": {
-    "url": "https://github.com/gsd-build/gsd-2/issues"
+    "url": "https://github.com/tuansondinh/lsd/issues"
   },
   "type": "module",
   "workspaces": [
-    "packages/*",
-    "studio"
+    "packages/*"
   ],
   "bin": {
     "lsd": "dist/loader.js",
@@ -22,7 +21,6 @@
   },
   "files": [
     "dist",
-    "dist/web",
     "packages",
     "pkg",
     "src/resources",
@@ -47,12 +45,9 @@
     "build:pi-coding-agent": "npm run build -w @gsd/pi-coding-agent",
     "build:native-pkg": "npm run build -w @gsd/native",
     "build:pi": "npm run build:native-pkg && npm run build:pi-tui && npm run build:pi-ai && npm run build:pi-agent-core && npm run build:pi-coding-agent",
-    "build": "npm run build:pi && tsc && npm run copy-resources && npm run copy-themes && npm run copy-export-html && node scripts/build-web-if-stale.cjs",
-    "stage:web-host": "node scripts/stage-web-standalone.cjs",
-    "build:web-host": "npm --prefix web run build && npm run stage:web-host",
+    "build": "npm run build:pi && tsc && npm run copy-resources && npm run copy-themes",
     "copy-resources": "node scripts/copy-resources.cjs",
     "copy-themes": "node scripts/copy-themes.cjs",
-    "copy-export-html": "node scripts/copy-export-html.cjs",
     "test:compile": "node scripts/compile-tests.mjs",
     "test:unit": "npm run test:compile && node --import ./scripts/dist-test-resolve.mjs --experimental-test-isolation=process --test-reporter=./scripts/test-reporter-compact.mjs --test 'dist-test/src/tests/*.test.js' 'dist-test/src/resources/extensions/gsd/tests/*.test.js' 'dist-test/src/resources/extensions/gsd/tests/*.test.mjs' 'dist-test/src/resources/extensions/shared/tests/*.test.js' 'dist-test/src/resources/extensions/claude-code-cli/tests/*.test.js' 'dist-test/src/resources/extensions/github-sync/tests/*.test.js' 'dist-test/src/resources/extensions/universal-config/tests/*.test.js' 'dist-test/src/resources/extensions/voice/tests/*.test.js' 'dist-test/src/resources/extensions/mcp-client/tests/*.test.js'",
     "test:packages": "node --test packages/pi-coding-agent/dist/core/*.test.js",
@@ -74,9 +69,6 @@
     "build:native:dev": "node native/scripts/build.js --dev",
     "dev": "node scripts/dev.js",
     "gsd": "node scripts/dev-cli.js",
-    "gsd:web": "npm run build:pi && npm run copy-resources && node scripts/build-web-if-stale.cjs && node scripts/dev-cli.js --web",
-    "gsd:web:stop": "node scripts/dev-cli.js web stop",
-    "gsd:web:stop:all": "node scripts/dev-cli.js web stop all",
     "postinstall": "node scripts/link-workspace-packages.cjs && node scripts/ensure-workspace-builds.cjs && node scripts/postinstall.js",
     "pi:install-global": "node scripts/install-pi-global.js",
     "pi:uninstall-global": "node scripts/uninstall-pi-global.js",

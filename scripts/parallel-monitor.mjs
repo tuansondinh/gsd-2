@@ -284,7 +284,7 @@ function findGsdLoader() {
   try {
     const globalRoot = execSync('npm root -g', { encoding: 'utf-8', timeout: 3000 }).trim();
     const candidates = [
-      path.join(globalRoot, 'gsd-pi', 'dist', 'loader.js'),
+      path.join(globalRoot, 'lsd-pi', 'dist', 'loader.js'),
       path.join(globalRoot, '@gsd', 'pi', 'dist', 'loader.js'),
     ];
     for (const c of candidates) {

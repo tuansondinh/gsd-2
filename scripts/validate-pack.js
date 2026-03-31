@@ -108,7 +108,7 @@ try {
   // This catches the Windows-style failure where symlinkSync fails silently and
   // node_modules/@gsd/ is never populated, causing ERR_MODULE_NOT_FOUND at runtime.
   console.log('==> Verifying @gsd/* workspace package resolution...');
-  const installedRoot = join(installDir, 'node_modules', 'gsd-pi');
+  const installedRoot = join(installDir, 'node_modules', 'lsd-pi');
   const criticalPkgs = ['pi-coding-agent'];
   let resolutionFailed = false;
   for (const pkg of criticalPkgs) {
@@ -131,7 +131,7 @@ try {
   console.log('    @gsd/* packages are resolvable.');
 
   // --- Run the binary to confirm end-to-end resolution ---
-  console.log('==> Running installed binary (gsd -v)...');
+  console.log('==> Running installed binary (lsd -v)...');
   const loaderPath = join(installedRoot, 'dist', 'loader.js');
   try {
     const versionOutput = execSync(`node "${loaderPath}" -v`, {
@@ -140,13 +140,13 @@ try {
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 15000,
     }).trim();
-    console.log(`    gsd -v => ${versionOutput}`);
+    console.log(`    lsd -v => ${versionOutput}`);
     if (!versionOutput.match(/^\d+\.\d+\.\d+/)) {
-      console.log('ERROR: gsd -v returned unexpected output (expected a version string).');
+      console.log('ERROR: lsd -v returned unexpected output (expected a version string).');
       process.exit(1);
     }
   } catch (err) {
-    console.log('ERROR: Running gsd -v failed after install.');
+    console.log('ERROR: Running lsd -v failed after install.');
     if (err.stdout) console.log(err.stdout);
     if (err.stderr) console.log(err.stderr);
     process.exit(1);

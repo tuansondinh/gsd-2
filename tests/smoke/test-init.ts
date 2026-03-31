@@ -15,7 +15,7 @@ try {
   const binary = process.env.GSD_SMOKE_BINARY || "npx";
   const args = process.env.GSD_SMOKE_BINARY
     ? ["init"]
-    : ["gsd-pi", "init"];
+    : ["lsd-pi", "init"];
 
   execFileSync(binary, args, {
     encoding: "utf8",
