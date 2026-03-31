@@ -20,6 +20,7 @@ import { migratePiCredentials } from './pi-migration.js'
 import { validateConfiguredModel } from './startup-model-validation.js'
 import { shouldRunOnboarding, runOnboarding } from './onboarding.js'
 import chalk from 'chalk'
+import { accentHex } from './cli-theme.js'
 import { checkForUpdates } from './update-check.js'
 import { printHelp, printSubcommandHelp } from './help-text.js'
 import {
@@ -259,7 +260,7 @@ if (cliFlags.messages[0] === 'sessions') {
     const s = toShow[i]
     const date = s.modified.toLocaleString()
     const msgs = s.messageCount
-    const name = s.name ? ` ${chalk.cyan(s.name)}` : ''
+    const name = s.name ? ` ${chalk.hex(accentHex())(s.name)}` : ''
     const preview = s.firstMessage
       ? s.firstMessage.replace(/\n/g, ' ').substring(0, 80)
       : chalk.dim('(empty)')
