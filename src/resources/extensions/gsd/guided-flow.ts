@@ -2,7 +2,7 @@
  * GSD Guided Flow — Smart Entry Wizard
  *
  * One function: showSmartEntry(). Reads state from disk, shows a contextual
- * wizard via showNextAction(), and dispatches through GSD-WORKFLOW.md.
+ * wizard via showNextAction(), and dispatches through code-owned prompt text.
  * No execution state, no hooks, no tools — the LLM does the rest.
  */
 
@@ -256,7 +256,7 @@ type UIContext = ExtensionContext;
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Read GSD-WORKFLOW.md and dispatch it to the LLM with a contextual note.
+ * Dispatch guided-flow work to the LLM with a contextual note.
  * This is the only way the wizard triggers work — everything else is the LLM's job.
  *
  * When a unitType is provided, resolves the user's model preference for that
@@ -288,13 +288,10 @@ async function dispatchWorkflow(
     }
   }
 
-  const workflowPath = process.env.GSD_WORKFLOW_PATH ?? join(process.env.HOME ?? "~", ".gsd", "agent", "GSD-WORKFLOW.md");
-  const workflow = readFileSync(workflowPath, "utf-8");
-
   pi.sendMessage(
     {
       customType,
-      content: `Read the following GSD workflow protocol and execute exactly.\n\n${workflow}\n\n## Your Task\n\n${note}`,
+      content: `Execute the following GSD task exactly.\n\n${note}`,
       display: false,
     },
     { triggerTurn: true },

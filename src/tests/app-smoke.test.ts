@@ -60,7 +60,6 @@ test("loader sets all 4 GSD_ env vars and PI_PACKAGE_DIR", async (t) => {
     process.env.GSD_CODING_AGENT_DIR = agentDir;
     process.env.GSD_BIN_PATH = process.argv[1];
     const resourcesDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'resources');
-    process.env.GSD_WORKFLOW_PATH = join(resourcesDir, 'GSD-WORKFLOW.md');
     const exts = ['extensions/gsd/index.ts'].map(r => join(resourcesDir, r));
     process.env.GSD_BUNDLED_EXTENSION_PATHS = exts.join(delimiter);
 
@@ -68,7 +67,6 @@ test("loader sets all 4 GSD_ env vars and PI_PACKAGE_DIR", async (t) => {
     console.log('PI_PACKAGE_DIR=' + process.env.PI_PACKAGE_DIR);
     console.log('GSD_CODING_AGENT_DIR=' + process.env.GSD_CODING_AGENT_DIR);
     console.log('GSD_BIN_PATH=' + process.env.GSD_BIN_PATH);
-    console.log('GSD_WORKFLOW_PATH=' + process.env.GSD_WORKFLOW_PATH);
     console.log('GSD_BUNDLED_EXTENSION_PATHS=' + process.env.GSD_BUNDLED_EXTENSION_PATHS);
     process.exit(0);
   `;
@@ -100,7 +98,6 @@ test("loader sets all 4 GSD_ env vars and PI_PACKAGE_DIR", async (t) => {
   assert.ok(loaderSrc.includes("PI_PACKAGE_DIR"), "loader sets PI_PACKAGE_DIR");
   assert.ok(loaderSrc.includes("GSD_CODING_AGENT_DIR"), "loader sets GSD_CODING_AGENT_DIR");
   assert.ok(loaderSrc.includes("GSD_BIN_PATH"), "loader sets GSD_BIN_PATH");
-  assert.ok(loaderSrc.includes("GSD_WORKFLOW_PATH"), "loader sets GSD_WORKFLOW_PATH");
   assert.ok(loaderSrc.includes("GSD_BUNDLED_EXTENSION_PATHS"), "loader sets GSD_BUNDLED_EXTENSION_PATHS");
   assert.ok(loaderSrc.includes("applyRtkProcessEnv"), "loader applies RTK environment bootstrap");
   const rtkSrc = readFileSync(join(projectRoot, "src", "rtk.ts"), "utf-8");

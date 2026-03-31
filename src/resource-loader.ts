@@ -381,8 +381,6 @@ function pruneRemovedBundledExtensions(
  *
  * - extensions/ → ~/.gsd/agent/extensions/   (overwrite when version changes)
  * - agents/     → ~/.gsd/agent/agents/        (overwrite when version changes)
- * - GSD-WORKFLOW.md → ~/.gsd/agent/GSD-WORKFLOW.md (fallback for env var miss)
- *
  * Skills are NOT synced here. They are installed by the user via the
  * skills.sh CLI (`npx skills add <repo>`) into ~/.agents/skills/ — the
  * industry-standard Agent Skills ecosystem directory.
@@ -438,13 +436,6 @@ export function initResources(agentDir: string): void {
   // Migration from the legacy ~/.gsd/agent/skills/ directory is handled
   // above the manifest check so it runs on every launch (including retries
   // after partial copy failures).
-
-  // Sync GSD-WORKFLOW.md to agentDir as a fallback for when GSD_WORKFLOW_PATH
-  // env var is not set (e.g. fork/dev builds, alternative entry points).
-  const workflowSrc = join(resourcesDir, 'GSD-WORKFLOW.md')
-  if (existsSync(workflowSrc)) {
-    try { copyFileSync(workflowSrc, join(agentDir, 'GSD-WORKFLOW.md')) } catch { /* non-fatal */ }
-  }
 
   // Ensure all newly copied files are owner-writable so the next run can
   // overwrite them (covers extensions, agents, and skills in one walk).

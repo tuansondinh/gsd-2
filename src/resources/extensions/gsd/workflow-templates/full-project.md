@@ -35,7 +35,6 @@ it should route to the standard GSD workflow:
 2. If `.gsd/` exists but no milestones: Start the discuss phase via `/gsd discuss`
 3. If milestones exist: Resume via `/gsd auto` or `/gsd next`
 
-The full GSD workflow protocol is defined in `GSD-WORKFLOW.md` and handles all
-phases, state tracking, and agent orchestration.
+The standard GSD flow handles all phases, state tracking, and agent orchestration.
 
 </process>

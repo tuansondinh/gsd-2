@@ -31,12 +31,6 @@ if (existsSync(agentsMdSrc)) {
   copied.push('AGENTS.md')
 }
 
-const workflowSrc = join(resourcesDir, 'GSD-WORKFLOW.md')
-if (existsSync(workflowSrc)) {
-  writeFileSync(join(piRoot, 'GSD-WORKFLOW.md'), readFileSync(workflowSrc))
-  copied.push('GSD-WORKFLOW.md')
-}
-
 process.stdout.write(
   `Installed GSD resources for pi in ${piRoot}\n` +
   `Copied: ${copied.join(', ')}\n` +

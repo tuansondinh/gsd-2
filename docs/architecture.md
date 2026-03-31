@@ -17,7 +17,7 @@ gsd (CLI binary)
               ├─ extensions/...     12 supporting extensions
               ├─ agents/            scout, researcher, worker
               ├─ AGENTS.md          Agent routing instructions
-              └─ GSD-WORKFLOW.md    Manual bootstrap protocol
+              └─ skills/            bundled skill content
 
 gsd headless              Headless mode — CI/cron orchestration via RPC child process
 gsd --mode mcp            MCP server mode — exposes tools over stdin/stdout

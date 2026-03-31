@@ -6,8 +6,7 @@
  */
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@gsd/pi-coding-agent";
-import { existsSync, readFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync } from "node:fs";
 import { deriveState } from "./state.js";
 import { gsdRoot } from "./paths.js";
 import { appendCapture, hasPendingCaptures, loadPendingCaptures } from "./captures.js";
@@ -25,8 +24,6 @@ import { projectRoot } from "./commands/context.js";
 import { loadPrompt } from "./prompt-loader.js";
 
 export function dispatchDoctorHeal(pi: ExtensionAPI, scope: string | undefined, reportText: string, structuredIssues: string): void {
-  const workflowPath = process.env.GSD_WORKFLOW_PATH ?? join(process.env.HOME ?? "~", ".gsd", "agent", "GSD-WORKFLOW.md");
-  const workflow = readFileSync(workflowPath, "utf-8");
   const prompt = loadPrompt("doctor-heal", {
     doctorSummary: reportText,
     structuredIssues,
@@ -34,7 +31,7 @@ export function dispatchDoctorHeal(pi: ExtensionAPI, scope: string | undefined, 
     doctorCommandSuffix: scope ? ` ${scope}` : "",
   });
 
-  const content = `Read the following GSD workflow protocol and execute exactly.\n\n${workflow}\n\n## Your Task\n\n${prompt}`;
+  const content = `Execute the following GSD task exactly.\n\n${prompt}`;
 
   pi.sendMessage(
     { customType: "gsd-doctor-heal", content, display: false },
@@ -202,13 +199,10 @@ export async function handleTriage(ctx: ExtensionCommandContext, pi: ExtensionAP
     roadmapContext: roadmapContext || "(no active roadmap)",
   });
 
-  const workflowPath = process.env.GSD_WORKFLOW_PATH ?? join(process.env.HOME ?? "~", ".gsd", "agent", "GSD-WORKFLOW.md");
-  const workflow = readFileSync(workflowPath, "utf-8");
-
   pi.sendMessage(
     {
       customType: "gsd-triage",
-      content: `Read the following GSD workflow protocol and execute exactly.\n\n${workflow}\n\n## Your Task\n\n${prompt}`,
+      content: `Execute the following GSD task exactly.\n\n${prompt}`,
       display: false,
     },
     { triggerTurn: true },
