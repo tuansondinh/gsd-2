@@ -1,7 +1,7 @@
 {
-  "name": "gsd-pi",
+  "name": "lsd-pi",
   "version": "2.58.0",
-  "description": "GSD — Get Shit Done coding agent",
+  "description": "LSD — Get Shit Done coding agent",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -17,8 +17,8 @@
     "studio"
   ],
   "bin": {
-    "gsd": "dist/loader.js",
-    "gsd-cli": "dist/loader.js"
+    "lsd": "dist/loader.js",
+    "lsd-cli": "dist/loader.js"
   },
   "files": [
     "dist",
@@ -33,8 +33,8 @@
     "README.md"
   ],
   "piConfig": {
-    "name": "gsd",
-    "configDir": ".gsd"
+    "name": "lsd",
+    "configDir": ".lsd"
   },
   "engines": {
     "node": ">=22.0.0"

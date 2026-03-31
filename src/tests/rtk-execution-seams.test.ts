@@ -79,11 +79,11 @@ function withManagedFakeRtk<T>(mapping: Record<string, string | { status?: numbe
     chmodSync(managedPath, 0o755);
   }
 
-  const previousHome = process.env.GSD_HOME;
+  const previousHome = process.env.LSD_HOME;
   const previousPath = process.env.GSD_RTK_PATH;
   const previousDisabled = process.env.GSD_RTK_DISABLED;
   const previousTimeout = process.env.GSD_RTK_REWRITE_TIMEOUT_MS;
-  process.env.GSD_HOME = managedHome;
+  process.env.LSD_HOME = managedHome;
   process.env.GSD_RTK_REWRITE_TIMEOUT_MS = "20000";
   delete process.env.GSD_RTK_PATH;
   delete process.env.GSD_RTK_DISABLED;
@@ -96,8 +96,8 @@ function withManagedFakeRtk<T>(mapping: Record<string, string | { status?: numbe
   delete env.GSD_RTK_PATH;
 
   const finalize = () => {
-    if (previousHome === undefined) delete process.env.GSD_HOME;
-    else process.env.GSD_HOME = previousHome;
+    if (previousHome === undefined) delete process.env.LSD_HOME;
+    else process.env.LSD_HOME = previousHome;
     if (previousPath === undefined) delete process.env.GSD_RTK_PATH;
     else process.env.GSD_RTK_PATH = previousPath;
     if (previousDisabled === undefined) delete process.env.GSD_RTK_DISABLED;

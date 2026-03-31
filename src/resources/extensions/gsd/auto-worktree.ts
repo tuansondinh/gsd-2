@@ -66,7 +66,7 @@ import {
   nativeMergeAbort,
 } from "./native-git-bridge.js";
 
-const gsdHome = process.env.GSD_HOME || join(homedir(), ".gsd");
+const gsdHome = process.env.LSD_HOME || join(homedir(), ".lsd");
 const PROJECT_PREFERENCES_FILE = "PREFERENCES.md";
 const LEGACY_PROJECT_PREFERENCES_FILE = "preferences.md";
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// GSD Startup Loader
+// LSD Startup Loader
 // Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 import { fileURLToPath } from 'url'
 import { dirname, resolve, join, relative, delimiter } from 'path'
@@ -12,7 +12,7 @@ const gsdRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
 const firstArg = args[0]
 
-// Read package.json once — reused for version, banner, and GSD_VERSION below
+// Read package.json once — reused for version, banner, and LSD_VERSION below
 let gsdVersion = '0.0.0'
 try {
   const pkg = JSON.parse(readFileSync(join(gsdRoot, 'package.json'), 'utf-8'))
@@ -46,7 +46,7 @@ if (firstArg === '--help' || firstArg === '-h') {
   const nodeMajor = parseInt(process.versions.node.split('.')[0], 10)
   if (nodeMajor < MIN_NODE_MAJOR) {
     process.stderr.write(
-      `\n${red}${bold}Error:${reset} GSD requires Node.js >= ${MIN_NODE_MAJOR}.0.0\n` +
+      `\n${red}${bold}Error:${reset} LSD requires Node.js >= ${MIN_NODE_MAJOR}.0.0\n` +
       `       You are running Node.js ${process.versions.node}\n\n` +
       `${dim}Install a supported version:${reset}\n` +
       `  nvm install ${MIN_NODE_MAJOR}   ${dim}# if using nvm${reset}\n` +
@@ -62,7 +62,7 @@ if (firstArg === '--help' || firstArg === '-h') {
     execFileSync('git', ['--version'], { stdio: 'ignore' })
   } catch {
     process.stderr.write(
-      `\n${red}${bold}Error:${reset} GSD requires git but it was not found on PATH.\n\n` +
+      `\n${red}${bold}Error:${reset} LSD requires git but it was not found on PATH.\n\n` +
       `${dim}Install git:${reset}\n` +
       `  https://git-scm.com/downloads\n\n`
     )
@@ -77,20 +77,20 @@ import { discoverExtensionEntryPaths } from './extension-discovery.js'
 import { loadRegistry, readManifestFromEntryPath, isExtensionEnabled } from './extension-registry.js'
 import { renderLogo } from './logo.js'
 
-// pkg/ is a shim directory: contains gsd's piConfig (package.json) and pi's
+// pkg/ is a shim directory: contains lsd's piConfig (package.json) and pi's
 // theme assets (dist/modes/interactive/theme/) without a src/ directory.
 // This allows config.js to:
-//   1. Read piConfig.name → "gsd" (branding)
+//   1. Read piConfig.name → "lsd" (branding)
 //   2. Resolve themes via dist/ (no src/ present → uses dist path)
 const pkgDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'pkg')
 
 // MUST be set before any dynamic import of pi SDK fires — this is what config.js
 // reads to determine APP_NAME and CONFIG_DIR_NAME
 process.env.PI_PACKAGE_DIR = pkgDir
-process.env.PI_SKIP_VERSION_CHECK = '1'  // GSD runs its own update check in cli.ts — suppress pi's
-process.title = 'gsd'
+process.env.PI_SKIP_VERSION_CHECK = '1'  // LSD runs its own update check in cli.ts — suppress pi's
+process.title = 'lsd'
 
-// Print branded banner on first launch (before ~/.gsd/ exists).
+// Print branded banner on first launch (before ~/.lsd/ exists).
 // Set GSD_FIRST_RUN_BANNER so cli.ts skips the duplicate welcome screen.
 if (!existsSync(appRoot)) {
   const cyan  = '\x1b[36m'
@@ -104,20 +104,20 @@ if (!existsSync(appRoot)) {
     `  Get Shit Done ${dim}v${gsdVersion}${reset}\n` +
     `  ${green}Welcome.${reset} Setting up your environment...\n\n`
   )
-  process.env.GSD_FIRST_RUN_BANNER = '1'
+  process.env.LSD_FIRST_RUN_BANNER = '1'
 }
 
-// GSD_CODING_AGENT_DIR — tells pi's getAgentDir() to return ~/.gsd/agent/ instead of ~/.gsd/agent/
-process.env.GSD_CODING_AGENT_DIR = agentDir
+// LSD_CODING_AGENT_DIR — tells pi's getAgentDir() to return ~/.lsd/agent/ instead of ~/.gsd/agent/
+process.env.LSD_CODING_AGENT_DIR = agentDir
 
-// RTK environment — make ~/.gsd/agent/bin visible to all child-process paths,
+// RTK environment — make ~/.lsd/agent/bin visible to all child-process paths,
 // not just the bash tool, and force-disable RTK telemetry for GSD-managed use.
 applyRtkProcessEnv(process.env)
 
 // NODE_PATH — make gsd's own node_modules available to extensions loaded via jiti.
 // Without this, extensions (e.g. browser-tools) can't resolve dependencies like
 // `playwright` because jiti resolves modules from pi-coding-agent's location, not gsd's.
-// Prepending gsd's node_modules to NODE_PATH fixes this for all extensions.
+// Prepending lsd's node_modules node_modules to NODE_PATH fixes this for all extensions.
 const gsdNodeModules = join(gsdRoot, 'node_modules')
 process.env.NODE_PATH = [gsdNodeModules, process.env.NODE_PATH]
   .filter(Boolean)
@@ -129,11 +129,11 @@ const { Module } = await import('module');
 (Module as any)._initPaths?.()
 
 // GSD_VERSION — expose package version so extensions can display it
-process.env.GSD_VERSION = gsdVersion
+process.env.LSD_VERSION = gsdVersion
 
 // GSD_BIN_PATH — absolute path to this loader (dist/loader.js), used by patched subagent
 // to spawn gsd instead of pi when dispatching workflow tasks
-process.env.GSD_BIN_PATH = process.argv[1]
+process.env.LSD_BIN_PATH = process.argv[1]
 
 const distRes = join(gsdRoot, 'dist', 'resources')
 const srcRes = join(gsdRoot, 'src', 'resources')
@@ -154,7 +154,7 @@ const discoveredExtensionPaths = discoverExtensionEntryPaths(bundledExtDir)
     return isExtensionEnabled(registry, manifest.id)
   })
 
-process.env.GSD_BUNDLED_EXTENSION_PATHS = serializeBundledExtensionPaths(discoveredExtensionPaths)
+process.env.LSD_BUNDLED_EXTENSION_PATHS = serializeBundledExtensionPaths(discoveredExtensionPaths)
 
 // Respect HTTP_PROXY / HTTPS_PROXY / NO_PROXY env vars for all outbound requests.
 // pi-coding-agent's cli.ts sets this, but GSD bypasses that entry point — so we

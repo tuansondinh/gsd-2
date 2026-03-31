@@ -12,7 +12,7 @@ import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, re
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 
-const gsdHome = process.env.GSD_HOME || join(homedir(), ".gsd");
+const gsdHome = process.env.LSD_HOME || join(homedir(), ".lsd");
 
 // ─── Repo Metadata ───────────────────────────────────────────────────────────
 
@@ -168,7 +168,7 @@ function isProjectGsd(gsdPath: string): boolean {
     // Recompute gsdHome dynamically so env overrides (GSD_HOME) are
     // picked up at call time, not just at module load time.
     if (stat.isDirectory()) {
-      const currentGsdHome = process.env.GSD_HOME || join(homedir(), ".gsd");
+      const currentGsdHome = process.env.LSD_HOME || join(homedir(), ".lsd");
       const normalizedGsdPath = canonicalizeExistingPath(gsdPath);
       const normalizedGsdHome = canonicalizeExistingPath(currentGsdHome);
       if (normalizedGsdPath === normalizedGsdHome) return false;

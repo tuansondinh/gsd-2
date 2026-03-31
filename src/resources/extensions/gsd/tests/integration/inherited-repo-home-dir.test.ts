@@ -56,16 +56,16 @@ describe("isInheritedRepo when git root is HOME (#2393)", () => {
 
     // Save and override env. Point GSD_HOME at fakeHome/.gsd so the
     // function recognizes it as the global state directory.
-    origGsdHome = process.env.GSD_HOME;
+    origGsdHome = process.env.LSD_HOME;
     origGsdStateDir = process.env.GSD_STATE_DIR;
-    process.env.GSD_HOME = join(fakeHome, ".gsd");
+    process.env.LSD_HOME = join(fakeHome, ".gsd");
     stateDir = mkdtempSync(join(tmpdir(), "gsd-state-"));
     process.env.GSD_STATE_DIR = stateDir;
   });
 
   afterEach(() => {
-    if (origGsdHome !== undefined) process.env.GSD_HOME = origGsdHome;
-    else delete process.env.GSD_HOME;
+    if (origGsdHome !== undefined) process.env.LSD_HOME = origGsdHome;
+    else delete process.env.LSD_HOME;
     if (origGsdStateDir !== undefined) process.env.GSD_STATE_DIR = origGsdStateDir;
     else delete process.env.GSD_STATE_DIR;
 

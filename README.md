@@ -1,6 +1,6 @@
 <div align="center">
 
-# GSD 2
+# LSD 2
 
 **The evolution of [Get Shit Done](https://github.com/gsd-build/get-shit-done) — now a real coding agent.**
 
@@ -17,7 +17,7 @@ This version is different. GSD is now a standalone CLI built on the [Pi SDK](htt
 
 One command. Walk away. Come back to a built project with clean git history.
 
-<pre><code>npm install -g gsd-pi@latest</code></pre>
+<pre><code>npm install -g lsd-pi@latest</code></pre>
 
 > GSD now provisions a managed [RTK](https://github.com/rtk-ai/rtk) binary on supported macOS, Linux, and Windows installs to compress shell-command output in `bash`, `async_bash`, `bg_shell`, and verification flows. GSD forces `RTK_TELEMETRY_DISABLED=1` for all managed invocations. Set `GSD_RTK_DISABLED=1` to disable the integration.
 
@@ -91,7 +91,7 @@ One command. Walk away. Come back to a built project with clean git history.
 - **`/gsd rethink`** — conversational project reorganization. (#2459)
 - **`/gsd mcp`** — MCP server status and connectivity. (#2362)
 - **Complete offline mode** — fully offline with local models. (#2429)
-- **Global KNOWLEDGE.md injection** — cross-project knowledge via `~/.gsd/agent/KNOWLEDGE.md`. (#2331)
+- **Global KNOWLEDGE.md injection** — cross-project knowledge via `~/.lsd/agent/KNOWLEDGE.md`. (#2331)
 - **Mobile-responsive web UI** — browser interface works on phones and tablets. (#2354)
 - **Default isolation mode changed to `none`** — set `git.isolation: worktree` explicitly if needed. (#2481)
 - **Non-API-key provider extensions** — support for Claude Code CLI and similar providers. (#2382)
@@ -106,7 +106,7 @@ One command. Walk away. Come back to a built project with clean git history.
 
 ### New Features
 
-- **Browser-based web interface** — run GSD from the browser with `gsd --web`. Full project management, real-time progress, and multi-project support via server-sent events. (#1717)
+- **Browser-based web interface** — run GSD from the browser with `lsd --web`. Full project management, real-time progress, and multi-project support via server-sent events. (#1717)
 - **Doctor: worktree lifecycle checks** — `/gsd doctor` now validates worktree health, detects orphaned worktrees, consolidates cleanup, and enhances `/worktree list` with lifecycle status. (#1814)
 - **CI: docs-only PR detection** — PRs that only change documentation skip build and test steps, with a new prompt injection scan for security. (#1699)
 - **Custom Models guide** — new documentation for adding custom providers (Ollama, vLLM, LM Studio, proxies) via `models.json`. (#1670)
@@ -117,9 +117,9 @@ This release includes 7 fixes preventing silent data loss in auto-mode:
 
 - **Hallucination guard** — execute-task agents that complete with zero tool calls are now rejected as hallucinated. Previously, agents could produce detailed but fabricated summaries without writing any code, wasting ~$25/milestone. (#1838)
 - **Merge anchor verification** — before deleting a milestone worktree/branch, GSD now verifies the code is actually on the integration branch. Prevents orphaning commits when squash-merge produces an empty diff. (#1829)
-- **Dirty working tree detection** — `nativeMergeSquash` now distinguishes dirty-tree rejections from content conflicts, preventing silent commit loss when synced `.gsd/` files block the merge. (#1752)
+- **Dirty working tree detection** — `nativeMergeSquash` now distinguishes dirty-tree rejections from content conflicts, preventing silent commit loss when synced `.lsd/` files block the merge. (#1752)
 - **Doctor cleanup safety** — the `orphaned_completed_units` check no longer auto-fixes during post-task health checks. Previously, timing races could cause the doctor to remove valid completion keys, reverting users to earlier tasks. (#1825)
-- **Root file reverse-sync** — worktree teardown now syncs root-level `.gsd/` files (PROJECT.md, REQUIREMENTS.md, completed-units.json) back to the project root. Previously these were lost on milestone closeout. (#1831)
+- **Root file reverse-sync** — worktree teardown now syncs root-level `.lsd/` files (PROJECT.md, REQUIREMENTS.md, completed-units.json) back to the project root. Previously these were lost on milestone closeout. (#1831)
 - **Empty merge guard** — milestone branches with unanchored code changes are preserved instead of deleted when squash-merge produces nothing to commit. (#1755)
 - **Crash-safe task closeout** — orphaned checkboxes in PLAN.md are unchecked on retry, preventing phantom task completion. (#1759)
 
@@ -144,7 +144,7 @@ This release includes 7 fixes preventing silent data loss in auto-mode:
 
 - **CONTEXT-DRAFT.md fallback** — `depends_on` is read from CONTEXT-DRAFT.md when CONTEXT.md doesn't exist, preventing draft milestones from being promoted past dependency constraints. (#1743)
 - **Unborn branch support** — `nativeBranchExists` handles repos with zero commits, preventing dispatch deadlock on new repos. (#1815)
-- **Ghost milestone detection** — empty `.gsd/milestones/` directories are skipped instead of crashing `deriveState()`. (#1817)
+- **Ghost milestone detection** — empty `.lsd/milestones/` directories are skipped instead of crashing `deriveState()`. (#1817)
 - **Default branch detection** — milestone merge detects `master` vs `main` instead of hardcoding. (#1669)
 - **Milestone title extraction** — titles are pulled from CONTEXT.md headings when no ROADMAP exists. (#1729)
 
@@ -164,7 +164,7 @@ See the full [Changelog](./CHANGELOG.md) for all 70+ fixes in this release.
 
 ### Previous highlights (v2.39–v2.41)
 
-- **Browser-based web interface** — run GSD from the browser with `gsd --web`
+- **Browser-based web interface** — run GSD from the browser with `lsd --web`
 - **GitHub sync extension** — auto-sync milestones to GitHub Issues, PRs, and Milestones
 - **Skill tool resolution** — skills auto-activate in dispatched prompts
 - **Health check phase 2** — real-time doctor issues in dashboard and visualizer
@@ -201,7 +201,7 @@ Full documentation is available at **[gsd.build](https://gsd.build)** (powered b
 - **[Web Interface](./docs/web-interface.md)** — browser-based project management and real-time progress
 - **[Pipeline Simplification (ADR-003)](./docs/ADR-003-pipeline-simplification.md)** — merged research into planning, mechanical completion
 - **[Docker Sandbox](./docker/README.md)** — run GSD auto mode in an isolated Docker container
-- **[Migration from v1](./docs/migration.md)** — `.planning` → `.gsd` migration
+- **[Migration from v1](./docs/migration.md)** — `.planning` → `.lsd` migration
 
 ---
 
@@ -220,7 +220,7 @@ GSD v2 solves all of these because it's not a prompt framework anymore — it's 
 | -------------------- | ---------------------------- | ------------------------------------------------------- |
 | Runtime              | Claude Code slash commands   | Standalone CLI via Pi SDK                               |
 | Context management   | Hope the LLM doesn't fill up | Fresh session per task, programmatic                    |
-| Auto mode            | LLM self-loop                | State machine reading `.gsd/` files                     |
+| Auto mode            | LLM self-loop                | State machine reading `.lsd/` files                     |
 | Crash recovery       | None                         | Lock files + session forensics                          |
 | Git strategy         | LLM writes git commands      | Worktree isolation, sequential commits, squash merge    |
 | Cost tracking        | None                         | Per-unit token/cost ledger with dashboard               |
@@ -237,7 +237,7 @@ GSD v2 solves all of these because it's not a prompt framework anymore — it's 
 
 > **Note:** Migration works best with a `ROADMAP.md` file for milestone structure. Without one, milestones are inferred from the `phases/` directory.
 
-If you have projects with `.planning` directories from the original Get Shit Done, you can migrate them to GSD-2's `.gsd` format:
+If you have projects with `.planning` directories from the original Get Shit Done, you can migrate them to GSD-2's `.lsd` format:
 
 ```bash
 # From within the project directory
@@ -292,7 +292,7 @@ This is what makes GSD different. Run it, walk away, come back to built software
 /gsd auto
 ```
 
-Auto mode is a state machine driven by files on disk. It reads `.gsd/STATE.md`, determines the next unit of work, creates a fresh agent session, injects a focused prompt with all relevant context pre-inlined, and lets the LLM execute. When the LLM finishes, auto mode reads disk state again and dispatches the next unit.
+Auto mode is a state machine driven by files on disk. It reads `.lsd/STATE.md`, determines the next unit of work, creates a fresh agent session, injects a focused prompt with all relevant context pre-inlined, and lets the LLM execute. When the LLM finishes, auto mode reads disk state again and dispatches the next unit.
 
 **What happens under the hood:**
 
@@ -320,11 +320,11 @@ Auto mode is a state machine driven by files on disk. It reads `.gsd/STATE.md`, 
 
 12. **Escape hatch** — Press Escape to pause. The conversation is preserved. Interact with the agent, inspect what happened, or just `/gsd auto` to resume from disk state.
 
-### `/gsd` and `/gsd next` — Step Mode
+### `/lsd` and `/gsd next` — Step Mode
 
-By default, `/gsd` runs in **step mode**: the same state machine as auto mode, but it pauses between units with a wizard showing what completed and what's next. You advance one step at a time, review the output, and continue when ready.
+By default, `/lsd` runs in **step mode**: the same state machine as auto mode, but it pauses between units with a wizard showing what completed and what's next. You advance one step at a time, review the output, and continue when ready.
 
-- **No `.gsd/` directory** → Start a new project. Discussion flow captures your vision, constraints, and preferences.
+- **No `.lsd/` directory** → Start a new project. Discussion flow captures your vision, constraints, and preferences.
 - **Milestone exists, no roadmap** → Discuss or research the milestone.
 - **Roadmap exists, slices pending** → Plan the next slice, execute one task, or switch to auto.
 - **Mid-task** → Resume from where you left off.
@@ -340,7 +340,7 @@ Step mode is the on-ramp. Auto mode is the highway.
 ### Install
 
 ```bash
-npm install -g gsd-pi
+npm install -g lsd-pi
 ```
 
 ### Log in to a provider
@@ -370,7 +370,7 @@ gsd
 
 GSD opens an interactive agent session. From there, you have two ways to work:
 
-**`/gsd` — step mode.** Type `/gsd` and GSD executes one unit of work at a time, pausing between each with a wizard showing what completed and what's next. Same state machine as auto mode, but you stay in the loop. No project yet? It starts the discussion flow. Roadmap exists? It plans or executes the next step.
+**`/lsd` — step mode.** Type `/lsd` and GSD executes one unit of work at a time, pausing between each with a wizard showing what completed and what's next. Same state machine as auto mode, but you stay in the loop. No project yet? It starts the discussion flow. Roadmap exists? It plans or executes the next step.
 
 **`/gsd auto` — autonomous mode.** Type `/gsd auto` and walk away. GSD researches, plans, executes, verifies, commits, and advances through every slice until the milestone is complete. Fresh context window per task. No babysitting.
 
@@ -394,11 +394,11 @@ gsd
 /gsd queue      # queue the next milestone
 ```
 
-Both terminals read and write the same `.gsd/` files on disk. Your decisions in terminal 2 are picked up automatically at the next phase boundary — no need to stop auto mode.
+Both terminals read and write the same `.lsd/` files on disk. Your decisions in terminal 2 are picked up automatically at the next phase boundary — no need to stop auto mode.
 
 ### Headless mode — CI and scripts
 
-`gsd headless` runs any `/gsd` command without a TUI. Designed for CI pipelines, cron jobs, and scripted automation.
+`gsd headless` runs any `/lsd` command without a TUI. Designed for CI pipelines, cron jobs, and scripted automation.
 
 ```bash
 # Run auto mode in CI
@@ -419,7 +419,7 @@ gsd headless dispatch plan
 
 Headless auto-responds to interactive prompts, detects completion, and exits with structured codes: `0` complete, `1` error/timeout, `2` blocked. Auto-restarts on crash with exponential backoff. Use `gsd headless query` for instant, machine-readable state inspection — returns phase, next dispatch preview, and parallel worker costs as a single JSON object without spawning an LLM session. Pair with [remote questions](./docs/remote-questions.md) to route decisions to Slack or Discord when human input is needed.
 
-**Multi-session orchestration** — headless mode supports file-based IPC in `.gsd/parallel/` for coordinating multiple GSD workers across milestones. Build orchestrators that spawn, monitor, and budget-cap a fleet of GSD workers.
+**Multi-session orchestration** — headless mode supports file-based IPC in `.lsd/parallel/` for coordinating multiple GSD workers across milestones. Build orchestrators that spawn, monitor, and budget-cap a fleet of GSD workers.
 
 ### First launch
 
@@ -429,8 +429,8 @@ On first run, GSD launches a branded setup wizard that walks you through LLM pro
 
 | Command                 | What it does                                                    |
 | ----------------------- | --------------------------------------------------------------- |
-| `/gsd`                  | Step mode — executes one unit at a time, pauses between each    |
-| `/gsd next`             | Explicit step mode (same as bare `/gsd`)                        |
+| `/lsd`                  | Step mode — executes one unit at a time, pauses between each    |
+| `/gsd next`             | Explicit step mode (same as bare `/lsd`)                        |
 | `/gsd auto`             | Autonomous mode — researches, plans, executes, commits, repeats |
 | `/gsd quick`            | Execute a quick task with GSD guarantees, skip planning overhead |
 | `/gsd stop`             | Stop auto mode gracefully                                       |
@@ -441,7 +441,7 @@ On first run, GSD launches a branded setup wizard that walks you through LLM pro
 | `/gsd status`           | Progress dashboard                                              |
 | `/gsd queue`            | Queue future milestones (safe during auto mode)                 |
 | `/gsd prefs`            | Model selection, timeouts, budget ceiling                       |
-| `/gsd migrate`          | Migrate a v1 `.planning` directory to `.gsd` format             |
+| `/gsd migrate`          | Migrate a v1 `.planning` directory to `.lsd` format             |
 | `/gsd help`             | Categorized command reference for all GSD subcommands           |
 | `/gsd mode`             | Switch workflow mode (solo/team) with coordinated defaults      |
 | `/gsd forensics`        | Full-access GSD debugger for auto-mode failure investigation    |
@@ -461,10 +461,10 @@ On first run, GSD launches a branded setup wizard that walks you through LLM pro
 | `Alt+V`                 | Paste clipboard image (macOS)                                   |
 | `gsd config`            | Re-run the setup wizard (LLM provider + tool keys)              |
 | `gsd update`            | Update GSD to the latest version                                |
-| `gsd headless [cmd]`    | Run `/gsd` commands without TUI (CI, cron, scripts)             |
+| `gsd headless [cmd]`    | Run `/lsd` commands without TUI (CI, cron, scripts)             |
 | `gsd headless query`    | Instant JSON snapshot — state, next dispatch, costs (no LLM)    |
-| `gsd --continue` (`-c`) | Resume the most recent session for the current directory        |
-| `gsd --worktree` (`-w`) | Launch an isolated worktree session for the active milestone    |
+| `lsd --continue` (`-c`) | Resume the most recent session for the current directory        |
+| `lsd --worktree` (`-w`) | Launch an isolated worktree session for the active milestone    |
 | `gsd sessions`          | Interactive session picker — browse and resume any saved session |
 
 ---
@@ -531,7 +531,7 @@ The verification ladder: static checks → command execution → behavioral test
 
 ### HTML Reports
 
-After a milestone completes, GSD auto-generates a self-contained HTML report in `.gsd/reports/`. Each report includes project summary, progress tree, slice dependency graph (SVG DAG), cost/token metrics with bar charts, execution timeline, changelog, and knowledge base sections. No external dependencies — all CSS and JS are inlined, printable to PDF from any browser.
+After a milestone completes, GSD auto-generates a self-contained HTML report in `.lsd/reports/`. Each report includes project summary, progress tree, slice dependency graph (SVG DAG), cost/token metrics with bar charts, execution timeline, changelog, and knowledge base sections. No external dependencies — all CSS and JS are inlined, printable to PDF from any browser.
 
 An auto-generated `index.html` shows all reports with progression metrics across milestones.
 
@@ -544,7 +544,7 @@ An auto-generated `index.html` shows all reports with progression metrics across
 
 ### Preferences
 
-GSD preferences live in `~/.gsd/PREFERENCES.md` (global) or `.gsd/PREFERENCES.md` (project). Manage with `/gsd prefs`.
+GSD preferences live in `~/.lsd/PREFERENCES.md` (global) or `.lsd/PREFERENCES.md` (project). Manage with `/gsd prefs`.
 
 ```yaml
 ---
@@ -598,11 +598,11 @@ auto_report: true
 
 Place an `AGENTS.md` file in any directory to provide persistent behavioral guidance for that scope. Pi core loads `AGENTS.md` automatically (with `CLAUDE.md` as a fallback) at both user and project levels. Use these files for coding standards, architectural decisions, domain terminology, or workflow preferences.
 
-> **Note:** The legacy `agent-instructions.md` format (`~/.gsd/agent-instructions.md` and `.gsd/agent-instructions.md`) is deprecated and no longer loaded. Migrate any existing instructions to `AGENTS.md` or `CLAUDE.md`.
+> **Note:** The legacy `agent-instructions.md` format (`~/.lsd/agent-instructions.md` and `.lsd/agent-instructions.md`) is deprecated and no longer loaded. Migrate any existing instructions to `AGENTS.md` or `CLAUDE.md`.
 
 ### Debug Mode
 
-Start GSD with `gsd --debug` to enable structured JSONL diagnostic logging. Debug logs capture dispatch decisions, state transitions, and timing data for troubleshooting auto-mode issues.
+Start GSD with `lsd --debug` to enable structured JSONL diagnostic logging. Debug logs capture dispatch decisions, state transitions, and timing data for troubleshooting auto-mode issues.
 
 ### Token Optimization
 
@@ -664,38 +664,38 @@ Three specialized subagents for delegated work:
 
 ## Working in teams
 
-The best practice for working in teams is to ensure unique milestone names across all branches (by using `unique_milestone_ids`) and checking in the right `.gsd/` artifacts to share valuable context between teammates.
+The best practice for working in teams is to ensure unique milestone names across all branches (by using `unique_milestone_ids`) and checking in the right `.lsd/` artifacts to share valuable context between teammates.
 
 ### Suggested .gitignore setup
 
 ```bash
 # ── GSD: Runtime / Ephemeral (per-developer, per-session) ──────────────────
 # Crash detection sentinel — PID lock, written per auto-mode session
-.gsd/auto.lock
+.lsd/auto.lock
 # Auto-mode dispatch tracker — prevents re-running completed units
-.gsd/completed-units.json
+.lsd/completed-units.json
 # Derived state cache — regenerated from plan/roadmap files on disk
-.gsd/STATE.md
+.lsd/STATE.md
 # Per-developer token/cost accumulator
-.gsd/metrics.json
+.lsd/metrics.json
 # Raw JSONL session dumps — crash recovery forensics, auto-pruned
-.gsd/activity/
+.lsd/activity/
 # Unit execution records — dispatch phase, timeouts, recovery tracking
-.gsd/runtime/
+.lsd/runtime/
 # Git worktree working copies
-.gsd/worktrees/
+.lsd/worktrees/
 # Parallel orchestration IPC and worker status
-.gsd/parallel/
+.lsd/parallel/
 # Generated HTML reports (regenerable via /gsd export --html)
-.gsd/reports/
+.lsd/reports/
 # Session-specific interrupted-work markers
-.gsd/milestones/**/continue.md
-.gsd/milestones/**/*-CONTINUE.md
+.lsd/milestones/**/continue.md
+.lsd/milestones/**/*-CONTINUE.md
 ```
 
 ### Unique Milestone Names
 
-Create or amend your `.gsd/PREFERENCES.md` file within the repo to include `unique_milestone_ids: true` e.g.
+Create or amend your `.lsd/PREFERENCES.md` file within the repo to include `unique_milestone_ids: true` e.g.
 
 ```markdown
 ---
@@ -704,16 +704,16 @@ unique_milestone_ids: true
 ---
 ```
 
-With the above `.gitignore` set up, the `.gsd/PREFERENCES.md` file is checked into the repo ensuring all teammates use unique milestone names to avoid collisions.
+With the above `.gitignore` set up, the `.lsd/PREFERENCES.md` file is checked into the repo ensuring all teammates use unique milestone names to avoid collisions.
 
 Milestone names will now be generated with a 6 char random string appended e.g. instead of `M001` you'll get something like `M001-ush8s3`
 
-### Migrating an existing git ignored `.gsd/` folder
+### Migrating an existing git ignored `.lsd/` folder
 
 1. Ensure you are not in the middle of any milestones (clean state)
-2. Update the `.gsd/` related entries in your `.gitignore` to follow the `Suggested .gitignore setup` section under `Working in teams` (ensure you are no longer blanket ignoring the whole `.gsd/` directory)
-3. Update your `.gsd/PREFERENCES.md` file within the repo as per section `Unique Milestone Names`
-4. If you want to update all your existing milestones use this prompt in GSD: `I have turned on unique milestone ids, please update all old milestone ids to use this new format e.g. M001-abc123 where abc123 is a random 6 char lowercase alpha numeric string. Update all references in all .gsd file contents, file names and directory names. Validate your work once done to ensure referential integrity.`
+2. Update the `.lsd/` related entries in your `.gitignore` to follow the `Suggested .gitignore setup` section under `Working in teams` (ensure you are no longer blanket ignoring the whole `.lsd/` directory)
+3. Update your `.lsd/PREFERENCES.md` file within the repo as per section `Unique Milestone Names`
+4. If you want to update all your existing milestones use this prompt in GSD: `I have turned on unique milestone ids, please update all old milestone ids to use this new format e.g. M001-abc123 where abc123 is a random 6 char lowercase alpha numeric string. Update all references in all .lsd file contents, file names and directory names. Validate your work once done to ensure referential integrity.`
 5. Commit to git
 
 ---
@@ -729,8 +729,8 @@ gsd (CLI binary)
           ├─ headless.ts     Headless orchestrator (spawns RPC child, auto-responds, detects completion)
           ├─ onboarding.ts   First-run setup wizard (LLM provider + tool keys)
           ├─ wizard.ts       Env hydration from stored auth.json credentials
-          ├─ app-paths.ts    ~/.gsd/agent/, ~/.gsd/sessions/, auth.json
-          ├─ resource-loader.ts  Syncs bundled extensions + agents to ~/.gsd/agent/
+          ├─ app-paths.ts    ~/.lsd/agent/, ~/.lsd/sessions/, auth.json
+          ├─ resource-loader.ts  Syncs bundled extensions + agents to ~/.lsd/agent/
           └─ src/resources/
               ├─ extensions/gsd/    Core GSD extension (auto, state, commands, ...)
               ├─ extensions/...     18 supporting extensions
@@ -743,8 +743,8 @@ gsd (CLI binary)
 
 - **`pkg/` shim directory** — `PI_PACKAGE_DIR` points here (not project root) to avoid Pi's theme resolution collision with our `src/` directory. Contains only `piConfig` and theme assets.
 - **Two-file loader pattern** — `loader.ts` sets all env vars with zero SDK imports, then dynamic-imports `cli.ts` which does static SDK imports. This ensures `PI_PACKAGE_DIR` is set before any SDK code evaluates.
-- **Always-overwrite sync** — `npm update -g` takes effect immediately. Bundled extensions and agents are synced to `~/.gsd/agent/` on every launch, not just first run.
-- **State lives on disk** — `.gsd/` is the source of truth. Auto mode reads it, writes it, and advances based on what it finds. No in-memory state survives across sessions.
+- **Always-overwrite sync** — `npm update -g` takes effect immediately. Bundled extensions and agents are synced to `~/.lsd/agent/` on every launch, not just first run.
+- **State lives on disk** — `.lsd/` is the source of truth. Auto mode reads it, writes it, and advances based on what it finds. No in-memory state survives across sessions.
 
 ---
 
@@ -825,6 +825,6 @@ Use expensive models where quality matters (planning, complex execution) and che
 
 **The original GSD showed what was possible. This version delivers it.**
 
-**`npm install -g gsd-pi && gsd`**
+**`npm install -g lsd-pi && lsd`**
 
 </div>

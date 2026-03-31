@@ -84,7 +84,7 @@ export {
 // ─── Path Constants & Getters ───────────────────────────────────────────────
 
 function gsdHome(): string {
-  return process.env.GSD_HOME || join(homedir(), ".gsd");
+  return process.env.LSD_HOME || join(homedir(), ".lsd");
 }
 
 function globalPreferencesPath(): string {

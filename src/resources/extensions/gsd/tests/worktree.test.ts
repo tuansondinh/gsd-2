@@ -263,13 +263,13 @@ describe('worktree', async () => {
     const deep = join(project, ".gsd", "worktrees", "M001", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k");
     mkdirSync(deep, { recursive: true });
 
-    process.env.GSD_HOME = join(fakeHome, ".gsd");
+    process.env.LSD_HOME = join(fakeHome, ".gsd");
     assert.deepStrictEqual(
       normalizePath(resolveProjectRoot(realpathSync(deep))),
       normalizePath(project),
       "resolves to real project root from deep symlink-resolved worktree path",
     );
-    delete process.env.GSD_HOME;
+    delete process.env.LSD_HOME;
 
     rmSync(project, { recursive: true, force: true });
     rmSync(fakeHome, { recursive: true, force: true });

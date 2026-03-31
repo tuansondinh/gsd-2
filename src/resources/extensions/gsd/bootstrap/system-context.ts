@@ -17,7 +17,7 @@ import { formatOverridesSection, loadActiveOverrides, loadFile, parseContinue, p
 import { toPosixPath } from "../../shared/mod.js";
 import { markCmuxPromptShown, shouldPromptToEnableCmux } from "../../cmux/index.js";
 
-const gsdHome = process.env.GSD_HOME || join(homedir(), ".gsd");
+const gsdHome = process.env.LSD_HOME || join(homedir(), ".lsd");
 
 function warnDeprecatedAgentInstructions(): void {
   const paths = [

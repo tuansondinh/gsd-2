@@ -105,11 +105,11 @@ test("RTK session stats fall back to the managed RTK path when GSD_RTK_PATH is u
     chmodSync(managedPath, 0o755);
   }
 
-  const previousHome = process.env.GSD_HOME;
+  const previousHome = process.env.LSD_HOME;
   const previousPath = process.env.GSD_RTK_PATH;
 
   try {
-    process.env.GSD_HOME = managedHome;
+    process.env.LSD_HOME = managedHome;
     delete process.env.GSD_RTK_PATH;
 
     const env: NodeJS.ProcessEnv = {
@@ -125,8 +125,8 @@ test("RTK session stats fall back to the managed RTK path when GSD_RTK_PATH is u
     assert.ok(savings, "expected savings snapshot from managed RTK path");
     assert.equal(savings?.commands, 0);
   } finally {
-    if (previousHome === undefined) delete process.env.GSD_HOME;
-    else process.env.GSD_HOME = previousHome;
+    if (previousHome === undefined) delete process.env.LSD_HOME;
+    else process.env.LSD_HOME = previousHome;
     if (previousPath === undefined) delete process.env.GSD_RTK_PATH;
     else process.env.GSD_RTK_PATH = previousPath;
     fake.cleanup();

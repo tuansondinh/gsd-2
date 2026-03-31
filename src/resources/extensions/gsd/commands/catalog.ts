@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { loadRegistry } from "../workflow-templates.js";
 import { resolveProjectRoot } from "../worktree.js";
 
-const gsdHome = process.env.GSD_HOME || join(homedir(), ".gsd");
+const gsdHome = process.env.LSD_HOME || join(homedir(), ".lsd");
 
 export interface GsdCommandDefinition {
   cmd: string;

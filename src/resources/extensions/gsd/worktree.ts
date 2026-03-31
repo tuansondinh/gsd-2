@@ -143,7 +143,7 @@ export function resolveProjectRoot(basePath: string): string {
   // Layer 2: Guard against resolving to the user's home directory.
   // When .gsd is a symlink into ~/.gsd/projects/<hash>, the resolved path
   // contains /.gsd/ at the user-level boundary. Slicing there yields ~ — wrong.
-  const gsdHome = normalizePathForCompare(process.env.GSD_HOME || join(homedir(), ".gsd"));
+  const gsdHome = normalizePathForCompare(process.env.LSD_HOME || join(homedir(), ".lsd"));
   const candidateGsdPath = normalizePathForCompare(join(candidate, ".gsd"));
 
   if (candidateGsdPath === gsdHome || candidateGsdPath.startsWith(gsdHome + "/")) {

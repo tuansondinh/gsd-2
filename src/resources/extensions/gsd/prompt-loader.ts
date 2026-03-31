@@ -38,7 +38,7 @@ function resolveExtensionDir(): string {
   if (existsSync(join(moduleDir, "prompts"))) return moduleDir;
 
   // Fallback: user-local agent directory
-  const gsdHome = process.env.GSD_HOME || join(homedir(), ".gsd");
+  const gsdHome = process.env.LSD_HOME || join(homedir(), ".lsd");
   const agentGsdDir = join(gsdHome, "agent", "extensions", "gsd");
   if (existsSync(join(agentGsdDir, "prompts"))) return agentGsdDir;
 

@@ -241,7 +241,7 @@ export async function handleForensics(
   // when import.meta.url resolves to the npm-global install path (Windows).
   let gsdSourceDir = dirname(fileURLToPath(import.meta.url));
   if (!existsSync(join(gsdSourceDir, "prompts"))) {
-    const gsdHome = process.env.GSD_HOME || join(homedir(), ".gsd");
+    const gsdHome = process.env.LSD_HOME || join(homedir(), ".lsd");
     const fallback = join(gsdHome, "agent", "extensions", "gsd");
     if (existsSync(join(fallback, "prompts"))) gsdSourceDir = fallback;
   }
