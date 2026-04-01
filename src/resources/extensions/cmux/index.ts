@@ -3,8 +3,27 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import type { GSDPreferences } from "../gsd/preferences.js";
-import type { GSDState, Phase } from "../gsd/types.js";
+import type { SharedPreferences } from "../shared/preferences.js";
+
+interface CmuxStateProgress {
+  milestones: { done: number; total: number };
+  slices?: { done?: number; total?: number };
+  tasks?: { done?: number; total?: number };
+}
+
+interface CmuxStateRef {
+  id: string;
+}
+
+interface CmuxState {
+  phase: string;
+  progress?: CmuxStateProgress;
+  activeMilestone?: CmuxStateRef;
+  activeSlice?: CmuxStateRef;
+  activeTask?: CmuxStateRef;
+}
+
+type Phase = string;
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_SOCKET_PATH = "/tmp/cmux.sock";
@@ -55,7 +74,7 @@ export function detectCmuxEnvironment(
 }
 
 export function resolveCmuxConfig(
-  preferences: GSDPreferences | undefined,
+  preferences: SharedPreferences | undefined,
   env: NodeJS.ProcessEnv = process.env,
   socketExists: (path: string) => boolean = existsSync,
   cliAvailable: () => boolean = isCmuxCliAvailable,
@@ -74,7 +93,7 @@ export function resolveCmuxConfig(
 }
 
 export function shouldPromptToEnableCmux(
-  preferences: GSDPreferences | undefined,
+  preferences: SharedPreferences | undefined,
   env: NodeJS.ProcessEnv = process.env,
   socketExists: (path: string) => boolean = existsSync,
   cliAvailable: () => boolean = isCmuxCliAvailable,
@@ -116,7 +135,7 @@ export function emitOsc777Notification(title: string, body: string): void {
   process.stdout.write(`\x1b]777;notify;${safeTitle};${safeBody}\x07`);
 }
 
-export function buildCmuxStatusLabel(state: GSDState): string {
+export function buildCmuxStatusLabel(state: CmuxState): string {
   const parts: string[] = [];
   if (state.activeMilestone) parts.push(state.activeMilestone.id);
   if (state.activeSlice) parts.push(state.activeSlice.id);
@@ -128,7 +147,7 @@ export function buildCmuxStatusLabel(state: GSDState): string {
   return `${parts.join(" ")} · ${state.phase}`;
 }
 
-export function buildCmuxProgress(state: GSDState): CmuxSidebarProgress | null {
+export function buildCmuxProgress(state: CmuxState): CmuxSidebarProgress | null {
   const progress = state.progress;
   if (!progress) return null;
 
@@ -174,7 +193,7 @@ export class CmuxClient {
     this.config = config;
   }
 
-  static fromPreferences(preferences: GSDPreferences | undefined): CmuxClient {
+  static fromPreferences(preferences: SharedPreferences | undefined): CmuxClient {
     return new CmuxClient(resolveCmuxConfig(preferences));
   }
 
@@ -366,7 +385,7 @@ export class CmuxClient {
   }
 }
 
-export function syncCmuxSidebar(preferences: GSDPreferences | undefined, state: GSDState): void {
+export function syncCmuxSidebar(preferences: SharedPreferences | undefined, state: CmuxState): void {
   const client = CmuxClient.fromPreferences(preferences);
   const config = client.getConfig();
   if (!config.sidebar) return;
@@ -382,7 +401,7 @@ export function syncCmuxSidebar(preferences: GSDPreferences | undefined, state: 
   lastSidebarSnapshots.set(key, snapshot);
 }
 
-export function clearCmuxSidebar(preferences: GSDPreferences | undefined): void {
+export function clearCmuxSidebar(preferences: SharedPreferences | undefined): void {
   const config = resolveCmuxConfig(preferences);
   if (!config.available || !config.cliAvailable) return;
   const client = new CmuxClient({ ...config, enabled: true, sidebar: true });
@@ -393,7 +412,7 @@ export function clearCmuxSidebar(preferences: GSDPreferences | undefined): void 
 }
 
 export function logCmuxEvent(
-  preferences: GSDPreferences | undefined,
+  preferences: SharedPreferences | undefined,
   message: string,
   level: CmuxLogLevel = "info",
 ): void {

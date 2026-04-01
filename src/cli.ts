@@ -28,7 +28,7 @@ import { printHelp, printSubcommandHelp } from './help-text.js'
 import { getProjectSessionsDir } from './project-sessions.js'
 import { markStartup, printStartupTimings } from './startup-timings.js'
 import { bootstrapRtk, GSD_RTK_DISABLED_ENV } from './rtk.js'
-import { loadEffectiveGSDPreferences } from './resources/extensions/gsd/preferences.js'
+import { loadEffectivePreferences } from './shared-preferences.js'
 
 // ---------------------------------------------------------------------------
 // V8 compile cache — Node 22+ can cache compiled bytecode across runs,
@@ -130,7 +130,7 @@ async function ensureRtkBootstrap(): Promise<void> {
   // Honor GSD_RTK_DISABLED if already explicitly set in the environment
   // (env var takes precedence over preferences for manual override).
   if (!process.env[GSD_RTK_DISABLED_ENV]) {
-    const prefs = loadEffectiveGSDPreferences();
+    const prefs = loadEffectivePreferences();
     const rtkEnabled = prefs?.preferences.experimental?.rtk === true;
     if (!rtkEnabled) {
       process.env[GSD_RTK_DISABLED_ENV] = "1";

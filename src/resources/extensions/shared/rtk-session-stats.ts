@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { gsdRoot } from "../gsd/paths.js";
+import { resolveProjectStateRoot } from "./paths.js";
 import { formatTokenCount } from "./format-utils.js";
 import { buildRtkEnv, isRtkEnabled, resolveRtkBinaryPath } from "./rtk.js";
 
@@ -46,7 +46,7 @@ interface BaselineStore {
 let cachedSummary: { at: number; binaryPath: string; summary: RtkGainSummary | null } | null = null;
 
 function getRuntimeDir(basePath: string): string {
-  return join(gsdRoot(basePath), "runtime");
+  return join(resolveProjectStateRoot(basePath), "runtime");
 }
 
 function getBaselinesPath(basePath: string): string {

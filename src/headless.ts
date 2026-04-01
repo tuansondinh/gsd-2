@@ -78,7 +78,7 @@ export interface HeadlessOptions {
   answers?: string       // path to answers JSON file
   eventFilter?: Set<string>  // filter JSONL output to specific event types
   resumeSession?: string // session ID to resume (--resume <id>)
-  bare?: boolean         // --bare: suppress CLAUDE.md/AGENTS.md, user skills, project preferences
+  bare?: boolean         // --bare: suppress lsd.md/CLAUDE.md/AGENTS.md, user skills, project preferences
 }
 
 interface TrackedEvent {
@@ -323,11 +323,9 @@ async function runHeadlessOnce(options: HeadlessOptions, restartCount: number): 
     process.exit(1)
   }
 
-  // Query: read-only state snapshot, no RPC child needed
   if (options.command === 'query') {
-    const { handleQuery } = await import('./headless-query.js')
-    const result = await handleQuery(process.cwd())
-    return { exitCode: result.exitCode, interrupted: false }
+    process.stderr.write('[headless] Error: `headless query` has been removed and is no longer supported.\n')
+    return { exitCode: 1, interrupted: false }
   }
 
   // Resolve CLI path for the child process

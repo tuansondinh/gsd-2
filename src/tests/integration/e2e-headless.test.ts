@@ -11,8 +11,7 @@
  * Prerequisite: npm run build must be run first.
  *
  * Run with:
- *   node --import ./src/resources/extensions/gsd/tests/resolve-ts.mjs \
- *        --experimental-strip-types --test \
+ *   node --experimental-strip-types --test \
  *        src/tests/integration/e2e-headless.test.ts
  */
 

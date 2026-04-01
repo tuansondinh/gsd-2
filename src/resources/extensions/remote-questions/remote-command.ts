@@ -7,7 +7,8 @@ import { AuthStorage } from "@gsd/pi-coding-agent";
 import { Editor, type EditorTheme, Key, matchesKey, truncateToWidth } from "@gsd/pi-tui";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { getGlobalGSDPreferencesPath, loadEffectiveGSDPreferences } from "../gsd/preferences.js";
+import { getGlobalPreferencesPath, loadEffectivePreferences } from "../shared/preferences.js";
+import { saveRemoteQuestionsConfig } from "../shared/remote-questions-config.js";
 import { getRemoteConfigStatus, isValidChannelId, resolveRemoteConfig } from "./config.js";
 import { maskEditorLine, sanitizeError } from "../shared/mod.js";
 import { getLatestPromptSummary } from "./status.js";
@@ -202,7 +203,7 @@ async function handleRemoteStatus(ctx: ExtensionCommandContext): Promise<void> {
 }
 
 async function handleDisconnect(ctx: ExtensionCommandContext): Promise<void> {
-  const prefs = loadEffectiveGSDPreferences();
+  const prefs = loadEffectivePreferences();
   const channel = prefs?.preferences.remote_questions?.channel;
   if (!channel) return void ctx.ui.notify("No remote channel configured — nothing to disconnect.", "info");
 
@@ -315,35 +316,8 @@ function removeProviderToken(provider: string): void {
   auth.remove(provider);
 }
 
-export function saveRemoteQuestionsConfig(channel: "slack" | "discord" | "telegram", channelId: string): void {
-  const prefsPath = getGlobalGSDPreferencesPath();
-  const block = [
-    "remote_questions:",
-    `  channel: ${channel}`,
-    `  channel_id: \"${channelId}\"`,
-    "  timeout_minutes: 5",
-    "  poll_interval_seconds: 5",
-  ].join("\n");
-
-  const content = existsSync(prefsPath) ? readFileSync(prefsPath, "utf-8") : "";
-  const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
-  let next = content;
-
-  if (fmMatch) {
-    let frontmatter = fmMatch[1];
-    const regex = /remote_questions:[\s\S]*?(?=\n[a-zA-Z_]|\n---|$)/;
-    frontmatter = regex.test(frontmatter) ? frontmatter.replace(regex, block) : `${frontmatter.trimEnd()}\n${block}`;
-    next = `---\n${frontmatter}\n---${content.slice(fmMatch[0].length)}`;
-  } else {
-    next = `---\n${block}\n---\n\n${content}`;
-  }
-
-  mkdirSync(dirname(prefsPath), { recursive: true });
-  writeFileSync(prefsPath, next, "utf-8");
-}
-
 function removeRemoteQuestionsConfig(): void {
-  const prefsPath = getGlobalGSDPreferencesPath();
+  const prefsPath = getGlobalPreferencesPath();
   if (!existsSync(prefsPath)) return;
   const content = readFileSync(prefsPath, "utf-8");
   const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);

@@ -34,7 +34,7 @@ import {
 	readIsolationMode,
 } from "./isolation.js";
 import { registerWorker, updateWorker } from "./worker-registry.js";
-import { loadEffectiveGSDPreferences } from "../gsd/preferences.js";
+import { loadEffectivePreferences } from "../shared/preferences.js";
 import { CmuxClient, shellEscape } from "../cmux/index.js";
 
 const MAX_PARALLEL_TASKS = 8;
@@ -450,129 +450,6 @@ async function runSingleAgent(
 	}
 }
 
-async function runSingleAgentInCmuxSplit(
-	cmuxClient: CmuxClient,
-	directionOrSurfaceId: "right" | "down" | string,
-	defaultCwd: string,
-	agents: AgentConfig[],
-	agentName: string,
-	task: string,
-	cwd: string | undefined,
-	step: number | undefined,
-	signal: AbortSignal | undefined,
-	onUpdate: OnUpdateCallback | undefined,
-	makeDetails: (results: SingleResult[]) => SubagentDetails,
-): Promise<SingleResult> {
-	const agent = agents.find((a) => a.name === agentName);
-	if (!agent) {
-		return runSingleAgent(defaultCwd, agents, agentName, task, cwd, step, signal, onUpdate, makeDetails);
-	}
-
-	let tmpPromptDir: string | null = null;
-	let tmpPromptPath: string | null = null;
-	let tmpOutputDir: string | null = null;
-
-	const currentResult: SingleResult = {
-		agent: agentName,
-		agentSource: agent.source,
-		task,
-		exitCode: 0,
-		messages: [],
-		stderr: "",
-		usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
-		model: agent.model,
-		step,
-	};
-
-	const emitUpdate = () => {
-		if (onUpdate) {
-			onUpdate({
-				content: [{ type: "text", text: getFinalOutput(currentResult.messages) || "(running...)" }],
-				details: makeDetails([currentResult]),
-			});
-		}
-	};
-
-	try {
-		if (agent.systemPrompt.trim()) {
-			const tmp = writePromptToTempFile(agent.name, agent.systemPrompt);
-			tmpPromptDir = tmp.dir;
-			tmpPromptPath = tmp.filePath;
-		}
-		tmpOutputDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagent-cmux-"));
-		const stdoutPath = path.join(tmpOutputDir, "stdout.jsonl");
-		const stderrPath = path.join(tmpOutputDir, "stderr.log");
-		const exitPath = path.join(tmpOutputDir, "exit.code");
-		// Accept either a pre-created surface ID or a direction to create a new split
-		const isDirection = directionOrSurfaceId === "right" || directionOrSurfaceId === "down"
-			|| directionOrSurfaceId === "left" || directionOrSurfaceId === "up";
-		const cmuxSurfaceId = isDirection
-			? await cmuxClient.createSplit(directionOrSurfaceId as "right" | "down" | "left" | "up")
-			: directionOrSurfaceId;
-		if (!cmuxSurfaceId) {
-			return runSingleAgent(defaultCwd, agents, agentName, task, cwd, step, signal, onUpdate, makeDetails);
-		}
-
-		const bundledPaths = (process.env.GSD_BUNDLED_EXTENSION_PATHS ?? "").split(path.delimiter).map((s) => s.trim()).filter(Boolean);
-		const extensionArgs = bundledPaths.flatMap((p) => ["--extension", p]);
-		const processArgs = [process.env.GSD_BIN_PATH!, ...extensionArgs, ...buildSubagentProcessArgs(agent, task, tmpPromptPath)];
-		// Normalize all paths to forward slashes before embedding in bash strings.
-		// On Windows, backslashes are interpreted as escape characters by bash,
-		// mangling paths like C:\Users\user into C:Useruser (#1436).
-		const bashPath = (p: string) => shellEscape(p.replaceAll("\\", "/"));
-		const innerScript = [
-			`cd ${bashPath(cwd ?? defaultCwd)}`,
-			"set -o pipefail",
-			`${bashPath(process.execPath)} ${processArgs.map(a => bashPath(a)).join(" ")} 2> >(tee ${bashPath(stderrPath)} >&2) | tee ${bashPath(stdoutPath)}`,
-			"status=${PIPESTATUS[0]}",
-			`printf '%s' "$status" > ${bashPath(exitPath)}`,
-		].join("; ");
-
-		const sent = await cmuxClient.sendSurface(cmuxSurfaceId, `bash -lc ${shellEscape(innerScript)}`);
-		if (!sent) {
-			return runSingleAgent(defaultCwd, agents, agentName, task, cwd, step, signal, onUpdate, makeDetails);
-		}
-
-		const finished = await waitForFile(exitPath, signal);
-		if (!finished) {
-			currentResult.exitCode = 1;
-			currentResult.stderr = "cmux split execution timed out or was aborted";
-			return currentResult;
-		}
-
-		if (fs.existsSync(stdoutPath)) {
-			const stdout = fs.readFileSync(stdoutPath, "utf-8");
-			for (const line of stdout.split("\n")) {
-				processSubagentEventLine(line, currentResult, emitUpdate);
-			}
-		}
-		if (fs.existsSync(stderrPath)) {
-			currentResult.stderr = fs.readFileSync(stderrPath, "utf-8");
-		}
-		currentResult.exitCode = Number.parseInt(fs.readFileSync(exitPath, "utf-8").trim() || "1", 10) || 0;
-		return currentResult;
-	} finally {
-		if (tmpPromptPath)
-			try {
-				fs.unlinkSync(tmpPromptPath);
-			} catch {
-				/* ignore */
-			}
-		if (tmpPromptDir)
-			try {
-				fs.rmdirSync(tmpPromptDir);
-			} catch {
-				/* ignore */
-			}
-		if (tmpOutputDir)
-			try {
-				fs.rmSync(tmpOutputDir, { recursive: true, force: true });
-			} catch {
-				/* ignore */
-			}
-	}
-}
-
 const TaskItem = Type.Object({
 	agent: Type.String({ description: "Name of the agent to invoke" }),
 	task: Type.String({ description: "Task to delegate to the agent" }),
@@ -657,7 +534,7 @@ export default function (pi: ExtensionAPI) {
 			const discovery = discoverAgents(ctx.cwd, agentScope);
 			const agents = discovery.agents;
 			const confirmProjectAgents = params.confirmProjectAgents ?? false;
-			const cmuxClient = CmuxClient.fromPreferences(loadEffectiveGSDPreferences()?.preferences);
+			const cmuxClient = CmuxClient.fromPreferences(loadEffectivePreferences()?.preferences);
 			const cmuxSplitsEnabled = cmuxClient.getConfig().splits;
 
 			// Resolve isolation mode
@@ -816,31 +693,11 @@ export default function (pi: ExtensionAPI) {
 				const batchId = crypto.randomUUID();
 				const batchSize = params.tasks.length;
 				// Pre-create a grid layout for cmux splits so agents get a clean tiled arrangement
-				const gridSurfaces = cmuxSplitsEnabled
-					? await cmuxClient.createGridLayout(Math.min(batchSize, MAX_CONCURRENCY))
-					: [];
+				const gridSurfaces: string[] = [];
 				const results = await mapWithConcurrencyLimit(params.tasks, MAX_CONCURRENCY, async (t, index) => {
 					const workerId = registerWorker(t.agent, t.task, index, batchSize, batchId);
-					const runTask = () => cmuxSplitsEnabled
-						? runSingleAgentInCmuxSplit(
-							cmuxClient,
-							gridSurfaces[index] ?? (index % 2 === 0 ? "right" : "down"),
-							ctx.cwd,
-							agents,
-							t.agent,
-							t.task,
-							t.cwd,
-							undefined,
-							signal,
-							(partial) => {
-								if (partial.details?.results[0]) {
-									allResults[index] = partial.details.results[0];
-									emitParallelUpdate();
-								}
-							},
-							makeDetails("parallel"),
-						)
-						: runSingleAgent(
+					const runTask = () =>
+						runSingleAgent(
 							ctx.cwd,
 							agents,
 							t.agent,
@@ -900,31 +757,17 @@ export default function (pi: ExtensionAPI) {
 						isolation = await createIsolation(effectiveCwd, taskId, isolationMode);
 					}
 
-					const result = cmuxSplitsEnabled
-						? await runSingleAgentInCmuxSplit(
-							cmuxClient,
-							"right",
-							ctx.cwd,
-							agents,
-							params.agent,
-							params.task,
-							isolation ? isolation.workDir : params.cwd,
-							undefined,
-							signal,
-							onUpdate,
-							makeDetails("single"),
-						)
-						: await runSingleAgent(
-							ctx.cwd,
-							agents,
-							params.agent,
-							params.task,
-							isolation ? isolation.workDir : params.cwd,
-							undefined,
-							signal,
-							onUpdate,
-							makeDetails("single"),
-						);
+					const result = await runSingleAgent(
+						ctx.cwd,
+						agents,
+						params.agent,
+						params.task,
+						isolation ? isolation.workDir : params.cwd,
+						undefined,
+						signal,
+						onUpdate,
+						makeDetails("single"),
+					);
 
 					// Capture and merge delta if isolated
 					if (isolation) {

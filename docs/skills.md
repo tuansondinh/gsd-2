@@ -42,7 +42,7 @@ npx skills update
 
 During `gsd init`, GSD detects the project's tech stack and recommends relevant skill packs. For brownfield projects, detection is automatic; for greenfield projects, the user picks a tech stack.
 
-The curated catalog is maintained in `src/resources/extensions/gsd/skill-catalog.ts`. Each entry maps a tech stack to a skills.sh repo and specific skill names.
+The recommendation catalog is now maintained in the onboarding/runtime code rather than in the removed bundled `src/resources/extensions/gsd/` tree.
 
 #### Available Skill Packs
 
@@ -73,7 +73,7 @@ The curated catalog is maintained in `src/resources/extensions/gsd/skill-catalog
 
 ### Maintaining the Catalog
 
-The skill catalog lives in [`src/resources/extensions/gsd/skill-catalog.ts`](../src/resources/extensions/gsd/skill-catalog.ts). To add or update a pack:
+The skill recommendation catalog no longer lives under the removed bundled `src/resources/extensions/gsd/` extension tree. Update the current onboarding/runtime skill recommendation source instead, keeping the same data model:
 
 1. Add a `SkillPack` entry to the `SKILL_CATALOG` array with `repo`, `skills`, and matching criteria
 2. For language-detection matching, use `matchLanguages` (values from `detection.ts` `LANGUAGE_MAP`)

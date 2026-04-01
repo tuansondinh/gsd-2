@@ -12,7 +12,6 @@
 import { AuthStorage } from '@gsd/pi-coding-agent'
 import { homedir } from 'os'
 import { join } from 'path'
-import { resolveSearchProviderFromPreferences } from '../gsd/preferences.js'
 
 // Compute authFilePath locally instead of importing from app-paths.ts,
 // because extensions are copied to ~/.gsd/agent/extensions/ at runtime
@@ -104,16 +103,10 @@ export function resolveSearchProvider(overridePreference?: string): SearchProvid
   let pref: SearchProviderPreference
   if (overridePreference && VALID_PREFERENCES.has(overridePreference)) {
     pref = overridePreference as SearchProviderPreference
+  } else if (overridePreference !== undefined && !VALID_PREFERENCES.has(overridePreference)) {
+    pref = 'auto'
   } else {
-    // PREFERENCES.md takes priority over auth.json
-    const mdPref = resolveSearchProviderFromPreferences()
-    if (mdPref && mdPref !== 'auto' && mdPref !== 'native') {
-      pref = mdPref as SearchProviderPreference
-    } else if (overridePreference !== undefined && !VALID_PREFERENCES.has(overridePreference)) {
-      pref = 'auto'
-    } else {
-      pref = getSearchProviderPreference()
-    }
+    pref = getSearchProviderPreference()
   }
 
   // Resolve based on preference

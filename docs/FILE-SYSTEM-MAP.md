@@ -82,7 +82,6 @@
 | src/headless-answers.ts | Headless Mode | Pre-supply answers to extension UI requests in headless |
 | src/headless-context.ts | Headless Mode | Context loading from stdin/files; project bootstrapping |
 | src/headless-events.ts | Headless Mode | Event classification, terminal detection, idle timeouts |
-| src/headless-query.ts | Headless Mode, CLI | Read-only snapshot query (state, dispatch preview, costs) |
 | src/headless-ui.ts | Headless Mode | Extension UI auto-response, progress formatting |
 | src/headless.ts | Headless Mode | Orchestrator for /gsd subcommands without TUI via RPC |
 | src/help-text.ts | CLI | Generates help text for all subcommands |
@@ -967,7 +966,7 @@ Quick lookup: which files are part of each system?
 | **AST** | native/crates/ast/*, packages/native/src/ast/ |
 | **Async Jobs** | src/resources/extensions/async-jobs/* |
 | **Auth / OAuth** | pi-ai/src/utils/oauth/*, src/web/web-auth-storage.ts, core/auth-storage.ts, src/pi-migration.ts, aws-auth/index.ts, web/lib/auth.ts |
-| **Auto Engine** | src/resources/extensions/gsd/auto*.ts, gsd/auto-loop.ts, gsd/auto-supervisor.ts, gsd/unit-runtime.ts |
+| **Auto Engine** | Removed with the legacy bundled GSD extension |
 | **Bg Shell** | src/resources/extensions/bg-shell/* |
 | **Browser Tools** | src/resources/extensions/browser-tools/* |
 | **Build System** | scripts/*, native/crates/engine/build.rs |
@@ -982,7 +981,7 @@ Quick lookup: which files are part of each system?
 | **Extension Registry** | src/extension-discovery.ts, src/extension-registry.ts, src/bundled-extension-paths.ts |
 | **Extensions** | pi-coding-agent/src/core/extensions/*, src/resource-loader.ts |
 | **File Search** | native/crates/engine/src/grep.rs, glob.rs, fd.rs, fs_cache.rs, packages/native/src/grep/*, fd/*, core/tools/grep.ts, find.ts |
-| **GSD Workflow** | src/resources/extensions/gsd/* (non-auto), gsd/reports.ts, gsd/notifications.ts, gsd/prompts/*, gsd/workflow-templates/* |
+| **GSD Workflow** | Removed with the legacy bundled GSD extension |
 | **Google Search** | src/resources/extensions/google-search/index.ts |
 | **Headless Mode** | src/headless*.ts |
 | **Image Processing** | native/crates/engine/src/image.rs, packages/native/src/image/*, utils/image-*.ts, web/lib/image-utils.ts |

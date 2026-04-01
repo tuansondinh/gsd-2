@@ -13,9 +13,8 @@ gsd (CLI binary)
           ├─ app-paths.ts    ~/.gsd/agent/, ~/.gsd/sessions/, auth.json
           ├─ resource-loader.ts  Syncs bundled extensions + agents to ~/.gsd/agent/
           └─ src/resources/
-              ├─ extensions/gsd/    Core GSD extension
-              ├─ extensions/...     12 supporting extensions
-              ├─ agents/            scout, researcher, worker
+              ├─ extensions/       Bundled tool and command extensions
+              ├─ agents/           scout, researcher, worker
               ├─ AGENTS.md          Agent routing instructions
               └─ skills/            bundled skill content
 
@@ -53,9 +52,10 @@ Every dispatch creates a new agent session. The LLM starts with a clean context 
 
 ## Bundled Extensions
 
+LSD now ships focused bundled extensions rather than a single monolithic `gsd` extension.
+
 | Extension | What It Provides |
 |-----------|-----------------|
-| **GSD** | Core workflow engine — auto mode, state machine, commands, dashboard |
 | **Browser Tools** | Playwright-based browser automation — navigation, forms, screenshots, PDF export, device emulation, visual regression, structured data extraction, route mocking, accessibility tree inspection, and semantic actions |
 | **Search the Web** | Brave Search, Tavily, or Jina page extraction |
 | **Google Search** | Gemini-powered web search with AI-synthesized answers |

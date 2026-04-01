@@ -5,7 +5,8 @@
  * the heavy tool-registration modules.
  */
 
-import { resolveSearchProviderFromPreferences } from "../gsd/preferences.js";
+import { resolveSearchProviderFromPreferences } from "../shared/preferences.js";
+
 
 /** Tool names for the Brave-backed custom search tools */
 export const BRAVE_TOOL_NAMES = ["search-the-web", "search_and_read"];

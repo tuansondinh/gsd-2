@@ -10,7 +10,7 @@
  * per-rule JS RegExp iteration when the native module is not loaded.
  */
 import picomatch from "picomatch";
-import { debugTime, debugCount, debugPeak } from "../gsd/debug-logger.js";
+import { debugTime, debugCount, debugPeak } from "../shared/debug-logger.js";
 
 // ── Native TTSR engine (optional) ─────────────────────────────────────
 let nativeTtsr: {

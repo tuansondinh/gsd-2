@@ -471,15 +471,6 @@ github:
 | `labels` | string[] | `[]` | Labels to apply to created issues and PRs |
 | `project` | string | (none) | GitHub Project ID for project board integration |
 
-**Requirements:**
-- `gh` CLI installed and authenticated (`gh auth login`)
-- Sync mapping is persisted in `.gsd/.github-sync.json`
-- Rate-limit aware — skips sync when GitHub API rate limit is low
-
-**Commands:**
-- `/github-sync bootstrap` — initial setup and sync
-- `/github-sync status` — show sync mapping counts
-
 ### `notifications`
 
 Control what notifications GSD sends during auto mode:

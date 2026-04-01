@@ -153,6 +153,12 @@ export function makeStreamExhaustedErrorMessage(model: string, lastTextContent: 
  * Extracted for testability — callers can verify session persistence,
  * beta flags, and other configuration without mocking the full SDK.
  */
+/**
+ * Build the options object passed to the Claude Agent SDK's `query()` call.
+ *
+ * Extracted for testability — callers can verify session persistence,
+ * beta flags, and other configuration without mocking the full SDK.
+ */
 export function buildSdkOptions(modelId: string, prompt: string): Record<string, unknown> {
 	return {
 		pathToClaudeCodeExecutable: getClaudePath(),

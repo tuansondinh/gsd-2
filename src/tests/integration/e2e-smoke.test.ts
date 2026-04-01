@@ -9,8 +9,7 @@
  * Prerequisite: npm run build must be run first.
  *
  * Run with:
- *   node --import ./src/resources/extensions/gsd/tests/resolve-ts.mjs \
- *        --experimental-strip-types --test \
+ *   node --experimental-strip-types --test \
  *        src/tests/integration/e2e-smoke.test.ts
  */
 
@@ -504,26 +503,21 @@ test("gsd headless --timeout with negative value exits 1", async (t) => {
   assertNoCrashMarkers(combined);
 });
 
-test("gsd headless query returns JSON from the built CLI", async (t) => {
+test("gsd headless query exits with a clear unsupported error", async (t) => {
   const tmpDir = createTempGitRepo("gsd-e2e-query-");
 
   t.after(() => { rmSync(tmpDir, { recursive: true, force: true }); });
 
   mkdirSync(join(tmpDir, ".gsd", "milestones"), { recursive: true });
 
-  // Cold packaged startup in a fresh temp repo is now regularly >10s because
-  // the built CLI loads bundled TS resources through jiti before answering.
-  // This command is still healthy; it just needs a realistic timeout budget.
   const result = await runGsd(["headless", "query"], 30_000, {}, tmpDir);
 
   assert.ok(!result.timedOut, "process should not hang");
-  assert.strictEqual(result.code, 0, `expected exit 0, got ${result.code}`);
+  assert.strictEqual(result.code, 1, `expected exit 1, got ${result.code}`);
 
   const combined = stripAnsi(result.stdout + result.stderr);
   assertNoCrashMarkers(combined);
-
-  const snapshot = JSON.parse(result.stdout);
-  assert.equal(typeof snapshot.state?.phase, "string", "query output should include state.phase");
+  assert.match(combined, /headless query.*removed|no longer supported/i);
 });
 
 test("gsd worktree list loads the built worktree CLI without module errors", async (t) => {
