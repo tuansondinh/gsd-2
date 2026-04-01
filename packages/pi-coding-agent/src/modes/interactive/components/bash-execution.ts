@@ -18,6 +18,8 @@ import { truncateToVisualLines } from "./visual-truncate.js";
 // Preview line limit when not expanded (matches tool execution behavior)
 const PREVIEW_LINES = 20;
 
+type ToolOutputMode = "minimal" | "normal";
+
 export class BashExecutionComponent extends Container {
 	private command: string;
 	private outputLines: string[] = [];
@@ -27,13 +29,15 @@ export class BashExecutionComponent extends Container {
 	private truncationResult?: TruncationResult;
 	private fullOutputPath?: string;
 	private expanded = false;
+	private renderMode: ToolOutputMode;
 	private contentContainer: Container;
 	private ui: TUI;
 
-	constructor(command: string, ui: TUI, excludeFromContext = false) {
+	constructor(command: string, ui: TUI, excludeFromContext = false, renderMode: ToolOutputMode = "normal") {
 		super();
 		this.command = command;
 		this.ui = ui;
+		this.renderMode = renderMode;
 
 		// Use dim border for excluded-from-context commands (!! prefix)
 		const colorKey = excludeFromContext ? "dim" : "bashMode";
@@ -72,6 +76,13 @@ export class BashExecutionComponent extends Container {
 	setExpanded(expanded: boolean): void {
 		this.expanded = expanded;
 		this.updateDisplay();
+	}
+
+	setRenderMode(mode: ToolOutputMode): void {
+		if (this.renderMode !== mode) {
+			this.renderMode = mode;
+			this.updateDisplay();
+		}
 	}
 
 	override invalidate(): void {
@@ -146,6 +157,8 @@ export class BashExecutionComponent extends Container {
 				// Show all lines
 				const displayText = availableLines.map((line) => theme.fg("muted", line)).join("\n");
 				this.contentContainer.addChild(new Text(`\n${displayText}`, 1, 0));
+			} else if (this.renderMode === "minimal") {
+				this.contentContainer.addChild(new Text(`\n${theme.fg("muted", `(${keyHint("expandTools", "to expand")})`)}`, 1, 0));
 			} else {
 				// Use shared visual truncation utility
 				const styledOutput = previewLogicalLines.map((line) => theme.fg("muted", line)).join("\n");

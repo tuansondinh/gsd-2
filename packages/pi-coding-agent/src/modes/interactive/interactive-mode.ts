@@ -2178,7 +2178,12 @@ export class InteractiveMode {
 	private addMessageToChat(message: AgentMessage, options?: { populateHistory?: boolean }): void {
 		switch (message.role) {
 			case "bashExecution": {
-				const component = new BashExecutionComponent(message.command, this.ui, message.excludeFromContext);
+				const component = new BashExecutionComponent(
+					message.command,
+					this.ui,
+					message.excludeFromContext,
+					this.settingsManager.getToolOutputMode(),
+				);
 				if (message.output) {
 					component.appendOutput(message.output);
 				}
@@ -2188,6 +2193,7 @@ export class InteractiveMode {
 					message.truncated ? ({ truncated: true } as TruncationResult) : undefined,
 					message.fullOutputPath,
 				);
+				component.setExpanded(this.toolOutputExpanded);
 				this.chatContainer.addChild(component);
 				break;
 			}
@@ -2294,7 +2300,10 @@ export class InteractiveMode {
 						const component = new ToolExecutionComponent(
 							content.name,
 							content.arguments,
-							{ showImages: this.settingsManager.getShowImages() },
+							{
+								showImages: this.settingsManager.getShowImages(),
+								renderMode: this.settingsManager.getToolOutputMode(),
+							},
 							this.getRegisteredToolDefinition(content.name),
 							this.ui,
 						);
@@ -2321,7 +2330,10 @@ export class InteractiveMode {
 						const component = new ToolExecutionComponent(
 							content.name,
 							content.input ?? {},
-							{ showImages: this.settingsManager.getShowImages() },
+							{
+								showImages: this.settingsManager.getShowImages(),
+								renderMode: this.settingsManager.getToolOutputMode(),
+							},
 							undefined,
 							this.ui,
 						);
@@ -2583,6 +2595,12 @@ export class InteractiveMode {
 			if (isExpandable(child)) {
 				child.setExpanded(expanded);
 			}
+		}
+		if (this.bashComponent) {
+			this.bashComponent.setExpanded(expanded);
+		}
+		for (const component of this.pendingBashComponents) {
+			component.setExpanded(expanded);
 		}
 		this.ui.requestRender();
 	}
@@ -2912,6 +2930,7 @@ export class InteractiveMode {
 					autoCompact: this.session.autoCompactionEnabled,
 					autoCompactThresholdPercent: this.settingsManager.getCompactionThresholdPercent(),
 					classifierModel: this.settingsManager.getClassifierModel() ?? "default",
+					budgetSubagentModel: this.settingsManager.getBudgetSubagentModel() ?? "default",
 					showImages: this.settingsManager.getShowImages(),
 					autoResizeImages: this.settingsManager.getImageAutoResize(),
 					blockImages: this.settingsManager.getBlockImages(),
@@ -2934,7 +2953,18 @@ export class InteractiveMode {
 					quietStartup: this.settingsManager.getQuietStartup(),
 					clearOnShrink: this.settingsManager.getClearOnShrink(),
 					timestampFormat: this.settingsManager.getTimestampFormat(),
+					toolOutputMode: this.settingsManager.getToolOutputMode(),
 					classifierModelSubmenu: (_currentValue, submenuDone) =>
+						new ModelSelectorComponent(
+							this.ui,
+							undefined,
+							this.settingsManager,
+							this.session.modelRegistry,
+							[],
+							(model) => submenuDone(`${model.provider}/${model.id}`),
+							() => submenuDone(),
+						),
+					budgetSubagentModelSubmenu: (_currentValue, submenuDone) =>
 						new ModelSelectorComponent(
 							this.ui,
 							undefined,
@@ -2957,6 +2987,12 @@ export class InteractiveMode {
 					onClassifierModelChange: (modelRef) => {
 						this.settingsManager.setClassifierModel(modelRef);
 						this.showStatus(`Classifier model: ${modelRef}`);
+					},
+					onBudgetSubagentModelChange: (modelRef) => {
+						this.settingsManager.setBudgetSubagentModel(modelRef === "default" ? undefined : modelRef);
+						this.showStatus(
+							`Budget subagent model: ${modelRef === "default" ? "use current/default model" : modelRef}`,
+						);
 					},
 					onShowImagesChange: (enabled) => {
 						this.settingsManager.setShowImages(enabled);
@@ -3057,6 +3093,17 @@ export class InteractiveMode {
 					},
 					onTimestampFormatChange: (format) => {
 						this.settingsManager.setTimestampFormat(format);
+					},
+					onToolOutputModeChange: (mode) => {
+						this.settingsManager.setToolOutputMode(mode);
+						for (const child of this.chatContainer.children) {
+							if (child instanceof ToolExecutionComponent || child instanceof BashExecutionComponent) {
+								child.setRenderMode(mode);
+							}
+						}
+						if (this.bashComponent) this.bashComponent.setRenderMode(mode);
+						for (const component of this.pendingBashComponents) component.setRenderMode(mode);
+						this.ui.requestRender();
 					},
 					onCancel: () => {
 						done();
@@ -3819,7 +3866,13 @@ export class InteractiveMode {
 			const result = eventResult.result;
 
 			// Create UI component for display
-			this.bashComponent = new BashExecutionComponent(label, this.ui, excludeFromContext);
+			this.bashComponent = new BashExecutionComponent(
+				label,
+				this.ui,
+				excludeFromContext,
+				this.settingsManager.getToolOutputMode(),
+			);
+			this.bashComponent.setExpanded(this.toolOutputExpanded);
 			if (this.session.isStreaming) {
 				this.pendingMessagesContainer.addChild(this.bashComponent);
 				this.pendingBashComponents.push(this.bashComponent);
@@ -3847,7 +3900,13 @@ export class InteractiveMode {
 
 		// Normal execution path (possibly with custom operations)
 		const isDeferred = this.session.isStreaming;
-		this.bashComponent = new BashExecutionComponent(label, this.ui, excludeFromContext);
+		this.bashComponent = new BashExecutionComponent(
+			label,
+			this.ui,
+			excludeFromContext,
+			this.settingsManager.getToolOutputMode(),
+		);
+		this.bashComponent.setExpanded(this.toolOutputExpanded);
 
 		if (isDeferred) {
 			// Show in pending area when agent is streaming

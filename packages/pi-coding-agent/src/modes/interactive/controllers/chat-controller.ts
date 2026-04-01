@@ -119,7 +119,10 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 							const component = new ToolExecutionComponent(
 								content.name,
 								content.arguments,
-								{ showImages: host.settingsManager.getShowImages() },
+								{
+									showImages: host.settingsManager.getShowImages(),
+									renderMode: host.settingsManager.getToolOutputMode(),
+								},
 								host.getRegisteredToolDefinition(content.name),
 								host.ui,
 							);
@@ -134,7 +137,10 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 							const component = new ToolExecutionComponent(
 								content.name,
 								content.input ?? {},
-								{ showImages: host.settingsManager.getShowImages() },
+								{
+									showImages: host.settingsManager.getShowImages(),
+									renderMode: host.settingsManager.getToolOutputMode(),
+								},
 								undefined,
 								host.ui,
 							);
@@ -203,7 +209,10 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 				const component = new ToolExecutionComponent(
 					event.toolName,
 					event.args,
-					{ showImages: host.settingsManager.getShowImages() },
+					{
+						showImages: host.settingsManager.getShowImages(),
+						renderMode: host.settingsManager.getToolOutputMode(),
+					},
 					host.getRegisteredToolDefinition(event.toolName),
 					host.ui,
 				);

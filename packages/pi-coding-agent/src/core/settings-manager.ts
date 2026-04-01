@@ -114,6 +114,7 @@ export interface Settings {
 	lastChangelogVersion?: string;
 	defaultProvider?: string;
 	defaultModel?: string;
+	budgetSubagentModel?: string;
 	permissionMode?: "danger-full-access" | "accept-on-edit" | "auto" | "plan";
 	classifierModel?: string;
 	defaultThinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
@@ -155,6 +156,7 @@ export interface Settings {
 	modelDiscovery?: ModelDiscoverySettings;
 	editMode?: "standard" | "hashline"; // Edit tool mode: "standard" (text match) or "hashline" (LINE#ID anchors). Default: "standard"
 	timestampFormat?: "date-time-iso" | "date-time-us"; // Timestamp display format for messages. Default: "date-time-iso"
+	toolOutputMode?: "minimal" | "normal"; // Collapsed tool rendering mode. "minimal" hides previews until expanded.
 }
 
 /** Deep merge settings: project/overrides take precedence, nested objects merge recursively */
@@ -659,6 +661,10 @@ export class SettingsManager {
 		return this.settings.defaultModel;
 	}
 
+	getBudgetSubagentModel(): string | undefined {
+		return this.settings.budgetSubagentModel;
+	}
+
 	getPermissionMode(): "danger-full-access" | "accept-on-edit" | "auto" | "plan" {
 		return this.settings.permissionMode ?? "accept-on-edit";
 	}
@@ -673,6 +679,16 @@ export class SettingsManager {
 
 	setDefaultModel(modelId: string): void {
 		this.setScopedSetting("defaultModel", modelId);
+	}
+
+	setBudgetSubagentModel(modelRef: string | undefined): void {
+		if (modelRef === undefined) {
+			delete this.globalSettings.budgetSubagentModel;
+			this.markModified("budgetSubagentModel");
+			this.save();
+			return;
+		}
+		this.setGlobalSetting("budgetSubagentModel", modelRef);
 	}
 
 	setPermissionMode(mode: "danger-full-access" | "accept-on-edit" | "auto" | "plan"): void {
@@ -844,6 +860,14 @@ export class SettingsManager {
 
 	setCollapseChangelog(collapse: boolean): void {
 		this.setGlobalSetting("collapseChangelog", collapse);
+	}
+
+	getToolOutputMode(): "minimal" | "normal" {
+		return this.settings.toolOutputMode === "minimal" ? "minimal" : "normal";
+	}
+
+	setToolOutputMode(mode: "minimal" | "normal"): void {
+		this.setGlobalSetting("toolOutputMode", mode);
 	}
 
 	getPackages(): PackageSource[] {

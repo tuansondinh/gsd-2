@@ -27,6 +27,7 @@ export interface SettingsConfig {
 	autoCompact: boolean;
 	autoCompactThresholdPercent: number;
 	classifierModel: string;
+	budgetSubagentModel: string;
 	showImages: boolean;
 	autoResizeImages: boolean;
 	blockImages: boolean;
@@ -49,13 +50,16 @@ export interface SettingsConfig {
 	quietStartup: boolean;
 	clearOnShrink: boolean;
 	timestampFormat: "date-time-iso" | "date-time-us";
+	toolOutputMode: "minimal" | "normal";
 	classifierModelSubmenu?: (currentValue: string, done: (selectedValue?: string) => void) => Component;
+	budgetSubagentModelSubmenu?: (currentValue: string, done: (selectedValue?: string) => void) => Component;
 }
 
 export interface SettingsCallbacks {
 	onAutoCompactChange: (enabled: boolean) => void;
 	onAutoCompactThresholdPercentChange: (percent: number) => void;
 	onClassifierModelChange: (modelRef: string) => void;
+	onBudgetSubagentModelChange: (modelRef: string) => void;
 	onShowImagesChange: (enabled: boolean) => void;
 	onAutoResizeImagesChange: (enabled: boolean) => void;
 	onBlockImagesChange: (blocked: boolean) => void;
@@ -77,6 +81,7 @@ export interface SettingsCallbacks {
 	onQuietStartupChange: (enabled: boolean) => void;
 	onClearOnShrinkChange: (enabled: boolean) => void;
 	onTimestampFormatChange: (format: "date-time-iso" | "date-time-us") => void;
+	onToolOutputModeChange: (mode: "minimal" | "normal") => void;
 	onCancel: () => void;
 }
 
@@ -176,6 +181,13 @@ export class SettingsSelectorComponent extends Container {
 				submenu: config.classifierModelSubmenu,
 			},
 			{
+				id: "budget-subagent-model",
+				label: "Budget subagent model",
+				description: "Cheap model alias for subagents like scout",
+				currentValue: config.budgetSubagentModel,
+				submenu: config.budgetSubagentModelSubmenu,
+			},
+			{
 				id: "steering-mode",
 				label: "Steering mode",
 				description:
@@ -204,6 +216,13 @@ export class SettingsSelectorComponent extends Container {
 				description: "Hide thinking blocks in assistant responses",
 				currentValue: config.hideThinkingBlock ? "true" : "false",
 				values: ["true", "false"],
+			},
+			{
+				id: "tool-output-mode",
+				label: "Tool output mode",
+				description: "Minimal hides collapsed previews until Ctrl+O. Normal shows collapsed previews.",
+				currentValue: config.toolOutputMode,
+				values: ["minimal", "normal"],
 			},
 			{
 				id: "collapse-changelog",
@@ -405,6 +424,9 @@ export class SettingsSelectorComponent extends Container {
 					case "classifier-model":
 						callbacks.onClassifierModelChange(newValue);
 						break;
+					case "budget-subagent-model":
+						callbacks.onBudgetSubagentModelChange(newValue);
+						break;
 					case "show-images":
 						callbacks.onShowImagesChange(newValue === "true");
 						break;
@@ -428,6 +450,9 @@ export class SettingsSelectorComponent extends Container {
 						break;
 					case "hide-thinking":
 						callbacks.onHideThinkingBlockChange(newValue === "true");
+						break;
+					case "tool-output-mode":
+						callbacks.onToolOutputModeChange(newValue as "minimal" | "normal");
 						break;
 					case "collapse-changelog":
 						callbacks.onCollapseChangelogChange(newValue === "true");

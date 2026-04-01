@@ -52,6 +52,7 @@ function str(value: unknown): string | null {
 
 export interface ToolExecutionOptions {
 	showImages?: boolean; // default: true (only used if terminal supports images)
+	renderMode?: "minimal" | "normal";
 }
 
 type WriteHighlightCache = {
@@ -73,6 +74,7 @@ export class ToolExecutionComponent extends Container {
 	private toolName: string;
 	private args: any;
 	private expanded = false;
+	private renderMode: "minimal" | "normal";
 	private showImages: boolean;
 	private isPartial = true;
 	private toolDefinition?: ToolDefinition;
@@ -105,6 +107,7 @@ export class ToolExecutionComponent extends Container {
 		this.toolName = toolName;
 		this.args = args;
 		this.showImages = options.showImages ?? true;
+		this.renderMode = options.renderMode ?? "normal";
 		this.toolDefinition = toolDefinition;
 		this.ui = ui;
 		this.cwd = cwd;
@@ -343,6 +346,13 @@ export class ToolExecutionComponent extends Container {
 		this.updateDisplay();
 	}
 
+	setRenderMode(mode: "minimal" | "normal"): void {
+		if (this.renderMode !== mode) {
+			this.renderMode = mode;
+			this.updateDisplay();
+		}
+	}
+
 	setShowImages(show: boolean): void {
 		this.showImages = show;
 		this.updateDisplay();
@@ -411,14 +421,23 @@ export class ToolExecutionComponent extends Container {
 			// Render result component if we have a result
 			if (this.result && this.toolDefinition.renderResult) {
 				try {
-					const resultComponent = this.toolDefinition.renderResult(
-						{ content: this.result.content as any, details: this.result.details },
-						{ expanded: this.expanded, isPartial: this.isPartial },
-						theme,
-					);
-					if (resultComponent !== undefined) {
-						this.contentBox.addChild(resultComponent);
-						customRendererHasContent = true;
+					if (this.shouldHideCollapsedPreview()) {
+						const output = this.getTextOutput();
+						const hasDetails = output.trim().length > 0 || this.imageComponents.length > 0 || this.result.details !== undefined;
+						if (hasDetails) {
+							this.contentBox.addChild(new Text(`\n${this.collapsedExpandHint()}`, 0, 0));
+							customRendererHasContent = true;
+						}
+					} else {
+						const resultComponent = this.toolDefinition.renderResult(
+							{ content: this.result.content as any, details: this.result.details },
+							{ expanded: this.expanded, isPartial: this.isPartial },
+							theme,
+						);
+						if (resultComponent !== undefined) {
+							this.contentBox.addChild(resultComponent);
+							customRendererHasContent = true;
+						}
 					}
 				} catch {
 					// Fall back to showing raw output on error
@@ -432,7 +451,11 @@ export class ToolExecutionComponent extends Container {
 				// Has result but no custom renderResult
 				const output = this.getTextOutput();
 				if (output) {
-					this.contentBox.addChild(new Text(theme.fg("toolOutput", output), 0, 0));
+					if (this.shouldHideCollapsedPreview()) {
+						this.contentBox.addChild(new Text(`\n${this.collapsedExpandHint()}`, 0, 0));
+					} else {
+						this.contentBox.addChild(new Text(theme.fg("toolOutput", output), 0, 0));
+					}
 					customRendererHasContent = true;
 				}
 			}
@@ -521,6 +544,8 @@ export class ToolExecutionComponent extends Container {
 				if (this.expanded) {
 					// Show all lines when expanded
 					this.contentBox.addChild(new Text(`\n${styledOutput}`, 0, 0));
+				} else if (this.renderMode === "minimal") {
+					this.contentBox.addChild(new Text(`\n${this.collapsedExpandHint()}`, 0, 0));
 				} else {
 					// Use visual line truncation when collapsed with width-aware caching
 					let cachedWidth: number | undefined;
@@ -601,9 +626,23 @@ export class ToolExecutionComponent extends Container {
 		return output;
 	}
 
+	private shouldHideCollapsedPreview(): boolean {
+		return !this.expanded && this.renderMode === "minimal" && !this.result?.isError;
+	}
+
+	private collapsedExpandHint(label = keyHint("expandTools", "to expand")): string {
+		return theme.fg("muted", `(${label})`);
+	}
+
+	private collapsedFirstLine(output: string): string | undefined {
+		const first = output.split("\n").map((line) => line.trim()).find(Boolean);
+		return first ? truncateToWidth(first, 120, "...") : undefined;
+	}
+
 	private formatToolExecution(): string {
 		let text = "";
 		const invalidArg = theme.fg("error", "[invalid arg]");
+		const hideCollapsedPreview = this.shouldHideCollapsedPreview();
 
 		if (this.toolName === "read") {
 			const rawPath = str(this.args?.file_path ?? this.args?.path);
@@ -628,17 +667,23 @@ export class ToolExecutionComponent extends Container {
 				const lang = rawPath ? getLanguageFromPath(rawPath) : undefined;
 				const lines = lang ? highlightCode(replaceTabs(output), lang) : output.split("\n");
 
-				const maxLines = this.expanded ? lines.length : 10;
-				const displayLines = lines.slice(0, maxLines);
-				const remaining = lines.length - maxLines;
+				if (hideCollapsedPreview) {
+					if (output.trim()) {
+						text += `\n\n${this.collapsedExpandHint()}`;
+					}
+				} else {
+					const maxLines = this.expanded ? lines.length : 10;
+					const displayLines = lines.slice(0, maxLines);
+					const remaining = lines.length - maxLines;
 
-				text +=
-					"\n\n" +
-					displayLines
-						.map((line: string) => (lang ? replaceTabs(line) : theme.fg("toolOutput", replaceTabs(line))))
-						.join("\n");
-				if (remaining > 0) {
-					text += `${theme.fg("muted", `\n... (${remaining} more lines,`)} ${keyHint("expandTools", "to expand")})`;
+					text +=
+						"\n\n" +
+						displayLines
+							.map((line: string) => (lang ? replaceTabs(line) : theme.fg("toolOutput", replaceTabs(line))))
+							.join("\n");
+					if (remaining > 0) {
+						text += `${theme.fg("muted", `\n... (${remaining} more lines,`)} ${keyHint("expandTools", "to expand")})`;
+					}
 				}
 
 				const truncation = this.result.details?.truncation;
@@ -704,18 +749,22 @@ export class ToolExecutionComponent extends Container {
 					this.writeHighlightCache = undefined;
 				}
 
-				const totalLines = lines.length;
-				const maxLines = this.expanded ? lines.length : 10;
-				const displayLines = lines.slice(0, maxLines);
-				const remaining = lines.length - maxLines;
+				if (hideCollapsedPreview) {
+					text += `\n\n${this.collapsedExpandHint()}`;
+				} else {
+					const totalLines = lines.length;
+					const maxLines = this.expanded ? lines.length : 10;
+					const displayLines = lines.slice(0, maxLines);
+					const remaining = lines.length - maxLines;
 
-				text +=
-					"\n\n" +
-					displayLines.map((line: string) => (lang ? line : theme.fg("toolOutput", replaceTabs(line)))).join("\n");
-				if (remaining > 0) {
 					text +=
-						theme.fg("muted", `\n... (${remaining} more lines, ${totalLines} total,`) +
-						` ${keyHint("expandTools", "to expand")})`;
+						"\n\n" +
+						displayLines.map((line: string) => (lang ? line : theme.fg("toolOutput", replaceTabs(line)))).join("\n");
+					if (remaining > 0) {
+						text +=
+							theme.fg("muted", `\n... (${remaining} more lines, ${totalLines} total,`) +
+							` ${keyHint("expandTools", "to expand")})`;
+					}
 				}
 			}
 
@@ -753,13 +802,17 @@ export class ToolExecutionComponent extends Container {
 				// Tool executed successfully - use the diff from result
 				// This takes priority over editDiffPreview which may have a stale error
 				// due to race condition (async preview computed after file was modified)
-				text += `\n\n${renderDiff(this.result.details.diff, { filePath: rawPath ?? undefined })}`;
+				text += hideCollapsedPreview
+					? `\n\n${this.collapsedExpandHint()}`
+					: `\n\n${renderDiff(this.result.details.diff, { filePath: rawPath ?? undefined })}`;
 			} else if (this.editDiffPreview) {
 				// Use cached diff preview (before tool executes)
 				if ("error" in this.editDiffPreview) {
 					text += `\n\n${theme.fg("error", this.editDiffPreview.error)}`;
 				} else if (this.editDiffPreview.diff) {
-					text += `\n\n${renderDiff(this.editDiffPreview.diff, { filePath: rawPath ?? undefined })}`;
+					text += hideCollapsedPreview
+						? `\n\n${this.collapsedExpandHint()}`
+						: `\n\n${renderDiff(this.editDiffPreview.diff, { filePath: rawPath ?? undefined })}`;
 				}
 			}
 		} else if (this.toolName === "ls") {
@@ -775,14 +828,18 @@ export class ToolExecutionComponent extends Container {
 			if (this.result) {
 				const output = this.getTextOutput().trim();
 				if (output) {
-					const lines = output.split("\n");
-					const maxLines = this.expanded ? lines.length : 20;
-					const displayLines = lines.slice(0, maxLines);
-					const remaining = lines.length - maxLines;
+					if (hideCollapsedPreview) {
+						text += `\n\n${this.collapsedExpandHint()}`;
+					} else {
+						const lines = output.split("\n");
+						const maxLines = this.expanded ? lines.length : 20;
+						const displayLines = lines.slice(0, maxLines);
+						const remaining = lines.length - maxLines;
 
-					text += `\n\n${displayLines.map((line: string) => theme.fg("toolOutput", line)).join("\n")}`;
-					if (remaining > 0) {
-						text += `${theme.fg("muted", `\n... (${remaining} more lines,`)} ${keyHint("expandTools", "to expand")})`;
+						text += `\n\n${displayLines.map((line: string) => theme.fg("toolOutput", line)).join("\n")}`;
+						if (remaining > 0) {
+							text += `${theme.fg("muted", `\n... (${remaining} more lines,`)} ${keyHint("expandTools", "to expand")})`;
+						}
 					}
 				}
 
@@ -817,14 +874,18 @@ export class ToolExecutionComponent extends Container {
 			if (this.result) {
 				const output = this.getTextOutput().trim();
 				if (output) {
-					const lines = output.split("\n");
-					const maxLines = this.expanded ? lines.length : 20;
-					const displayLines = lines.slice(0, maxLines);
-					const remaining = lines.length - maxLines;
+					if (hideCollapsedPreview) {
+						text += `\n\n${this.collapsedExpandHint()}`;
+					} else {
+						const lines = output.split("\n");
+						const maxLines = this.expanded ? lines.length : 20;
+						const displayLines = lines.slice(0, maxLines);
+						const remaining = lines.length - maxLines;
 
-					text += `\n\n${displayLines.map((line: string) => theme.fg("toolOutput", line)).join("\n")}`;
-					if (remaining > 0) {
-						text += `${theme.fg("muted", `\n... (${remaining} more lines,`)} ${keyHint("expandTools", "to expand")})`;
+						text += `\n\n${displayLines.map((line: string) => theme.fg("toolOutput", line)).join("\n")}`;
+						if (remaining > 0) {
+							text += `${theme.fg("muted", `\n... (${remaining} more lines,`)} ${keyHint("expandTools", "to expand")})`;
+						}
 					}
 				}
 
@@ -863,14 +924,18 @@ export class ToolExecutionComponent extends Container {
 			if (this.result) {
 				const output = this.getTextOutput().trim();
 				if (output) {
-					const lines = output.split("\n");
-					const maxLines = this.expanded ? lines.length : 15;
-					const displayLines = lines.slice(0, maxLines);
-					const remaining = lines.length - maxLines;
+					if (hideCollapsedPreview) {
+						text += `\n\n${this.collapsedExpandHint()}`;
+					} else {
+						const lines = output.split("\n");
+						const maxLines = this.expanded ? lines.length : 15;
+						const displayLines = lines.slice(0, maxLines);
+						const remaining = lines.length - maxLines;
 
-					text += `\n\n${displayLines.map((line: string) => theme.fg("toolOutput", line)).join("\n")}`;
-					if (remaining > 0) {
-						text += `${theme.fg("muted", `\n... (${remaining} more lines,`)} ${keyHint("expandTools", "to expand")})`;
+						text += `\n\n${displayLines.map((line: string) => theme.fg("toolOutput", line)).join("\n")}`;
+						if (remaining > 0) {
+							text += `${theme.fg("muted", `\n... (${remaining} more lines,`)} ${keyHint("expandTools", "to expand")})`;
+						}
 					}
 				}
 
@@ -900,14 +965,18 @@ export class ToolExecutionComponent extends Container {
 			} else if (this.result) {
 				const output = this.getTextOutput().trim();
 				if (output) {
-					const lines = output.split("\n");
-					const maxLines = this.expanded ? lines.length : 10;
-					const displayLines = lines.slice(0, maxLines);
-					const remaining = lines.length - maxLines;
+					if (hideCollapsedPreview) {
+						text += `\n\n${this.collapsedExpandHint()}`;
+					} else {
+						const lines = output.split("\n");
+						const maxLines = this.expanded ? lines.length : 10;
+						const displayLines = lines.slice(0, maxLines);
+						const remaining = lines.length - maxLines;
 
-					text += `\n\n${displayLines.map((line: string) => theme.fg("toolOutput", line)).join("\n")}`;
-					if (remaining > 0) {
-						text += `${theme.fg("muted", `\n... (${remaining} more lines,`)} ${keyHint("expandTools", "to expand")})`;
+						text += `\n\n${displayLines.map((line: string) => theme.fg("toolOutput", line)).join("\n")}`;
+						if (remaining > 0) {
+							text += `${theme.fg("muted", `\n... (${remaining} more lines,`)} ${keyHint("expandTools", "to expand")})`;
+						}
 					}
 				}
 			}
@@ -916,9 +985,9 @@ export class ToolExecutionComponent extends Container {
 			text = theme.fg("toolTitle", theme.bold(this.toolName));
 
 			const content = JSON.stringify(this.args, null, 2);
-			text += `\n\n${content}`;
+			text += hideCollapsedPreview ? `\n\n${this.collapsedExpandHint()}` : `\n\n${content}`;
 			const output = this.getTextOutput();
-			if (output) {
+			if (output && !hideCollapsedPreview) {
 				text += `\n${output}`;
 			}
 		}
