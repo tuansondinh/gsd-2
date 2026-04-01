@@ -1,0 +1,12 @@
+{
+  "id": "codex-rotate",
+  "name": "Codex OAuth Rotation",
+  "version": "1.0.0",
+  "description": "Manage multiple ChatGPT/Codex OAuth accounts with automatic rotation and token refresh",
+  "tier": "bundled",
+  "requires": { "platform": ">=2.29.0" },
+  "provides": {
+    "commands": ["codex"],
+    "hooks": ["session_start", "session_shutdown", "agent_end"]
+  }
+}
