@@ -237,6 +237,7 @@ export class ExtensionRunner {
 		this.runtime.sendMessage = actions.sendMessage;
 		this.runtime.sendUserMessage = actions.sendUserMessage;
 		this.runtime.executeSlashCommand = actions.executeSlashCommand;
+		this.runtime.abort = actions.abort;
 		this.runtime.retryLastTurn = actions.retryLastTurn;
 		this.runtime.appendEntry = actions.appendEntry;
 		this.runtime.setSessionName = actions.setSessionName;

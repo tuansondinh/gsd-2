@@ -11,7 +11,6 @@ import { apiRequest } from "./http-client.js";
 import { telegramPullUpdates, telegramSyncLatestUpdateId, telegramMarkConsumerSeen } from "./telegram-update-stream.js";
 
 const TELEGRAM_API = "https://api.telegram.org";
-const TOOL_FLUSH_MS = 2000;
 const ASSISTANT_FLUSH_MS = 1200;
 const TELEGRAM_MESSAGE_LIMIT = 4000;
 const RELAY_OWNER_STALE_MS = 2 * 60 * 1000;
@@ -45,19 +44,21 @@ interface TelegramUpdate {
   };
 }
 
+type AbortableExtensionAPI = ExtensionAPI & { abort(): void };
+
 export class TelegramLiveRelay {
   private readonly pi: ExtensionAPI;
   private state: RelayState | null = null;
   private pollTimer: NodeJS.Timeout | null = null;
   private isPolling = false;
   private shuttingDown = false;
+  private stopRequested = false;
   private botUserId: number | null = null;
-  private toolBuffer: string[] = [];
-  private toolFlushTimer: NodeJS.Timeout | null = null;
   private readonly consumerId: string;
   private readonly ownerId: string;
   private readonly recentInboundFingerprints = new Map<string, number>();
   private readonly toolArgsByCallId = new Map<string, Record<string, unknown> | undefined>();
+  private readonly toolStartMessageIds = new Map<string, number>();
   private assistantDraftMessageId: number | null = null;
   private assistantDraftCreation: Promise<number | null> | null = null;
   private assistantDraftText = "";
@@ -125,7 +126,8 @@ export class TelegramLiveRelay {
   async disconnect(ctx?: ExtensionCommandContext, reason?: string): Promise<void> {
     const wasConnected = !!this.state?.connected;
     this.stopPollingLoop();
-    this.flushToolBuffer();
+    this.toolArgsByCallId.clear();
+    this.toolStartMessageIds.clear();
     this.releaseOwnership();
     if (wasConnected) {
       const message = reason ? `Telegram live relay disconnected: ${reason}` : "Telegram live relay disconnected.";
@@ -190,6 +192,7 @@ export class TelegramLiveRelay {
   onMessageStart(event: { message?: { role?: string } }): void {
     if (!this.state?.connected) return;
     if (event.message?.role !== "assistant") return;
+    this.stopRequested = false;
     this.assistantDraftText = "";
     this.lastAssistantFlushAt = 0;
     void this.ensureAssistantDraftMessage();
@@ -198,6 +201,7 @@ export class TelegramLiveRelay {
   onMessageUpdate(event: { message?: { role?: string; content?: unknown } }): void {
     if (!this.state?.connected) return;
     if (event.message?.role !== "assistant") return;
+    if (this.stopRequested) return;
     const text = extractText(event.message.content).trim();
     if (!text) return;
     this.assistantDraftText = text;
@@ -207,6 +211,12 @@ export class TelegramLiveRelay {
   onMessageEnd(event: { message?: { role?: string; content?: unknown } }): void {
     if (!this.state?.connected) return;
     if (event.message?.role !== "assistant") return;
+    if (this.stopRequested) {
+      this.stopRequested = false;
+      this.assistantDraftText = "";
+      void this.clearAssistantDraft();
+      return;
+    }
     const text = extractText(event.message.content);
     if (!text.trim()) return;
     if (this.wasRecentlyReceivedFromTelegram(text)) return;
@@ -216,15 +226,28 @@ export class TelegramLiveRelay {
 
   onToolExecutionStart(event: { toolCallId?: string; toolName: string; args?: Record<string, unknown> }): void {
     if (!this.state?.connected) return;
-    if (event.toolCallId) this.toolArgsByCallId.set(event.toolCallId, event.args);
-    this.bufferToolEvent(formatToolStart(event.toolName, event.args));
+
+    const startText = formatToolStart(event.toolName, event.args);
+    if (!event.toolCallId) {
+      void this.safeSendTelegram(startText);
+      return;
+    }
+
+    this.toolArgsByCallId.set(event.toolCallId, event.args);
+    void this.sendToolStartMessage(event.toolCallId, startText);
   }
 
   onToolExecutionEnd(event: { toolCallId?: string; toolName: string; isError: boolean; result?: unknown; args?: Record<string, unknown> }): void {
     if (!this.state?.connected) return;
     const args = event.args ?? (event.toolCallId ? this.toolArgsByCallId.get(event.toolCallId) : undefined);
     if (event.toolCallId) this.toolArgsByCallId.delete(event.toolCallId);
-    this.bufferToolEvent(formatToolEnd(event.toolName, args, event.result, event.isError));
+
+    const endText = formatToolEnd(event.toolName, args, event.result, event.isError);
+    if (event.toolCallId) {
+      void this.updateToolStartMessage(event.toolCallId, endText);
+      return;
+    }
+    void this.safeSendTelegram(endText);
   }
 
   async onSessionSwitch(_event: unknown): Promise<void> {
@@ -339,6 +362,13 @@ export class TelegramLiveRelay {
 
     if (!this.state.connected) return;
 
+    if (text === "/stop") {
+      this.stopRequested = true;
+      (this.pi as AbortableExtensionAPI).abort();
+      await this.clearAssistantDraft();
+      await this.safeSendTelegram("🛑 Stopped current response.", true);
+      return;
+    }
     if (text === "/disconnect") {
       await this.safeSendTelegram("🔌 Disconnecting live relay.", true);
       await this.disconnect(undefined, "requested from Telegram");
@@ -352,6 +382,7 @@ export class TelegramLiveRelay {
       await this.safeSendTelegram([
         "Commands:",
         "  /status",
+        "  /stop",
         "  /disconnect",
         "  /help",
         "  /clear, /reload, /compact, /lsd ...",
@@ -479,19 +510,33 @@ export class TelegramLiveRelay {
     this.assistantDraftText = "";
   }
 
-  private bufferToolEvent(line: string): void {
-    this.toolBuffer.push(line);
-    if (this.toolFlushTimer) return;
-    this.toolFlushTimer = setTimeout(() => this.flushToolBuffer(), TOOL_FLUSH_MS);
+  private async clearAssistantDraft(): Promise<void> {
+    if (this.assistantFlushTimer) clearTimeout(this.assistantFlushTimer);
+    this.assistantFlushTimer = null;
+    if (this.assistantDraftMessageId) {
+      await this.safeDeleteTelegram(this.assistantDraftMessageId);
+    }
+    this.assistantDraftMessageId = null;
+    this.assistantDraftCreation = null;
+    this.assistantDraftText = "";
   }
 
-  private flushToolBuffer(): void {
-    if (this.toolFlushTimer) clearTimeout(this.toolFlushTimer);
-    this.toolFlushTimer = null;
-    if (this.toolBuffer.length === 0) return;
-    const lines = [...this.toolBuffer];
-    this.toolBuffer = [];
-    void this.safeSendTelegram(lines.slice(0, 12).join("\n"));
+  private async sendToolStartMessage(toolCallId: string, text: string): Promise<void> {
+    const result = await this.safeSendTelegram(text);
+    const messageId = result?.result?.message_id;
+    if (typeof messageId === "number") {
+      this.toolStartMessageIds.set(toolCallId, messageId);
+    }
+  }
+
+  private async updateToolStartMessage(toolCallId: string, text: string): Promise<void> {
+    const messageId = this.toolStartMessageIds.get(toolCallId);
+    this.toolStartMessageIds.delete(toolCallId);
+    if (typeof messageId === "number") {
+      await this.safeEditTelegram(messageId, text);
+      return;
+    }
+    await this.safeSendTelegram(text);
   }
 
   private async tryDirectHandshakeCatchup(): Promise<void> {

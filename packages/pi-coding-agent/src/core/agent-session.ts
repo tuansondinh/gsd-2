@@ -2100,6 +2100,9 @@ export class AgentSession {
 						return true;
 					}
 				},
+				abort: () => {
+					this.abort();
+				},
 				retryLastTurn: () => {
 					const messages = this.agent.state.messages;
 					const last = messages[messages.length - 1];
