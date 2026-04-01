@@ -104,6 +104,13 @@ const CLASSIFIER_MODEL_OPTIONS = [
   { value: 'google/gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro Preview', hint: 'newer pro option' },
 ]
 
+const BUDGET_MODEL_OPTIONS = [
+  { value: 'anthropic/claude-haiku-4-5', label: 'Claude Haiku 4.5', hint: 'recommended for scout/subagents' },
+  { value: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash', hint: 'fast and cheap' },
+  { value: 'google/gemini-3-flash-preview', label: 'Gemini 3 Flash Preview', hint: 'newer flash option' },
+  { value: 'openai/gpt-4.1-mini', label: 'GPT-4.1 mini', hint: 'small general-purpose option' },
+]
+
 // ─── Dynamic imports ──────────────────────────────────────────────────────────
 
 /**
@@ -259,6 +266,18 @@ export async function runOnboarding(authStorage: AuthStorage, settingsManager: S
     p.log.warn(`Classifier model setup failed: ${err instanceof Error ? err.message : String(err)}`)
   }
 
+  // ── Budget Subagent Model ───────────────────────────────────────────────
+  let budgetModel: string | null = null
+  try {
+    budgetModel = await runBudgetModelStep(p, pc, settingsManager)
+  } catch (err) {
+    if (isCancelError(p, err)) {
+      p.cancel('Setup cancelled.')
+      return
+    }
+    p.log.warn(`Budget model setup failed: ${err instanceof Error ? err.message : String(err)}`)
+  }
+
   // ── Summary ───────────────────────────────────────────────────────────────
   const summaryLines: string[] = []
   if (llmConfigured) {
@@ -296,6 +315,12 @@ export async function runOnboarding(authStorage: AuthStorage, settingsManager: S
     summaryLines.push(`${pc.green('✓')} Classifier model: ${classifierModel}`)
   } else {
     summaryLines.push(`${pc.dim('↷')} Classifier model: app default`)
+  }
+
+  if (budgetModel) {
+    summaryLines.push(`${pc.green('✓')} Budget subagent model: ${budgetModel}`)
+  } else {
+    summaryLines.push(`${pc.dim('↷')} Budget subagent model: app default/current model`)
   }
 
   p.note(summaryLines.join('\n'), 'Setup complete')
@@ -342,6 +367,47 @@ async function runClassifierModelStep(
   settingsManager.setClassifierModel(selected)
   process.env.LUCENT_CODE_CLASSIFIER_MODEL = selected
   p.log.success(`Classifier model: ${pc.green(selected)}`)
+  return selected
+}
+
+async function runBudgetModelStep(
+  p: ClackModule,
+  pc: PicoModule,
+  settingsManager: SettingsManager,
+): Promise<string | null> {
+  const existing = settingsManager.getBudgetSubagentModel()
+  const options = []
+
+  if (existing) {
+    options.push({ value: 'keep', label: `Keep current (${existing})`, hint: 'already configured' })
+  }
+
+  options.push(
+    { value: 'default', label: 'Use current/default model', hint: 'scout falls back when no budget model is set' },
+    ...BUDGET_MODEL_OPTIONS,
+    { value: 'skip', label: 'Skip for now', hint: 'change later in /settings' },
+  )
+
+  const choice = await p.select({
+    message: 'Choose a budget model for cheap subagents like scout',
+    options,
+  })
+
+  if (p.isCancel(choice) || choice === 'skip') {
+    return existing ?? null
+  }
+  if (choice === 'keep') {
+    return existing ?? null
+  }
+  if (choice === 'default') {
+    settingsManager.setBudgetSubagentModel(undefined)
+    p.log.success(`Budget subagent model: ${pc.green('use current/default model')}`)
+    return null
+  }
+
+  const selected = String(choice)
+  settingsManager.setBudgetSubagentModel(selected)
+  p.log.success(`Budget subagent model: ${pc.green(selected)}`)
   return selected
 }
 

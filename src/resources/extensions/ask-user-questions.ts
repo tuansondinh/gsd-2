@@ -136,9 +136,6 @@ export default function AskUserQuestions(pi: ExtensionAPI) {
 			}
 
 			if (!ctx.hasUI) {
-				const { tryRemoteQuestions } = await import("./remote-questions/manager.js");
-				const remoteResult = await tryRemoteQuestions(params.questions, signal);
-				if (remoteResult) return { ...remoteResult, details: remoteResult.details as unknown };
 				return errorResult("Error: UI not available (non-interactive mode)", params.questions);
 			}
 

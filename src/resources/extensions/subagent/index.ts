@@ -12,7 +12,7 @@
  * Uses JSON mode to capture structured output from subagents.
  */
 
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, execSync, type ChildProcess } from "node:child_process";
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -20,7 +20,12 @@ import * as path from "node:path";
 import type { AgentToolResult } from "@gsd/pi-agent-core";
 import type { Message } from "@gsd/pi-ai";
 import { StringEnum } from "@gsd/pi-ai";
-import { type ExtensionAPI, SettingsManager, getMarkdownTheme } from "@gsd/pi-coding-agent";
+import {
+	type ExtensionAPI,
+	getAgentDir,
+	getMarkdownTheme,
+} from "@gsd/pi-coding-agent";
+import { requestClassifierDecision, requestFileChangeApproval } from "../../../../packages/pi-coding-agent/src/core/tool-approval.js";
 import { Container, Markdown, Spacer, Text } from "@gsd/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { formatTokenCount } from "../shared/mod.js";
@@ -34,6 +39,8 @@ import {
 	readIsolationMode,
 } from "./isolation.js";
 import { registerWorker, updateWorker } from "./worker-registry.js";
+import { handleSubagentPermissionRequest, isSubagentPermissionRequest } from "./approval-proxy.js";
+import { resolveConfiguredSubagentModel } from "./configured-model.js";
 import { resolveSubagentModel } from "./model-resolution.js";
 import { loadEffectivePreferences } from "../shared/preferences.js";
 import { CmuxClient, shellEscape } from "../cmux/index.js";
@@ -260,17 +267,16 @@ function writePromptToTempFile(agentName: string, prompt: string): { dir: string
 	return { dir: tmpDir, filePath };
 }
 
-export function resolveConfiguredSubagentModel(
-	agent: AgentConfig,
-	preferences = loadEffectivePreferences()?.preferences,
-	settingsBudgetModel = SettingsManager.create().getBudgetSubagentModel(),
-): string | undefined {
-	const configuredModel = agent.model?.trim();
-	if (!configuredModel) return undefined;
-	if (configuredModel === "$budget_model") {
-		return settingsBudgetModel?.trim() || preferences?.subagent?.budget_model?.trim() || undefined;
+function readBudgetSubagentModelFromSettings(): string | undefined {
+	try {
+		const settingsPath = path.join(getAgentDir(), "settings.json");
+		if (!fs.existsSync(settingsPath)) return undefined;
+		const raw = fs.readFileSync(settingsPath, "utf-8");
+		const parsed = JSON.parse(raw) as { budgetSubagentModel?: unknown };
+		return typeof parsed.budgetSubagentModel === "string" ? parsed.budgetSubagentModel.trim() || undefined : undefined;
+	} catch {
+		return undefined;
 	}
-	return configuredModel;
 }
 
 function buildSubagentProcessArgs(
@@ -287,16 +293,51 @@ function buildSubagentProcessArgs(
 	return args;
 }
 
+function resolveSubagentCliPath(defaultCwd: string): string | null {
+	const candidates = [process.env.GSD_BIN_PATH, process.env.LSD_BIN_PATH, process.argv[1]]
+		.map((value) => value?.trim())
+		.filter((value): value is string => Boolean(value && value !== "undefined"));
+
+	for (const candidate of candidates) {
+		if (path.isAbsolute(candidate) && fs.existsSync(candidate)) return candidate;
+	}
+
+	const cwdCandidates = [path.join(defaultCwd, "dist", "loader.js"), path.join(defaultCwd, "scripts", "dev-cli.js")];
+	for (const candidate of cwdCandidates) {
+		if (fs.existsSync(candidate)) return candidate;
+	}
+
+	for (const binName of ["lsd", "gsd"]) {
+		try {
+			const resolved = execSync(`which ${binName}`, { encoding: "utf-8" }).trim();
+			if (resolved) return resolved;
+		} catch {
+			/* ignore */
+		}
+	}
+
+	return null;
+}
+
 function processSubagentEventLine(
 	line: string,
 	currentResult: SingleResult,
 	emitUpdate: () => void,
+	proc?: ChildProcess,
 ): void {
 	if (!line.trim()) return;
 	let event: any;
 	try {
 		event = JSON.parse(line);
 	} catch {
+		return;
+	}
+
+	if (proc && isSubagentPermissionRequest(event)) {
+		void handleSubagentPermissionRequest(event, proc, {
+			requestFileChangeApproval,
+			requestClassifierDecision,
+		});
 		return;
 	}
 
@@ -372,7 +413,9 @@ async function runSingleAgent(
 	let tmpPromptDir: string | null = null;
 	let tmpPromptPath: string | null = null;
 
-	const resolvedModel = resolveConfiguredSubagentModel(agent);
+	const preferences = loadEffectivePreferences()?.preferences;
+	const settingsBudgetModel = readBudgetSubagentModelFromSettings();
+	const resolvedModel = resolveConfiguredSubagentModel(agent, preferences, settingsBudgetModel);
 	const inferredModel = resolveSubagentModel(
 		{ name: agent.name, model: resolvedModel },
 		{ overrideModel: modelOverride, parentModel },
@@ -411,10 +454,16 @@ async function runSingleAgent(
 		const exitCode = await new Promise<number>((resolve) => {
 			const bundledPaths = (process.env.GSD_BUNDLED_EXTENSION_PATHS ?? "").split(path.delimiter).map(s => s.trim()).filter(Boolean);
 			const extensionArgs = bundledPaths.flatMap(p => ["--extension", p]);
+			const cliPath = resolveSubagentCliPath(cwd ?? defaultCwd);
+			if (!cliPath) {
+				currentResult.stderr += "Unable to resolve LSD/GSD CLI path for subagent launch.";
+				resolve(1);
+				return;
+			}
 			const proc = spawn(
 				process.execPath,
-				[process.env.GSD_BIN_PATH!, ...extensionArgs, ...args],
-				{ cwd: cwd ?? defaultCwd, shell: false, stdio: ["ignore", "pipe", "pipe"] },
+				[cliPath, ...extensionArgs, ...args],
+				{ cwd: cwd ?? defaultCwd, shell: false, stdio: ["pipe", "pipe", "pipe"] },
 			);
 			liveSubagentProcesses.add(proc);
 			let buffer = "";
@@ -423,7 +472,7 @@ async function runSingleAgent(
 				buffer += data.toString();
 				const lines = buffer.split("\n");
 				buffer = lines.pop() || "";
-				for (const line of lines) processSubagentEventLine(line, currentResult, emitUpdate);
+				for (const line of lines) processSubagentEventLine(line, currentResult, emitUpdate, proc);
 			});
 
 			proc.stderr.on("data", (data) => {
@@ -432,7 +481,7 @@ async function runSingleAgent(
 
 			proc.on("close", (code) => {
 				liveSubagentProcesses.delete(proc);
-				if (buffer.trim()) processSubagentEventLine(buffer, currentResult, emitUpdate);
+				if (buffer.trim()) processSubagentEventLine(buffer, currentResult, emitUpdate, proc);
 				resolve(code ?? 0);
 			});
 
@@ -540,7 +589,7 @@ export default function (pi: ExtensionAPI) {
 		handler: async (_args, ctx) => {
 			const discovery = discoverAgents(ctx.cwd, "both");
 			if (discovery.agents.length === 0) {
-				ctx.ui.notify("No agents found. Add .md files to ~/.gsd/agent/agents/ or .gsd/agents/", "warning");
+				ctx.ui.notify("No agents found. Add .md files to ~/.lsd/agent/agents/ (or your configured agent dir) or .lsd/agents/", "warning");
 				return;
 			}
 			const lines = discovery.agents.map(
@@ -558,7 +607,7 @@ export default function (pi: ExtensionAPI) {
 			"Each subagent is a separate pi process with its own tools, model, and system prompt.",
 			"Model selection can be overridden per call, otherwise it is inferred from the agent config, delegated-task preferences, or the current session model.",
 			"Modes: single ({ agent, task }), parallel ({ tasks: [{agent, task},...] }), chain ({ chain: [{agent, task},...] } with {previous} placeholder).",
-			"Agents are defined as .md files in ~/.gsd/agent/agents/ (user) or .gsd/agents/ (project).",
+			"Agents are defined as .md files in the configured user agent directory (for LSD this is typically ~/.lsd/agent/agents/) or project-local .lsd/agents/, with legacy support for .gsd/agents/ and .pi/agents/.",
 			"Use the /subagent command to list available agents and their descriptions.",
 			"Use chain mode to pipeline: scout finds context, planner designs, worker implements.",
 		].join(" "),

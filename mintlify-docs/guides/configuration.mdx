@@ -114,6 +114,8 @@ models:
   execution_simple: claude-haiku-4-5-20250414
   completion: claude-sonnet-4-6
   subagent: claude-sonnet-4-6
+subagent:
+  budget_model: claude-haiku-4-5-20250414
 ```
 
 **Phases:** `research`, `planning`, `execution`, `execution_simple`, `completion`, `subagent`
@@ -127,6 +129,17 @@ For custom providers (Ollama, vLLM, LM Studio), see [custom models](/guides/cust
 ### `token_profile`
 
 Coordinates model selection, phase skipping, and context compression. Values: `budget`, `balanced` (default), `quality`. See [token optimization](/guides/token-optimization).
+
+### `subagent.budget_model`
+
+Optional cheap-model alias used by bundled budget-oriented subagents.
+
+```yaml
+subagent:
+  budget_model: claude-haiku-4-5-20250414
+```
+
+The bundled `scout` subagent resolves `model: $budget_model`, so setting this preference makes scout use the cheaper model automatically. If omitted, scout falls back to the current session/default model.
 
 ### `budget_ceiling`
 

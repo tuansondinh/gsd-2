@@ -338,6 +338,7 @@ export {
 	resolveApprovalResponse,
 	resolveClassifierResponse,
 	requestFileChangeApproval,
+	requestClassifierDecision,
 	setFileChangeApprovalHandler,
 	setPermissionMode,
 	setSubagentApprovalRouter,

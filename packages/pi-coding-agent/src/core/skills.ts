@@ -8,19 +8,22 @@ import type { ResourceDiagnostic } from "./diagnostics.js";
 import { CONFIG_DIR_NAME } from "../config.js";
 
 /**
- * The standard ecosystem skills directory used by skills.sh and the
- * Agent Skills standard.  All agents share this location for globally
- * installed skills.
+ * Preferred global skills directory for LSD.
  */
-export const ECOSYSTEM_SKILLS_DIR = join(homedir(), ".agents", "skills");
+export const ECOSYSTEM_SKILLS_DIR = join(homedir(), CONFIG_DIR_NAME, "skills");
 
 /**
- * The standard project-level skills directory (`.agents/skills/` relative to cwd).
+ * Preferred project-level skills directory (`.lsd/skills/` relative to cwd).
  */
-export const ECOSYSTEM_PROJECT_SKILLS_DIR = ".agents";
+export const ECOSYSTEM_PROJECT_SKILLS_DIR = CONFIG_DIR_NAME;
 
 /**
- * Legacy skills directory (~/.gsd/agent/skills/ or ~/.pi/agent/skills/).
+ * Compatibility fallback: shared Agent Skills ecosystem directory.
+ */
+const COMPAT_ECOSYSTEM_SKILLS_DIR = join(homedir(), ".agents", "skills");
+
+/**
+ * Legacy skills directory (~/.lsd/agent/skills/ or ~/.pi/agent/skills/).
  * Read as a fallback so existing installs don't lose skills before migration runs.
  */
 const LEGACY_SKILLS_DIR = join(homedir(), CONFIG_DIR_NAME, "agent", "skills");
@@ -349,7 +352,7 @@ function escapeXml(str: string): string {
 export interface LoadSkillsOptions {
 	/** Working directory for project-local skills. Default: process.cwd() */
 	cwd?: string;
-	/** @deprecated Skills now use ~/.agents/skills/ exclusively. This option is ignored. */
+	/** @deprecated Retained for compatibility. Default skill discovery no longer depends on agentDir. */
 	agentDir?: string;
 	/** Explicit skill paths (files or directories) */
 	skillPaths?: string[];
@@ -419,15 +422,18 @@ export function loadSkills(options: LoadSkillsOptions = {}): LoadSkillsResult {
 	}
 
 	if (includeDefaults) {
-		// Primary: ~/.agents/skills/ — the industry-standard skills.sh location
+		// Primary global location for LSD.
 		addSkills(loadSkillsFromDirInternal(ECOSYSTEM_SKILLS_DIR, "user", true));
-		// Primary project: .agents/skills/ — standard project-level location
+		// Preferred project-local location for LSD repos.
 		addSkills(loadSkillsFromDirInternal(resolve(cwd, ECOSYSTEM_PROJECT_SKILLS_DIR, "skills"), "project", true));
+		// Compatibility fallback: shared Agent Skills ecosystem directory.
+		if (COMPAT_ECOSYSTEM_SKILLS_DIR !== ECOSYSTEM_SKILLS_DIR) {
+			addSkills(loadSkillsFromDirInternal(COMPAT_ECOSYSTEM_SKILLS_DIR, "user", true));
+		}
 
-		// Legacy fallback: read skills from ~/.gsd/agent/skills/ so existing
-		// installs keep working until the one-time migration in resource-loader
-		// copies them to ~/.agents/skills/. Skip if migration has completed.
-		const legacyMigrated = existsSync(join(LEGACY_SKILLS_DIR, ".migrated-to-agents"));
+		// Legacy fallback: read skills from ~/.lsd/agent/skills/ so existing
+		// installs keep working until migration moves them to ~/.lsd/skills/.
+		const legacyMigrated = existsSync(join(LEGACY_SKILLS_DIR, ".migrated-to-lsd-skills"));
 		if (LEGACY_SKILLS_DIR !== ECOSYSTEM_SKILLS_DIR && existsSync(LEGACY_SKILLS_DIR) && !legacyMigrated) {
 			addSkills(loadSkillsFromDirInternal(LEGACY_SKILLS_DIR, "user", true));
 		}

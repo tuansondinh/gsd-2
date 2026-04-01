@@ -381,9 +381,8 @@ function pruneRemovedBundledExtensions(
  *
  * - extensions/ → ~/.gsd/agent/extensions/   (overwrite when version changes)
  * - agents/     → ~/.gsd/agent/agents/        (overwrite when version changes)
- * Skills are NOT synced here. They are installed by the user via the
- * skills.sh CLI (`npx skills add <repo>`) into ~/.agents/skills/ — the
- * industry-standard Agent Skills ecosystem directory.
+ * Skills are NOT synced here. Global skills now live in ~/.lsd/skills/ by
+ * default, with compatibility fallbacks for older locations.
  *
  * Skips the copy when the managed-resources.json version matches the current
  * GSD version, avoiding ~128ms of synchronous cpSync on every startup.
@@ -429,11 +428,11 @@ export function initResources(agentDir: string): void {
 
   syncResourceDir(bundledExtensionsDir, join(agentDir, 'extensions'))
   syncResourceDir(join(resourcesDir, 'agents'), join(agentDir, 'agents'))
-  // Skills are no longer force-synced here. Users install skills via the
-  // skills.sh CLI (`npx skills add <repo>`) into ~/.agents/skills/ which
-  // is the industry-standard Agent Skills ecosystem directory.
+  // Skills are no longer force-synced here. Users place global skills in
+  // ~/.lsd/skills/ by default. We also keep compatibility with ~/.agents/skills/
+  // and legacy ~/.lsd/agent/skills/ during migration.
   //
-  // Migration from the legacy ~/.gsd/agent/skills/ directory is handled
+  // Migration from the legacy ~/.lsd/agent/skills/ directory is handled
   // above the manifest check so it runs on every launch (including retries
   // after partial copy failures).
 
@@ -449,27 +448,26 @@ export function initResources(agentDir: string): void {
 
 /**
  * One-time migration: copy user-customized skills from the old
- * ~/.gsd/agent/skills/ directory into ~/.agents/skills/.
+ * ~/.lsd/agent/skills/ directory into ~/.lsd/skills/.
  *
  * The migration is conservative:
  *  - Only skill directories containing a SKILL.md are considered.
  *  - Copies, does not move — the old directory stays intact so downgrading
- *    to a pre-migration GSD version still works.
+ *    to a pre-migration LSD version still works.
  *  - Collision-safe — if a skill name already exists in the target, the
- *    existing ecosystem skill wins (user may have already installed a newer
- *    version via skills.sh).
- *  - Writes a `.migrated-to-agents` marker inside the legacy directory so
+ *    preferred ~/.lsd/skills/ version wins.
+ *  - Writes a `.migrated-to-lsd-skills` marker inside the legacy directory so
  *    the migration runs at most once.
  */
 function migrateSkillsToEcosystemDir(agentDir: string): void {
   const legacyDir = join(agentDir, 'skills')
-  const markerPath = join(legacyDir, '.migrated-to-agents')
+  const markerPath = join(legacyDir, '.migrated-to-lsd-skills')
 
   // Already migrated or no legacy dir — nothing to do
   if (!existsSync(legacyDir)) return
 
   // Atomic marker check — 'wx' fails if file already exists, preventing races
-  // when two GSD processes start simultaneously.
+  // when two LSD processes start simultaneously.
   let markerFd: number
   try {
     markerFd = openSync(markerPath, 'wx')
@@ -478,7 +476,7 @@ function migrateSkillsToEcosystemDir(agentDir: string): void {
   }
 
   try {
-    const ecosystemDir = join(homedir(), '.agents', 'skills')
+    const ecosystemDir = join(homedir(), '.lsd', 'skills')
     mkdirSync(ecosystemDir, { recursive: true })
 
     const entries = readdirSync(legacyDir, { withFileTypes: true })
@@ -506,14 +504,14 @@ function migrateSkillsToEcosystemDir(agentDir: string): void {
       if (!existsSync(skillMd)) continue
 
       const target = join(ecosystemDir, entry.name)
-      if (existsSync(target)) continue // ecosystem version wins
+      if (existsSync(target)) continue // preferred global version wins
 
       candidates++
       try {
         if (isSymlink) {
-          // Recreate the symlink in the ecosystem directory using an absolute
+          // Recreate the symlink in the preferred global skills directory using an absolute
           // target. Relative symlinks would resolve from the new parent dir
-          // (~/.agents/skills/) instead of the original (~/.gsd/agent/skills/),
+          // (~/.lsd/skills/) instead of the original (~/.lsd/agent/skills/),
           // pointing to the wrong location.
           const rawTarget = readlinkSync(sourcePath)
           const absTarget = resolve(dirname(sourcePath), rawTarget)
@@ -528,7 +526,7 @@ function migrateSkillsToEcosystemDir(agentDir: string): void {
     }
 
     // If any skills failed to copy, remove the marker so migration retries
-    // on the next launch.  This keeps the legacy dir as fallback until every
+    // on the next launch. This keeps the legacy dir as fallback until every
     // skill has been successfully migrated.
     if (migrated < candidates) {
       try { closeSync(markerFd); markerFd = -1 } catch { /* non-fatal */ }
@@ -539,7 +537,7 @@ function migrateSkillsToEcosystemDir(agentDir: string): void {
     // Write migration info to the marker
     try { writeFileSync(markerFd, `Migrated ${migrated} skill(s) to ${ecosystemDir} on ${new Date().toISOString()}\n`) } catch { /* non-fatal */ }
   } catch {
-    // can't create ecosystem dir or read legacy dir — close fd first (required on Windows
+    // can't create target dir or read legacy dir — close fd first (required on Windows
     // where unlinkSync fails on open handles), then remove marker so we retry next launch
     try { closeSync(markerFd); markerFd = -1 } catch { /* non-fatal */ }
     try { unlinkSync(markerPath) } catch { /* non-fatal */ }

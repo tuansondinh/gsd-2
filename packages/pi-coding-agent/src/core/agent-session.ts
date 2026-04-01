@@ -362,6 +362,13 @@ export class AgentSession {
 		});
 	}
 
+	private async _waitForAutomatedFollowUps(): Promise<void> {
+		while (this._retryHandler.isRetrying || this._compactionOrchestrator.hasPendingAutoCompaction) {
+			await this._retryHandler.waitForRetry();
+			await this._compactionOrchestrator.waitForAutoCompaction();
+		}
+	}
+
 	/** Model registry for API key resolution and model discovery */
 	get modelRegistry(): ModelRegistry {
 		return this._modelRegistry;
@@ -398,6 +405,7 @@ export class AgentSession {
 		// _processAgentEvent, slow earlier queued events can delay agent_end processing
 		// and waitForRetry() can miss the in-flight retry.
 		this._createRetryPromiseForAgentEnd(event);
+		this._createAutoCompactionPromiseForAgentEnd(event);
 
 		this._agentEventQueue = this._agentEventQueue.then(
 			() => this._processAgentEvent(event),
@@ -411,6 +419,11 @@ export class AgentSession {
 	private _createRetryPromiseForAgentEnd(event: AgentEvent): void {
 		if (event.type !== "agent_end") return;
 		this._retryHandler.createRetryPromiseForAgentEnd(event.messages);
+	}
+
+	private _createAutoCompactionPromiseForAgentEnd(event: AgentEvent): void {
+		if (event.type !== "agent_end") return;
+		this._compactionOrchestrator.createAutoCompactionPromiseForAgentEnd(event.messages);
 	}
 
 	private async _processAgentEvent(event: AgentEvent): Promise<void> {
@@ -1191,7 +1204,7 @@ export class AgentSession {
 		}
 
 		await this.agent.prompt(messages);
-		await this._retryHandler.waitForRetry();
+		await this._waitForAutomatedFollowUps();
 	}
 
 	/**

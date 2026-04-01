@@ -1622,7 +1622,7 @@ export class DefaultPackageManager implements PackageManager {
 
 		const userDirs = {
 			extensions: join(globalBaseDir, "extensions"),
-			skills: join(globalBaseDir, "skills"),
+			skills: join(homedir(), CONFIG_DIR_NAME, "skills"),
 			prompts: join(globalBaseDir, "prompts"),
 			themes: join(globalBaseDir, "themes"),
 		};
@@ -1701,16 +1701,16 @@ export class DefaultPackageManager implements PackageManager {
 			);
 		}
 		{
-			// Ecosystem skills (~/.agents/skills/) take priority over legacy config-dir skills.
-			// Skip legacy dir entirely when migration has completed (marker file present).
+			// Preferred global skills live in ~/.lsd/skills/. Keep ~/.agents/skills/
+			// and ~/.lsd/agent/skills as compatibility fallbacks so existing installs still work.
+			const legacySkillsDir = join(homedir(), CONFIG_DIR_NAME, "agent", "skills");
 			const legacySkillsMigrated =
-				resolve(userDirs.skills) !== resolve(userAgentsSkillsDir) &&
-				existsSync(join(userDirs.skills, ".migrated-to-agents"));
+				resolve(userDirs.skills) !== resolve(legacySkillsDir) &&
+				existsSync(join(legacySkillsDir, ".migrated-to-lsd-skills"));
 			const legacyUserSkillEntries =
-				!legacySkillsMigrated && userSubdirs.has("skills")
-					? collectAutoSkillEntries(userDirs.skills)
-					: [];
+				!legacySkillsMigrated && existsSync(legacySkillsDir) ? collectAutoSkillEntries(legacySkillsDir) : [];
 			const skillEntries = [
+				...collectAutoSkillEntries(userDirs.skills),
 				...collectAutoSkillEntries(userAgentsSkillsDir),
 				...legacyUserSkillEntries,
 			];

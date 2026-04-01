@@ -4,6 +4,8 @@ import {
 	makeStreamExhaustedErrorMessage,
 	buildPromptFromContext,
 	buildSdkOptions,
+	mapPermissionMode,
+	buildCanUseTool,
 } from "../stream-adapter.ts";
 import type { Context, Message } from "@gsd/pi-ai";
 

@@ -75,7 +75,8 @@ import { applyRtkProcessEnv } from './rtk.js'
 import { serializeBundledExtensionPaths } from './bundled-extension-paths.js'
 import { discoverExtensionEntryPaths } from './extension-discovery.js'
 import { loadRegistry, readManifestFromEntryPath, isExtensionEnabled } from './extension-registry.js'
-import { renderLogo } from './logo.js'
+import { renderBrandedLogo } from './logo.js'
+import { brandAnsi, brandNameAnsi } from './lsd-brand.js'
 
 // pkg/ is a shim directory: contains lsd's piConfig (package.json) and pi's
 // theme assets (dist/modes/interactive/theme/) without a src/ directory.
@@ -93,15 +94,13 @@ process.title = 'lsd'
 // Print branded banner on first launch (before ~/.lsd/ exists).
 // Set GSD_FIRST_RUN_BANNER so cli.ts skips the duplicate welcome screen.
 if (!existsSync(appRoot)) {
-  const cyan  = '\x1b[36m'
   const green = '\x1b[32m'
   const dim   = '\x1b[2m'
   const reset = '\x1b[0m'
-  const colorCyan = (s: string) => `${cyan}${s}${reset}`
   process.stderr.write(
-    renderLogo(colorCyan) +
+    renderBrandedLogo({ l: brandAnsi.l, s: brandAnsi.s, d: brandAnsi.d }) +
     '\n' +
-    `  Lucent Software Developer ${dim}v${gsdVersion}${reset}\n` +
+    `  ${brandNameAnsi()} ${dim}v${gsdVersion}${reset}\n` +
     `  ${green}Welcome.${reset} Setting up your environment...\n\n`
   )
   process.env.LSD_FIRST_RUN_BANNER = '1'
@@ -133,8 +132,10 @@ const { Module } = await import('module');
 process.env.LSD_VERSION = gsdVersion
 process.env.GSD_VERSION = gsdVersion
 
-// GSD_BIN_PATH — absolute path to this loader (dist/loader.js), used by patched subagent
-// to spawn gsd instead of pi when dispatching workflow tasks
+// CLI loader path for child-process re-entry (subagent/headless).
+// Keep both names during the LSD rebrand so legacy GSD codepaths and
+// newer LSD call sites can resolve the current executable consistently.
+process.env.GSD_BIN_PATH = process.argv[1]
 process.env.LSD_BIN_PATH = process.argv[1]
 
 const distRes = join(gsdRoot, 'dist', 'resources')

@@ -10,12 +10,12 @@ GSD reads skills from two locations, in priority order:
 
 | Location                          | Scope   | Description                                              |
 |-----------------------------------|---------|----------------------------------------------------------|
-| `~/.agents/skills/`              | Global  | Shared across all projects and all compatible agents     |
-| `.agents/skills/` (project root) | Project | Project-specific skills, committable to version control  |
+| `~/.lsd/skills/`            | Global  | Preferred LSD-global skills directory                      |
+| `.lsd/skills/` (project root) | Project | Recommended project-local skills directory for LSD repos   |
 
 Global skills take precedence over project skills when names collide.
 
-> **Migration from `~/.gsd/agent/skills/`:** On first launch after upgrading, GSD automatically copies skills from the legacy `~/.gsd/agent/skills/` directory to `~/.agents/skills/`. The old directory is preserved for backward compatibility.
+> **Migration from `~/.lsd/agent/skills/`:** On first launch after upgrading, LSD automatically copies skills from the legacy `~/.lsd/agent/skills/` directory to `~/.lsd/skills/`. Compatibility fallbacks remain discoverable.
 
 ## Installing Skills
 
@@ -116,18 +116,18 @@ skill_rules:
 ### Resolution Order
 
 Skills can be referenced by:
-1. **Bare name** — e.g., `frontend-design` → scans `~/.agents/skills/` and project `.agents/skills/`
-2. **Absolute path** — e.g., `/Users/you/.agents/skills/my-skill/SKILL.md`
+1. **Bare name** — e.g., `frontend-design` → scans `~/.lsd/skills/` and project `.lsd/skills/`
+2. **Absolute path** — e.g., `/Users/you/.lsd/skills/my-skill/SKILL.md`
 3. **Directory path** — e.g., `~/custom-skills/my-skill` → looks for `SKILL.md` inside
 
-Global skills (`~/.agents/skills/`) take precedence over project skills (`.agents/skills/`).
+Global skills (`~/.lsd/skills/`) take precedence over project skills (`.lsd/skills/`).
 
 ## Custom Skills
 
 Create your own skills by adding a directory with a `SKILL.md` file:
 
 ```
-~/.agents/skills/my-skill/
+~/.lsd/skills/my-skill/
   SKILL.md           — instructions for the LLM
   references/        — optional reference files
 ```
@@ -136,14 +136,9 @@ The `SKILL.md` file contains instructions the LLM follows when the skill is acti
 
 ### Project-Local Skills
 
-Place skills in your project for project-specific guidance:
+Place skills in `.lsd/skills/` for repo-local workflows. This is the recommended project-local location for LSD.
 
-```
-.agents/skills/my-project-skill/
-  SKILL.md
-```
-
-Project-local skills can be committed to version control so team members share the same skill set.
+For compatibility, LSD can still discover older skill directories like `~/.agents/skills/` and project `.agents/skills/`, but `~/.lsd/skills/` and `.lsd/skills/` are the preferred conventions.
 
 ## Skill Lifecycle Management
 
@@ -186,3 +181,7 @@ Stale skills are excluded from automatic matching but remain invokable explicitl
 When configured as a post-unit hook, GSD can analyze whether the agent deviated from a skill's instructions during execution. If significant drift is detected (outdated API patterns, incorrect guidance), it writes proposed fixes to `.gsd/skill-review-queue.md` for human review.
 
 Key design principle: skills are **never auto-modified**. Research shows curated skills outperform auto-generated ones significantly, so the human review step is critical.
+itical.
+al.
+itical.
+ical.

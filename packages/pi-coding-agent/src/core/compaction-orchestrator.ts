@@ -48,6 +48,9 @@ export class CompactionOrchestrator {
 	private _autoCompactionAbortController: AbortController | undefined = undefined;
 	private _overflowRecoveryAttempted = false;
 	private _branchSummaryAbortController: AbortController | undefined = undefined;
+	private _autoCompactionPromise: Promise<void> | undefined = undefined;
+	private _autoCompactionResolve: (() => void) | undefined = undefined;
+	private _pendingAutoContinues = 0;
 
 	constructor(private readonly _deps: CompactionOrchestratorDeps) {}
 
@@ -58,6 +61,40 @@ export class CompactionOrchestrator {
 			this._compactionAbortController !== undefined ||
 			this._branchSummaryAbortController !== undefined
 		);
+	}
+
+	/** Whether an auto-compaction follow-up (including resume/continue) is in progress */
+	get hasPendingAutoCompaction(): boolean {
+		return this._autoCompactionPromise !== undefined;
+	}
+
+	/** Create an auto-compaction wait promise synchronously for agent_end events. */
+	createAutoCompactionPromiseForAgentEnd(messages: Array<{ role: string } & Record<string, any>>): void {
+		if (this._autoCompactionPromise) return;
+		if (!this._deps.settingsManager.getCompactionEnabled()) return;
+		const hasAssistant = messages.some((message) => message.role === "assistant");
+		if (!hasAssistant) return;
+		this._autoCompactionPromise = new Promise((resolve) => {
+			this._autoCompactionResolve = resolve;
+		});
+	}
+
+	/** Wait for any in-progress auto-compaction follow-up to settle. */
+	async waitForAutoCompaction(): Promise<void> {
+		if (this._autoCompactionPromise) {
+			await this._autoCompactionPromise;
+		}
+	}
+
+	private _resolveAutoCompaction(): void {
+		if (this._pendingAutoContinues > 0 || this._autoCompactionAbortController !== undefined) {
+			return;
+		}
+		if (this._autoCompactionResolve) {
+			this._autoCompactionResolve();
+			this._autoCompactionResolve = undefined;
+			this._autoCompactionPromise = undefined;
+		}
 	}
 
 	/** Reset overflow recovery flag (called when a new user message starts) */
@@ -211,9 +248,15 @@ export class CompactionOrchestrator {
 	 */
 	async checkCompaction(assistantMessage: AssistantMessage, skipAbortedCheck = true): Promise<void> {
 		const settings = this._deps.settingsManager.getCompactionSettings();
-		if (!settings.enabled) return;
+		if (!settings.enabled) {
+			this._resolveAutoCompaction();
+			return;
+		}
 
-		if (skipAbortedCheck && assistantMessage.stopReason === "aborted") return;
+		if (skipAbortedCheck && assistantMessage.stopReason === "aborted") {
+			this._resolveAutoCompaction();
+			return;
+		}
 
 		const model = this._deps.getModel();
 		const contextWindow = model?.contextWindow ?? 0;
@@ -225,7 +268,10 @@ export class CompactionOrchestrator {
 		const compactionEntry = getLatestCompactionEntry(branchEntries);
 		const assistantIsFromBeforeCompaction =
 			compactionEntry !== null && assistantMessage.timestamp <= new Date(compactionEntry.timestamp).getTime();
-		if (assistantIsFromBeforeCompaction) return;
+		if (assistantIsFromBeforeCompaction) {
+			this._resolveAutoCompaction();
+			return;
+		}
 
 		// Case 1: Overflow - LLM returned context overflow error
 		if (sameModel && isContextOverflow(assistantMessage, contextWindow)) {
@@ -238,6 +284,7 @@ export class CompactionOrchestrator {
 					errorMessage:
 						"Context overflow recovery failed after one compact-and-retry attempt. Try reducing context or switching to a larger-context model.",
 				});
+				this._resolveAutoCompaction();
 				return;
 			}
 
@@ -255,13 +302,17 @@ export class CompactionOrchestrator {
 		if (assistantMessage.stopReason === "error") {
 			const messages = this._deps.agent.state.messages;
 			const estimate = estimateContextTokens(messages);
-			if (estimate.lastUsageIndex === null) return;
+			if (estimate.lastUsageIndex === null) {
+				this._resolveAutoCompaction();
+				return;
+			}
 			const usageMsg = messages[estimate.lastUsageIndex];
 			if (
 				compactionEntry &&
 				usageMsg.role === "assistant" &&
 				(usageMsg as AssistantMessage).timestamp <= new Date(compactionEntry.timestamp).getTime()
 			) {
+				this._resolveAutoCompaction();
 				return;
 			}
 			contextTokens = estimate.tokens;
@@ -270,7 +321,10 @@ export class CompactionOrchestrator {
 		}
 		if (shouldCompact(contextTokens, contextWindow, settings)) {
 			await this._runAutoCompaction("threshold", false);
+			return;
 		}
+
+		this._resolveAutoCompaction();
 	}
 
 	/** Toggle auto-compaction setting */
@@ -297,11 +351,13 @@ export class CompactionOrchestrator {
 			const model = this._deps.getModel();
 			if (!model) {
 				this._deps.emit({ type: "auto_compaction_end", result: undefined, aborted: false, willRetry: false });
+				this._resolveAutoCompaction();
 				return;
 			}
 
 			if (!this._deps.modelRegistry.isProviderRequestReady(model.provider)) {
 				this._deps.emit({ type: "auto_compaction_end", result: undefined, aborted: false, willRetry: false });
+				this._resolveAutoCompaction();
 				return;
 			}
 			// undefined for externalCli/none providers — stripped at the streamSimple boundary (model-registry.ts)
@@ -311,6 +367,7 @@ export class CompactionOrchestrator {
 			const preparation = prepareCompaction(pathEntries, settings);
 			if (!preparation) {
 				this._deps.emit({ type: "auto_compaction_end", result: undefined, aborted: false, willRetry: false });
+				this._resolveAutoCompaction();
 				return;
 			}
 
@@ -334,6 +391,7 @@ export class CompactionOrchestrator {
 						aborted: true,
 						willRetry: false,
 					});
+					this._resolveAutoCompaction();
 					return;
 				}
 
@@ -369,6 +427,7 @@ export class CompactionOrchestrator {
 
 			if (this._autoCompactionAbortController.signal.aborted) {
 				this._deps.emit({ type: "auto_compaction_end", result: undefined, aborted: true, willRetry: false });
+				this._resolveAutoCompaction();
 				return;
 			}
 
@@ -392,20 +451,27 @@ export class CompactionOrchestrator {
 			const result: CompactionResult = { summary, firstKeptEntryId, tokensBefore, details };
 			this._deps.emit({ type: "auto_compaction_end", result, aborted: false, willRetry });
 
-			if (willRetry) {
-				const messages = this._deps.agent.state.messages;
-				const lastMsg = messages[messages.length - 1];
-				if (lastMsg?.role === "assistant" && (lastMsg as AssistantMessage).stopReason === "error") {
-					this._deps.agent.replaceMessages(messages.slice(0, -1));
-				}
+			const shouldContinue = willRetry || this._deps.agent.hasQueuedMessages();
+			if (shouldContinue) {
+				this._pendingAutoContinues++;
+				setTimeout(() => {
+					if (willRetry) {
+						const messages = this._deps.agent.state.messages;
+						const lastMsg = messages[messages.length - 1];
+						if (lastMsg?.role === "assistant" && (lastMsg as AssistantMessage).stopReason === "error") {
+							this._deps.agent.replaceMessages(messages.slice(0, -1));
+						}
+					}
 
-				setTimeout(() => {
-					this._deps.agent.continue().catch(() => {});
+					this._deps.agent.continue()
+						.catch(() => {})
+						.finally(() => {
+							this._pendingAutoContinues = Math.max(0, this._pendingAutoContinues - 1);
+							this._resolveAutoCompaction();
+						});
 				}, 100);
-			} else if (this._deps.agent.hasQueuedMessages()) {
-				setTimeout(() => {
-					this._deps.agent.continue().catch(() => {});
-				}, 100);
+			} else {
+				this._resolveAutoCompaction();
 			}
 		} catch (error) {
 			const errorMessage = getErrorMessage(error);
@@ -419,8 +485,10 @@ export class CompactionOrchestrator {
 						? `Context overflow recovery failed: ${errorMessage}`
 						: `Auto-compaction failed: ${errorMessage}`,
 			});
+			this._resolveAutoCompaction();
 		} finally {
 			this._autoCompactionAbortController = undefined;
+			this._resolveAutoCompaction();
 		}
 	}
 }

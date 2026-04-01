@@ -21,6 +21,10 @@ export interface CmuxPreferences {
   browser?: boolean
 }
 
+export interface SubagentPreferences {
+  budget_model?: string
+}
+
 export interface SharedPreferences {
   experimental?: {
     rtk?: boolean
@@ -28,6 +32,7 @@ export interface SharedPreferences {
   remote_questions?: RemoteQuestionsConfig
   search_provider?: SearchProviderPreference
   cmux?: CmuxPreferences
+  subagent?: SubagentPreferences
 }
 
 export interface LoadedSharedPreferences {

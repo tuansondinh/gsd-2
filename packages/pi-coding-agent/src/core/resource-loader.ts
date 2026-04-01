@@ -795,6 +795,7 @@ export class DefaultResourceLoader implements ResourceLoader {
 		}
 
 		const agentRoots = [
+			join(homedir(), CONFIG_DIR_NAME, "skills"),
 			join(this.agentDir, "skills"),
 			join(this.agentDir, "prompts"),
 			join(this.agentDir, "themes"),

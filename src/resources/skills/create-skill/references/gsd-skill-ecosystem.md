@@ -5,14 +5,13 @@ GSD-specific skill ecosystem details: directory conventions, discovery mechanics
 <skill_directories>
 GSD supports two skill directories, checked in order:
 
-**User-scope (global):** `~/.gsd/agent/skills/`
-- Available in every GSD session regardless of working directory
-- Installed by default or by the user
+**User-scope (global):** `~/.lsd/skills/`
+- Available in every GSD/LSD session regardless of working directory
+- Preferred global location for LSD-managed skills
 
-**Project-scope (local):** `.pi/agent/skills/`
-- Available only when GSD runs inside the project directory
-- The project-local directory uses `.pi` (inherited from the pi base), **not** `.gsd`
-- Ideal for project-specific workflows, deploy scripts, or conventions
+**Project-scope (local):** `.lsd/skills/`
+- Available only when LSD runs inside the project directory
+- Recommended for repo-specific workflows, deploy scripts, or conventions
 
 Skills in both directories follow the same SKILL.md format and router pattern conventions.
 </skill_directories>
@@ -65,4 +64,6 @@ After creating or modifying a skill:
 1. Run `/reload` to make it available in the current session
 2. On next session start, auto-discovery picks it up automatically
 3. In auto-mode, new skills are detected at unit boundaries without any action needed
+</activation>
+ are detected at unit boundaries without any action needed
 </activation>

@@ -15,8 +15,8 @@
 **Ask the user:**
 "Should this skill be global or project-local?"
 
-1. **Global** (`~/.gsd/agent/skills/`) — Available in all GSD sessions
-2. **Project-local** (`.pi/agent/skills/`) — Available only in this project
+1. **Global** (`~/.lsd/skills/`) — Available in all GSD/LSD sessions
+2. **Project-local** (`.lsd/skills/`) — Available only in this project
 
 ## Step 2: Adaptive Requirements Gathering
 
@@ -99,11 +99,11 @@ See references/recommended-structure.md for templates.
 ## Step 5: Create Directory
 
 Use the scope selected in Step 1 to determine the base path:
-- **Global:** `~/.gsd/agent/skills/{skill-name}`
-- **Project-local:** `.pi/agent/skills/{skill-name}`
+- **Global:** `~/.lsd/skills/{skill-name}`
+- **Project-local:** `.lsd/skills/{skill-name}`
 
 ```bash
-BASE_PATH="{selected-base}/agent/skills/{skill-name}"
+BASE_PATH="{selected-base}/skills/{skill-name}"
 mkdir -p $BASE_PATH
 # If complex:
 mkdir -p $BASE_PATH/workflows
@@ -194,3 +194,4 @@ Skill is complete when:
 - [ ] /reload run to activate
 - [ ] Tested with real invocation
 </success_criteria>
+criteria>

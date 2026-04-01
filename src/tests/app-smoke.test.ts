@@ -97,7 +97,8 @@ test("loader sets all 4 GSD_ env vars and PI_PACKAGE_DIR", async (t) => {
   const loaderSrc = readFileSync(join(projectRoot, "src", "loader.ts"), "utf-8");
   assert.ok(loaderSrc.includes("PI_PACKAGE_DIR"), "loader sets PI_PACKAGE_DIR");
   assert.ok(loaderSrc.includes("GSD_CODING_AGENT_DIR"), "loader sets GSD_CODING_AGENT_DIR");
-  assert.ok(loaderSrc.includes("GSD_BIN_PATH"), "loader sets GSD_BIN_PATH");
+  assert.ok(loaderSrc.includes("process.env.GSD_BIN_PATH = process.argv[1]"), "loader populates GSD_BIN_PATH");
+  assert.ok(loaderSrc.includes("process.env.LSD_BIN_PATH = process.argv[1]"), "loader populates LSD_BIN_PATH");
   assert.ok(loaderSrc.includes("GSD_BUNDLED_EXTENSION_PATHS"), "loader sets GSD_BUNDLED_EXTENSION_PATHS");
   assert.ok(loaderSrc.includes("applyRtkProcessEnv"), "loader applies RTK environment bootstrap");
   const rtkSrc = readFileSync(join(projectRoot, "src", "rtk.ts"), "utf-8");
@@ -218,7 +219,7 @@ test("initResources syncs extensions, agents, and skills to target dir", async (
   // Agents synced
   assert.ok(existsSync(join(fakeAgentDir, "agents", "scout.md")), "scout agent synced");
 
-  // Skills are NOT synced here — they use ~/.agents/skills/ via skills.sh
+  // Skills are NOT synced here — they use ~/.lsd/skills/ by default
 
   // Version manifest synced
   const managedVersion = readManagedResourceVersion(fakeAgentDir);

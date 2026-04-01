@@ -28,6 +28,8 @@ models:
   planning: claude-opus-4-6
   execution: claude-sonnet-4-6
   completion: claude-sonnet-4-6
+subagent:
+  budget_model: claude-haiku-4-5-20250414
 skill_discovery: suggest
 auto_supervisor:
   soft_timeout_minutes: 20
@@ -48,7 +50,18 @@ token_profile: balanced
 **Merge behavior:**
 - **Scalar fields** (`skill_discovery`, `budget_ceiling`): project wins if defined
 - **Array fields** (`always_use_skills`, etc.): concatenated (global first, then project)
-- **Object fields** (`models`, `git`, `auto_supervisor`): shallow-merged, project overrides per-key
+- **Object fields** (`models`, `git`, `auto_supervisor`, `subagent`): shallow-merged, project overrides per-key
+
+### `subagent.budget_model`
+
+Optional budget-friendly model alias used by bundled budget-oriented subagents.
+
+```yaml
+subagent:
+  budget_model: claude-haiku-4-5-20250414
+```
+
+Today the bundled `scout` subagent resolves `model: $budget_model`, so if this preference is set the scout runs on the cheaper model automatically. If omitted, scout falls back to the current session/default model.
 
 ## Global API Keys (`/gsd config`)
 
@@ -577,7 +590,7 @@ prefer_skills:
 avoid_skills: []
 ```
 
-Skills can be bare names (looked up in `~/.agents/skills/` and `.agents/skills/`) or absolute paths.
+Skills can be bare names (looked up in `~/.lsd/skills/` and `.lsd/skills/`) or absolute paths.
 
 ### `skill_rules`
 

@@ -48,8 +48,9 @@ On-demand capability packages following the [Agent Skills standard](https://agen
 ```
 
 **Placement:**
-- `~/.agents/skills/` (global — shared across all agents)
-- `.agents/skills/` (project, searched up to git root)
+- `~/.lsd/skills/` (global for LSD)
+- `.lsd/skills/` (project-local for LSD repos)
+- `~/.agents/skills/` and `.agents/skills/` (compatibility fallbacks)
 
 **Skill structure:**
 ```
