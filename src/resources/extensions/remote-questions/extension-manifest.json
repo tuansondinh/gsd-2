@@ -6,6 +6,6 @@
   "tier": "bundled",
   "requires": { "platform": ">=2.29.0" },
   "provides": {
-    "commands": ["remote"]
+    "commands": ["remote", "lsd"]
   }
 }

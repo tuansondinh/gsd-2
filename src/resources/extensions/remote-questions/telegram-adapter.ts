@@ -2,23 +2,26 @@
  * Remote Questions — Telegram adapter
  */
 
+import { randomUUID } from "node:crypto";
 import { type ChannelAdapter, type RemotePrompt, type RemoteDispatchResult, type RemoteAnswer, type RemotePromptRef } from "./types.js";
 import { formatForTelegram, parseTelegramResponse } from "./format.js";
 import { apiRequest } from "./http-client.js";
+import { telegramPullUpdates } from "./telegram-update-stream.js";
 
 const TELEGRAM_API = "https://api.telegram.org";
 
 export class TelegramAdapter implements ChannelAdapter {
   readonly name = "telegram" as const;
   private botUserId: number | null = null;
-  private lastUpdateId = 0;
   private lastSentText = "";
   private readonly token: string;
   private readonly chatId: string;
+  private readonly consumerId: string;
 
   constructor(token: string, chatId: string) {
     this.token = token;
     this.chatId = chatId;
+    this.consumerId = `remote-questions:${randomUUID()}`;
   }
 
   async validate(): Promise<void> {
@@ -62,20 +65,9 @@ export class TelegramAdapter implements ChannelAdapter {
   async pollAnswer(prompt: RemotePrompt, ref: RemotePromptRef): Promise<RemoteAnswer | null> {
     if (!this.botUserId) await this.validate();
 
-    const res = await this.telegramApi("getUpdates", {
-      offset: this.lastUpdateId + 1,
-      timeout: 0,
-      allowed_updates: ["message", "callback_query"],
-    });
+    const updates = await telegramPullUpdates(this.token, this.consumerId, ["message", "callback_query"]);
 
-    if (!res.ok || !Array.isArray(res.result)) return null;
-
-    for (const update of res.result) {
-      // Advance offset for all updates to prevent reprocessing
-      if (update.update_id > this.lastUpdateId) {
-        this.lastUpdateId = update.update_id;
-      }
-
+    for (const update of updates) {
       // Handle callback_query (inline keyboard button press)
       if (update.callback_query) {
         const cq = update.callback_query;
