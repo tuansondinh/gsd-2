@@ -218,6 +218,8 @@ test("initResources syncs extensions, agents, and skills to target dir", async (
 
   // Agents synced
   assert.ok(existsSync(join(fakeAgentDir, "agents", "scout.md")), "scout agent synced");
+  assert.ok(existsSync(join(fakeAgentDir, "agents", "teams-builder.md")), "teams-builder agent synced");
+  assert.ok(existsSync(join(fakeAgentDir, "agents", "teams-reviewer.md")), "teams-reviewer agent synced");
 
   // Skills are NOT synced here — they use ~/.lsd/skills/ by default
 
