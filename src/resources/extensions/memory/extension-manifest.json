@@ -1,0 +1,11 @@
+{
+  "id": "memory",
+  "name": "Persistent Memory",
+  "version": "1.0.0",
+  "description": "Persistent file-based memory across sessions",
+  "tier": "bundled",
+  "provides": {
+    "hooks": ["session_start", "before_agent_start", "session_shutdown"],
+    "commands": ["memories", "remember", "forget"]
+  }
+}
