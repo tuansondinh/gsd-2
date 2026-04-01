@@ -1241,6 +1241,14 @@ export class AgentSession {
 	}
 
 	/**
+	 * Try to execute an extension command. Returns true if command was found and executed.
+	 * Public method for use by interactive mode and other subsystems.
+	 */
+	async tryExecuteExtensionCommand(text: string): Promise<boolean> {
+		return this._tryExecuteExtensionCommand(text);
+	}
+
+	/**
 	 * Expand skill commands (/skill:name args) to their full content.
 	 * Returns the expanded text, or the original text if not a skill command or skill not found.
 	 * Emits errors via extension runner if file read fails.

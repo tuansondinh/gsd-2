@@ -1183,7 +1183,15 @@ export class InteractiveMode {
 						await this.handleReloadCommand();
 					},
 				},
-				executeSlashCommand: async (text) => dispatchSlashCommand(text, this.getSlashCommandContext()),
+				executeSlashCommand: async (text, options) => {
+					// Try extension commands first
+					const extensionHandled = await this.session.tryExecuteExtensionCommand(text);
+					if (extensionHandled) {
+						return true;
+					}
+					// Fall back to built-in commands
+					return dispatchSlashCommand(text, this.getSlashCommandContext());
+				},
 				shutdownHandler: () => {
 					this.shutdownRequested = true;
 					if (!this.session.isStreaming) {
