@@ -425,10 +425,11 @@ export function loadSkills(options: LoadSkillsOptions = {}): LoadSkillsResult {
 	}
 
 	if (includeDefaults) {
+		// Preferred project-local location for LSD repos.
+		// Load this first so project skills shadow user/global skills with the same name.
+		addSkills(loadSkillsFromDirInternal(resolve(cwd, ECOSYSTEM_PROJECT_SKILLS_DIR, "skills"), "project", true));
 		// Primary global location for LSD.
 		addSkills(loadSkillsFromDirInternal(ECOSYSTEM_SKILLS_DIR, "user", true));
-		// Preferred project-local location for LSD repos.
-		addSkills(loadSkillsFromDirInternal(resolve(cwd, ECOSYSTEM_PROJECT_SKILLS_DIR, "skills"), "project", true));
 		// Compatibility fallback: shared Agent Skills ecosystem directory.
 		if (COMPAT_ECOSYSTEM_SKILLS_DIR !== ECOSYSTEM_SKILLS_DIR) {
 			addSkills(loadSkillsFromDirInternal(COMPAT_ECOSYSTEM_SKILLS_DIR, "user", true));

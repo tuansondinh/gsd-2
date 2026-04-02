@@ -31,6 +31,7 @@ import { Container, Markdown, Spacer, Text } from "@gsd/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { formatTokenCount } from "../shared/mod.js";
 import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.js";
+import { buildSubagentProcessArgs, getBundledExtensionPathsFromEnv } from "./launch-helpers.js";
 import {
 	type IsolationEnvironment,
 	type IsolationMode,
@@ -54,7 +55,7 @@ const MAX_CONCURRENCY = 4;
 const COLLAPSED_ITEM_COUNT = 10;
 const liveSubagentProcesses = new Set<ChildProcess>();
 
-async function stopLiveSubagents(): Promise<void> {
+export async function stopLiveSubagents(): Promise<void> {
 	const active = Array.from(liveSubagentProcesses);
 	if (active.length === 0) return;
 
@@ -285,33 +286,6 @@ function readBudgetSubagentModelFromSettings(): string | undefined {
 	}
 }
 
-function getBundledExtensionPathsFromEnv(env: NodeJS.ProcessEnv = process.env): string[] {
-	const rawPaths = [env.GSD_BUNDLED_EXTENSION_PATHS, env.LSD_BUNDLED_EXTENSION_PATHS]
-		.map((value) => value?.trim())
-		.filter((value): value is string => Boolean(value));
-	const unique = new Set<string>();
-	for (const raw of rawPaths) {
-		for (const entry of raw.split(path.delimiter).map((value) => value.trim()).filter(Boolean)) {
-			unique.add(entry);
-		}
-	}
-	return Array.from(unique);
-}
-
-function buildSubagentProcessArgs(
-	agent: AgentConfig,
-	task: string,
-	tmpPromptPath: string | null,
-	model: string | undefined,
-): string[] {
-	const args: string[] = ["--mode", "json", "-p", "--no-session"];
-	if (model) args.push("--model", model);
-	if (agent.tools && agent.tools.length > 0) args.push("--tools", agent.tools.join(","));
-	if (tmpPromptPath) args.push("--append-system-prompt", tmpPromptPath);
-	args.push(`Task: ${task}`);
-	return args;
-}
-
 function resolveSubagentCliPath(defaultCwd: string): string | null {
 	const candidates = [process.env.GSD_BIN_PATH, process.env.LSD_BIN_PATH, process.argv[1]]
 		.map((value) => value?.trim())
@@ -343,13 +317,13 @@ function processSubagentEventLine(
 	currentResult: SingleResult,
 	emitUpdate: () => void,
 	proc?: ChildProcess,
-): void {
-	if (!line.trim()) return;
+): boolean {
+	if (!line.trim()) return false;
 	let event: any;
 	try {
 		event = JSON.parse(line);
 	} catch {
-		return;
+		return false;
 	}
 
 	if (proc && isSubagentPermissionRequest(event)) {
@@ -357,10 +331,10 @@ function processSubagentEventLine(
 			requestFileChangeApproval,
 			requestClassifierDecision,
 		});
-		return;
+		return false;
 	}
 
-	if (event.type === "message_end" && event.message) {
+	if ((event.type === "message_end" || event.type === "turn_end") && event.message) {
 		const msg = event.message as Message;
 		currentResult.messages.push(msg);
 
@@ -375,7 +349,7 @@ function processSubagentEventLine(
 				currentResult.usage.cost += usage.cost?.total || 0;
 				currentResult.usage.contextTokens = usage.totalTokens || 0;
 			}
-			if (msg.model) currentResult.model = msg.model;
+			if (msg.model && (!currentResult.model || msg.model.includes("/"))) currentResult.model = msg.model;
 			if (msg.stopReason) currentResult.stopReason = msg.stopReason;
 			if (msg.errorMessage) currentResult.errorMessage = msg.errorMessage;
 		}
@@ -386,6 +360,8 @@ function processSubagentEventLine(
 		currentResult.messages.push(event.message as Message);
 		emitUpdate();
 	}
+
+	return event.type === "agent_end";
 }
 
 async function waitForFile(filePath: string, signal: AbortSignal | undefined, timeoutMs = 30 * 60 * 1000): Promise<boolean> {
@@ -484,14 +460,25 @@ async function runSingleAgent(
 				[cliPath, ...extensionArgs, ...args],
 				{ cwd: cwd ?? defaultCwd, shell: false, stdio: ["pipe", "pipe", "pipe"] },
 			);
+			proc.stdin.end();
 			liveSubagentProcesses.add(proc);
 			let buffer = "";
+			let completionSeen = false;
 
 			proc.stdout.on("data", (data) => {
 				buffer += data.toString();
 				const lines = buffer.split("\n");
 				buffer = lines.pop() || "";
-				for (const line of lines) processSubagentEventLine(line, currentResult, emitUpdate, proc);
+				for (const line of lines) {
+					if (processSubagentEventLine(line, currentResult, emitUpdate, proc)) {
+						completionSeen = true;
+						try {
+							proc.kill("SIGTERM");
+						} catch {
+							/* ignore */
+						}
+					}
+				}
 			});
 
 			proc.stderr.on("data", (data) => {
@@ -500,8 +487,11 @@ async function runSingleAgent(
 
 			proc.on("close", (code) => {
 				liveSubagentProcesses.delete(proc);
-				if (buffer.trim()) processSubagentEventLine(buffer, currentResult, emitUpdate, proc);
-				resolve(code ?? 0);
+				if (buffer.trim()) {
+					const completedOnFlush = processSubagentEventLine(buffer, currentResult, emitUpdate, proc);
+					completionSeen = completionSeen || completedOnFlush;
+				}
+				resolve(completionSeen && (code === null || code === 143 || code === 15) ? 0 : (code ?? 0));
 			});
 
 			proc.on("error", () => {

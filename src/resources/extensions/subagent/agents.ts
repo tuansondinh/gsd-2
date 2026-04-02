@@ -25,6 +25,16 @@ export interface AgentDiscoveryResult {
 	projectAgentsDir: string | null;
 }
 
+function normalizeAgentModel(model: string | undefined): string | undefined {
+	const trimmed = model?.trim();
+	if (!trimmed) return undefined;
+	if (trimmed === "$budget_model") return trimmed;
+	if (trimmed.includes(" ")) return undefined;
+	if (!trimmed.includes("/")) return trimmed;
+	const parts = trimmed.split("/");
+	return parts.length === 2 && parts.every(Boolean) ? trimmed : undefined;
+}
+
 function loadAgentsFromDir(dir: string, source: "user" | "project"): AgentConfig[] {
 	const agents: AgentConfig[] = [];
 
@@ -66,7 +76,7 @@ function loadAgentsFromDir(dir: string, source: "user" | "project"): AgentConfig
 			name: frontmatter.name,
 			description: frontmatter.description,
 			tools: tools && tools.length > 0 ? tools : undefined,
-			model: frontmatter.model,
+			model: normalizeAgentModel(frontmatter.model),
 			systemPrompt: body,
 			source,
 			filePath,
