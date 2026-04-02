@@ -453,12 +453,15 @@ async function runLspStep(
   const missing = detectMissingServers(cwd)
   const alreadyInstalled = detectInstalledServers(cwd)
 
+  // Always show what's already installed so users know the full picture
+  if (alreadyInstalled.length > 0) {
+    p.log.info(
+      `Already installed: ${pc.green(alreadyInstalled.map((s) => s.label).join(', '))} ✓`,
+    )
+  }
+
   if (missing.length === 0) {
-    if (alreadyInstalled.length > 0) {
-      p.log.success(
-        `Language servers: ${pc.green(alreadyInstalled.map((s) => s.label).join(', '))} already installed ✓`,
-      )
-    }
+    p.log.success('All detected language servers are installed.')
     return []
   }
 
