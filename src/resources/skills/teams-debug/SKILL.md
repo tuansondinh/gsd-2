@@ -1,18 +1,17 @@
 ---
 name: teams-debug
 description: "Fix any bug related to an active Teams plan. Can be triggered by the user at any time or automatically from teams-verify on failure. Reads the plan for context, spawns a targeted builder subagent to fix the issue, then appends a debug status update to the plan."
-user-invocable: true
 ---
 
 # Teams: Debug
 
 Fix a bug related to the current Teams plan. This skill can be triggered:
-- **By the user at any time** — e.g. "something's broken, use `/teams-debug`"
-- **Automatically from `/teams-verify`** — when a scenario fails during manual verification
+- **By the user at any time** — e.g. "something's broken, use `/skill:teams-debug`"
+- **Automatically from `/skill:teams-verify`** — when a scenario fails during manual verification
 
 It reads the plan (which contains all review and verification history) before fixing.
 
-**Prerequisite:** A `.lsd/plan/PLAN-*.md` file must exist. If none found, stop and tell the user to run `/teams-plan` first.
+**Prerequisite:** A `.lsd/plan/PLAN-*.md` file must exist. If none found, stop and tell the user to run `/skill:teams-plan` first.
 
 ---
 
@@ -32,7 +31,7 @@ Otherwise, ask:
 
 > **What's the bug?**
 >
-> Describe what went wrong, what you expected, and what you saw. Include the scenario name if it came from `/teams-verify`.
+> Describe what went wrong, what you expected, and what you saw. Include the scenario name if it came from `/skill:teams-verify`.
 
 Wait for their response.
 
@@ -127,4 +126,4 @@ Print:
 ```
 
 Then ask:
-> **Want to re-verify this scenario? Run `/teams-verify` to continue from where you left off.**
+> **Want to re-verify this scenario? Run `/skill:teams-verify` to continue from where you left off.**

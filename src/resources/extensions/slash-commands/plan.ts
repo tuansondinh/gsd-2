@@ -258,11 +258,12 @@ function buildApprovalSteeringMessage(planPath: string): string {
     `Plan artifact saved at ${planPath}.`,
     "Present approval options now using ask_user_questions with exactly one single-select question.",
     `Use question id \"${PLAN_APPROVAL_QUESTION_ID}\" and ask the user what to do next.`,
-    "Options must be:",
+    "Important: ask_user_questions single-select supports only 2-3 explicit options.",
+    "Use exactly these 3 options:",
     `1. ${APPROVE_AUTO_LABEL} (Recommended)`,
     `2. ${APPROVE_BYPASS_LABEL}`,
     `3. ${REVISE_LABEL}`,
-    `4. ${CANCEL_LABEL}`,
+    `Do not include \"${CANCEL_LABEL}\" as an explicit option. If the user wants to cancel, they should choose \"None of the above\" and type \"${CANCEL_LABEL}\" in the free-text note.`,
     "If the dialog is dismissed or the user gives no answer, continue planning.",
   ].join(" ");
 }
@@ -271,6 +272,16 @@ function approvalSelectionToPermissionMode(selected: string): RestorablePermissi
   if (selected.includes(APPROVE_AUTO_LABEL)) return "auto";
   if (selected.includes(APPROVE_BYPASS_LABEL)) return "danger-full-access";
   return undefined;
+}
+
+function selectionRequestsCancel(selected: string | string[]): boolean {
+  const values = Array.isArray(selected) ? selected : [selected];
+  return values.some((value) => {
+    if (typeof value !== "string") return false;
+    if (value.includes(CANCEL_LABEL)) return true;
+    const normalized = value.replace(/^user_note:\s*/i, "").trim().toLowerCase();
+    return normalized === "cancel" || normalized.includes("cancel plan");
+  });
 }
 
 export const __testing = {
@@ -386,10 +397,10 @@ export default function planCommand(pi: ExtensionAPI) {
     const answer = details.response.answers[PLAN_APPROVAL_QUESTION_ID];
     if (!answer) return;
 
-    const selected = Array.isArray(answer.selected) ? answer.selected[0] : answer.selected;
-    if (typeof selected !== "string") return;
+    const selected = Array.isArray(answer.selected) ? answer.selected : [answer.selected];
+    if (!selected.every((value) => typeof value === "string")) return;
 
-    const targetPermissionMode = approvalSelectionToPermissionMode(selected);
+    const targetPermissionMode = approvalSelectionToPermissionMode(selected[0]);
     if (targetPermissionMode) {
       state = {
         ...state,
@@ -399,14 +410,14 @@ export default function planCommand(pi: ExtensionAPI) {
       return;
     }
 
-    if (selected.includes(REVISE_LABEL)) {
+    if (selected.some((value) => value.includes(REVISE_LABEL))) {
       enablePlanMode(pi, ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined, {
         approvalStatus: "revising",
       });
       return;
     }
 
-    if (selected.includes(CANCEL_LABEL)) {
+    if (selectionRequestsCancel(selected)) {
       await cancelPlan(pi, ctx, true);
     }
   });

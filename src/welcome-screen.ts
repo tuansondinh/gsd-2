@@ -10,6 +10,7 @@ import os from 'node:os'
 import chalk from 'chalk'
 import { GSD_LOGO_SEGMENTS } from './logo.js'
 import { brandNameChalk, LSD_BLUE, LSD_PINK, LSD_YELLOW } from './lsd-brand.js'
+import { accentHex } from './cli-theme.js'
 
 
 export interface WelcomeScreenOptions {
@@ -51,6 +52,7 @@ export function printWelcomeScreen(opts: WelcomeScreenOptions): void {
   const YELLOW = LSD_YELLOW
   const BLUE = LSD_BLUE
   const PINK = LSD_PINK
+  const ACCENT = accentHex()
 
   // ── Panel widths ────────────────────────────────────────────────────────────
   // Layout: 1 leading space + LEFT_INNER logo content + 1 inner divider + RIGHT_INNER info
@@ -78,16 +80,16 @@ export function printWelcomeScreen(opts: WelcomeScreenOptions): void {
   if (process.env.CONTEXT7_API_KEY)   toolParts.push('Context7 ✓')
 
   // Tools summary row
-  const toolsLeft  = toolParts.length > 0 ? chalk.hex(PINK).dim('  ' + toolParts.join('  ·  ')) : ''
+  const toolsLeft  = toolParts.length > 0 ? chalk.hex(PINK)('  ' + toolParts.join('  ·  ')) : ''
   const footerRow  = rpad(toolsLeft, RIGHT_INNER)
 
   const DIVIDER = null
   const rightRows: (string | null)[] = [
     titleRow,
     DIVIDER,
-    modelName ? `  Model      ${chalk.hex(BLUE).dim(modelName)}`  : '',
-    provider  ? `  Provider   ${chalk.hex(BLUE).dim(provider)}`   : '',
-    `  Directory  ${chalk.hex(BLUE).dim(shortCwd)}`,
+    modelName ? `  Model      ${chalk.hex(ACCENT)(modelName)}`  : '',
+    provider  ? `  Provider   ${chalk.hex(ACCENT)(provider)}`   : '',
+    `  Directory  ${chalk.hex(ACCENT)(shortCwd)}`,
     DIVIDER,
     footerRow,
     '',
@@ -96,8 +98,8 @@ export function printWelcomeScreen(opts: WelcomeScreenOptions): void {
   // ── Render ──────────────────────────────────────────────────────────────────
   const out: string[] = ['']
 
-  // Top bar — full-width blue separator
-  out.push(chalk.hex(BLUE)(H.repeat(termWidth)))
+  // Top bar — full-width accent separator
+  out.push(chalk.hex(ACCENT)(H.repeat(termWidth)))
 
   for (let i = 0; i < 8; i++) {
     const row = leftRows[i]
@@ -110,16 +112,16 @@ export function printWelcomeScreen(opts: WelcomeScreenOptions): void {
     const rRow     = rightRows[i]
 
     if (rRow === null) {
-      // Section divider: left logo area + blue ├────... extending right
-      out.push(' ' + lContent + chalk.hex(BLUE).dim(DS + H.repeat(RIGHT_INNER)))
+      // Section divider: left logo area + accent ├────... extending right
+      out.push(' ' + lContent + chalk.hex(ACCENT)(DS + H.repeat(RIGHT_INNER)))
     } else {
       // Content row: 1 space + logo │ info (no outer vertical borders)
-      out.push(' ' + lContent + chalk.hex(BLUE).dim(DV) + rpad(rRow, RIGHT_INNER))
+      out.push(' ' + lContent + chalk.hex(ACCENT)(DV) + rpad(rRow, RIGHT_INNER))
     }
   }
 
-  // Bottom bar — full-width blue separator
-  out.push(chalk.hex(BLUE)(H.repeat(termWidth)))
+  // Bottom bar — full-width accent separator
+  out.push(chalk.hex(ACCENT)(H.repeat(termWidth)))
   out.push('')
 
   process.stderr.write(out.join('\n') + '\n')

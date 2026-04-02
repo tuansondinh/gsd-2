@@ -20,7 +20,7 @@ import { BUDGET_MODEL_OPTIONS, getLlmProviderOptions, getOtherLlmProviders, LLM_
 export { BUDGET_MODEL_OPTIONS, getLlmProviderOptions, LLM_PROVIDER_IDS, shouldRunOnboarding } from './onboarding-llm.js'
 import { renderLogo } from './logo.js'
 import { agentDir } from './app-paths.js'
-import { accentAnsi } from './cli-theme.js'
+import { accentAnsi, accentHex } from './cli-theme.js'
 import { detectMissingServers, detectInstalledServers, installServer } from './lsp-install.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -195,7 +195,7 @@ export async function runOnboarding(authStorage: AuthStorage, settingsManager: S
 
   // ── Intro ─────────────────────────────────────────────────────────────────
   process.stderr.write(renderLogo(accentAnsi))
-  p.intro(pc.bold('Welcome to LSD — let\'s get you set up'))
+  p.intro(accentAnsi(pc.bold('Welcome to LSD')) + pc.bold(' — let\'s get you set up'))
 
   // ── LLM Provider Selection ────────────────────────────────────────────────
   let llmConfigured = false
@@ -337,8 +337,8 @@ export async function runOnboarding(authStorage: AuthStorage, settingsManager: S
     summaryLines.push(`${pc.green('✓')} Language servers: ${lspInstalled.join(', ')} (${lspInstalled.length} installed)`)
   }
 
-  p.note(summaryLines.join('\n'), 'Setup complete')
-  p.outro(pc.dim('Launching LSD...'))
+  p.note(summaryLines.join('\n'), accentAnsi('Setup complete'))
+  p.outro(accentAnsi('Launching LSD...'))
 }
 
 async function runClassifierModelStep(

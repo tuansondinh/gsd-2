@@ -95,8 +95,8 @@ export class BashExecutionComponent extends Container {
 		let text = theme.fg(this.colorKey, theme.bold(`$ ${this.command}`));
 		if (this.rtkActive) {
 			const badge = this.rtkFlashOn
-				? theme.fg("accent", "⚡ RTK")
-				: theme.fg("dim", "⚡ RTK");
+				? theme.fg("accent", "$ RTK")
+				: theme.fg("dim", "$ RTK");
 			text = `${text}  ${badge}`;
 		}
 		return text;

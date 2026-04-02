@@ -143,6 +143,9 @@ export class Editor implements Component, Focusable {
 	// Border color (can be changed dynamically)
 	public borderColor: (str: string) => string;
 
+	// Optional hint rendered in the bottom border line (right-aligned, already styled)
+	public bottomHint: string = "";
+
 	// Autocomplete support
 	private autocompleteProvider?: AutocompleteProvider;
 	private autocompleteList?: SelectList;
@@ -427,6 +430,26 @@ export class Editor implements Component, Focusable {
 			const indicator = `─── ↓ ${linesBelow} more `;
 			const remaining = width - visibleWidth(indicator);
 			result.push(this.borderColor(indicator + "─".repeat(Math.max(0, remaining))));
+		} else if (this.bottomHint) {
+			// Embed hint right-aligned in the bottom border: ─────── hint ─
+			// Apply borderColor only to the dashes so the hint's own styling is preserved.
+			const hintVisible = visibleWidth(this.bottomHint);
+			const minDashes = 1;
+			const separatorWidth = 1; // single space on each side of hint
+			const totalFixed = hintVisible + separatorWidth * 2 + minDashes * 2;
+			if (width >= totalFixed) {
+				const leftDashes = Math.floor((width - hintVisible - separatorWidth * 2) * 0.75);
+				const rightDashes = Math.max(minDashes, width - hintVisible - separatorWidth * 2 - leftDashes);
+				const line =
+					this.borderColor("─".repeat(leftDashes)) +
+					" " +
+					this.bottomHint +
+					" " +
+					this.borderColor("─".repeat(rightDashes));
+				result.push(line);
+			} else {
+				result.push(horizontal.repeat(width));
+			}
 		} else {
 			result.push(horizontal.repeat(width));
 		}

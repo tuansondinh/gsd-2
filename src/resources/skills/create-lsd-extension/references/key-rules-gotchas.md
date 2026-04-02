@@ -1,5 +1,5 @@
 <overview>
-Non-negotiable rules and common gotchas when building GSD extensions.
+Non-negotiable rules and common gotchas when building LSD extensions.
 </overview>
 
 <must_follow>
@@ -22,16 +22,16 @@ Non-negotiable rules and common gotchas when building GSD extensions.
 - Overlay components are **disposed when closed** — create fresh instances each time
 - Treat `ctx.reload()` as terminal — code after runs from pre-reload version
 - Check `ctx.hasUI` before dialog methods (false in print/JSON mode)
-- Extension errors are logged but don't crash GSD — tool_call handler errors fail-safe (block the tool)
+- Extension errors are logged but don't crash LSD — tool_call handler errors fail-safe (block the tool)
 </common_patterns>
 
 <gsd_paths>
-**GSD extension paths (community/user-installed extensions):**
+**LSD extension paths (community/user-installed extensions):**
 - Global: `~/.pi/agent/extensions/*.ts`
 - Global (subdir): `~/.pi/agent/extensions/*/index.ts`
 - Project-local: `.gsd/extensions/*.ts`
 - Project-local (subdir): `.gsd/extensions/*/index.ts`
 
-Note: `~/.gsd/agent/extensions/` is reserved for bundled extensions synced from the gsd-pi package.
+Note: `~/.gsd/agent/extensions/` is reserved for bundled extensions synced from the lsd-pi package.
 Community extensions placed there are silently ignored by the loader.
 </gsd_paths>

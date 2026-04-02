@@ -139,6 +139,7 @@ See [Parallel Orchestration](./parallel-orchestration.md) for full documentation
 | `/cache-timer` | Toggle the footer cache elapsed-time indicator |
 | `/thinking` | Toggle thinking level during sessions |
 | `/voice` | Toggle real-time speech-to-text (macOS, Linux) |
+| `/usage` | Show built-in token/cost usage reports from LSD session history |
 
 ## Keyboard Shortcuts
 

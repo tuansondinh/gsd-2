@@ -562,7 +562,7 @@ export class ToolExecutionComponent extends Container {
 		const commandDisplay =
 			command === null ? theme.fg("error", "[invalid arg]") : command ? command : theme.fg("toolOutput", "...");
 		const rtkBadge = rtkActive
-			? "  " + (this.rtkFlashOn ? theme.fg("accent", "⚡ RTK") : theme.fg("dim", "⚡ RTK"))
+			? "  " + (this.rtkFlashOn ? theme.fg("accent", "$ RTK") : theme.fg("dim", "$ RTK"))
 			: "";
 		this.contentBox.addChild(
 			new Text(theme.fg("toolTitle", theme.bold(`$ ${commandDisplay}`)) + timeoutSuffix + rtkBadge, 0, 0),

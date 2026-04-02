@@ -19,6 +19,7 @@ function mapStatusToExitCode(status: string): number {
   switch (status) {
     case 'success':
     case 'complete':
+    case 'completed':
       return EXIT_SUCCESS
     case 'error':
     case 'timeout':
@@ -133,6 +134,7 @@ interface EventHandlerState {
   exitCode: number
   v2Enabled: boolean
   isMultiTurnCommand?: boolean
+  isSingleTurnContextRun?: boolean
 }
 
 function handleEvent(
@@ -148,6 +150,13 @@ function handleEvent(
     const status = String(eventObj.status ?? 'success')
     state.exitCode = mapStatusToExitCode(status)
     if (eventObj.status === 'blocked') state.blocked = true
+    return
+  }
+
+  // Quick commands and bare+context runs resolve on first agent_end
+  if (eventObj.type === 'agent_end' && state.isSingleTurnContextRun && !state.completed) {
+    state.completed = true
+    state.exitCode = state.blocked ? EXIT_BLOCKED : EXIT_SUCCESS
     return
   }
 
@@ -530,5 +539,38 @@ test('non-multi-turn commands still complete on execution_complete', () => {
   handleEvent({ type: 'execution_complete', status: 'success' }, state, client)
 
   assert.equal(state.completed, true, 'single-turn commands should complete on execution_complete')
+  assert.equal(state.exitCode, EXIT_SUCCESS)
+})
+
+test('bare+context runs treat execution_complete as terminal even when command defaults to auto', () => {
+  const client = new MockRpcClient()
+  const state: EventHandlerState = {
+    completed: false,
+    blocked: false,
+    exitCode: -1,
+    v2Enabled: true,
+    isMultiTurnCommand: false,
+    isSingleTurnContextRun: true,
+  }
+
+  handleEvent({ type: 'execution_complete', status: 'completed' }, state, client)
+
+  assert.equal(state.completed, true)
+  assert.equal(state.exitCode, EXIT_SUCCESS)
+})
+
+test('bare+context runs fall back to agent_end completion when execution_complete is missing', () => {
+  const client = new MockRpcClient()
+  const state: EventHandlerState = {
+    completed: false,
+    blocked: false,
+    exitCode: -1,
+    v2Enabled: false,
+    isSingleTurnContextRun: true,
+  }
+
+  handleEvent({ type: 'agent_end' }, state, client)
+
+  assert.equal(state.completed, true)
   assert.equal(state.exitCode, EXIT_SUCCESS)
 })

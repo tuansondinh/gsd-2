@@ -82,7 +82,7 @@ function makeCtx(overrides: Partial<any> = {}): any {
   }
 }
 
-function makeAskUserDetails(selected?: string, cancelled = false) {
+function makeAskUserDetails(selected?: string | string[], cancelled = false) {
   if (cancelled) return { cancelled: true }
   if (!selected) return { response: { answers: {} } }
   return {
@@ -129,6 +129,8 @@ test('plan mode pending → approved switches to configured reasoning model and 
   )
   assert.match(pi.sentMessages.at(-1) ?? '', /Approve & switch to Auto mode/)
   assert.match(pi.sentMessages.at(-1) ?? '', /ask_user_questions/)
+  assert.match(pi.sentMessages.at(-1) ?? '', /single-select supports only 2-3 explicit options/)
+  assert.doesNotMatch(pi.sentMessages.at(-1) ?? '', /4\. Cancel/)
 
   await pi.handlers.tool_result(
     { toolName: 'ask_user_questions', details: makeAskUserDetails('Approve & switch to Auto mode') },
@@ -224,7 +226,7 @@ test('plan mode pending → cancelled restores preplan model and original permis
   )
 
   await pi.handlers.tool_result(
-    { toolName: 'ask_user_questions', details: makeAskUserDetails('Cancel') },
+    { toolName: 'ask_user_questions', details: makeAskUserDetails(['None of the above', 'user_note: Cancel']) },
     makeCtx({ model: { provider: 'anthropic', id: 'claude-sonnet-4-6' } }),
   )
 

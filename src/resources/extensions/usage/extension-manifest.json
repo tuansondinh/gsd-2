@@ -1,0 +1,11 @@
+{
+  "id": "usage",
+  "name": "Usage",
+  "version": "1.0.0",
+  "description": "Show built-in LSD token and cost usage reports aggregated from session history",
+  "tier": "bundled",
+  "requires": { "platform": ">=2.29.0" },
+  "provides": {
+    "commands": ["usage"]
+  }
+}

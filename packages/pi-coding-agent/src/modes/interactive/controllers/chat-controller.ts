@@ -78,6 +78,14 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 				host.defaultWorkingMessage,
 			);
 			host.statusContainer.addChild(host.loadingAnimation);
+			// Show steer/queue hint in editor bottom border while agent is running
+			{
+				const enterKey = theme.fg("dim", "↵");
+				const followUpKey = theme.fg("dim", appKey(host.keybindings, "followUp"));
+				const steerLabel = theme.fg("muted", " steer");
+				const queueLabel = theme.fg("muted", " queue");
+				host.defaultEditor.bottomHint = `${enterKey}${steerLabel}  ${followUpKey}${queueLabel}`;
+			}
 			if (host.pendingWorkingMessage !== undefined) {
 				if (host.pendingWorkingMessage) {
 					host.loadingAnimation.setMessage(host.pendingWorkingMessage);
@@ -254,6 +262,8 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 				host.streamingMessage = undefined;
 			}
 			host.pendingTools.clear();
+			// Clear the steer/queue hint when agent finishes
+			host.defaultEditor.bottomHint = "";
 			await host.checkShutdownRequested();
 			host.ui.requestRender();
 			break;

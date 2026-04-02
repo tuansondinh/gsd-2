@@ -5,7 +5,7 @@
   "description": "Persistent file-based memory across sessions",
   "tier": "bundled",
   "provides": {
-    "hooks": ["session_start", "before_agent_start", "session_shutdown"],
-    "commands": ["memories", "remember", "forget"]
+    "hooks": ["session_start", "before_agent_start", "turn_end", "tool_call", "session_shutdown"],
+    "commands": ["memories", "remember", "forget", "dream", "auto-dream"]
   }
 }

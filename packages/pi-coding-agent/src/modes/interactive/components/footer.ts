@@ -169,13 +169,10 @@ export class FooterComponent implements Component {
 
 		// Colorize context percentage based on usage
 		let contextPercentStr: string;
-		const autoIndicator = this.autoCompactEnabled ? " (auto)" : "";
 		const contextPercentDisplay =
 			contextPercent === "?"
-				? `?/${formatTokens(contextWindow)}${autoIndicator}`
-				: contextTokens !== null
-					? `${formatTokens(contextTokens)} ${contextPercent}%/${formatTokens(contextWindow)}${autoIndicator}`
-					: `${contextPercent}%/${formatTokens(contextWindow)}${autoIndicator}`;
+				? `?/${formatTokens(contextWindow)}`
+				: `${contextPercent}%/${formatTokens(contextWindow)}`;
 		if (contextPercentValue > 90) {
 			contextPercentStr = theme.fg("error", contextPercentDisplay);
 		} else if (contextPercentValue > 70) {
@@ -186,14 +183,16 @@ export class FooterComponent implements Component {
 		statsParts.push(contextPercentStr);
 
 		const currentPermissionMode = getPermissionMode();
-		const permissionModeLabel =
-			currentPermissionMode === "danger-full-access"
-				? "⚡ full-access"
-				: currentPermissionMode === "accept-on-edit"
-					? "✓ accept-edit"
-					: currentPermissionMode === "auto"
-						? "🤖 auto"
-						: "📝 plan";
+		let permissionModeLabel: string;
+		if (currentPermissionMode === "danger-full-access") {
+			permissionModeLabel = theme.fg("error", "⚡ full-access");
+		} else if (currentPermissionMode === "accept-on-edit") {
+			permissionModeLabel = theme.fg("success", "✓ accept-edit");
+		} else if (currentPermissionMode === "auto") {
+			permissionModeLabel = theme.fg("warning", "🤖 auto");
+		} else {
+			permissionModeLabel = theme.fg("violet", "📝 plan");
+		}
 		statsParts.push(permissionModeLabel);
 
 		let statsLeft = statsParts.join(" ");

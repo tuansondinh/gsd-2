@@ -9,4 +9,5 @@
 - [ ] Add Bedrock to the onboarding setup command
 - [ ] Add missing model: gpt-5.4-mini
 - [ ] Fix subagents with skills — lsd is not aware how to use corectl models
+- [ ] Improve classifier in auto mode
 - [x] Add 5min cache timer for Claude

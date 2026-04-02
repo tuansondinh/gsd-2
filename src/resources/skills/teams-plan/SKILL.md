@@ -1,7 +1,6 @@
 ---
 name: teams-plan
 description: "Plan and build a feature. Orchestrator plans, spawns sequential builder subagents per phase (with Playwright/Maestro verification), then a reviewer subagent, then a builder to apply fixes. Supports parallel mode for independent phases."
-user-invocable: true
 ---
 
 # Teams: Plan + Build
@@ -41,7 +40,7 @@ mkdir -p .lsd/plan
 - Check for existing plan files: `.lsd/plan/PLAN-*.md`
 - Count existing files to determine N (next plan number = count + 1)
 - If plans exist, inform the user:
-  > **Found [N-1] existing plan(s). Creating Plan #[N]. Use `/teams-run` to resume an existing plan.**
+  > **Found [N-1] existing plan(s). Creating Plan #[N]. Use `/skill:teams-run` to resume an existing plan.**
 - If no existing plans: plan number = 1
 
 Write `.lsd/plan/PLAN-[N].md`:
@@ -291,7 +290,7 @@ Final summary format:
 ```
 
 Then suggest:
-> **Build done. Run `/teams-verify` to walk through manual E2E verification.**
+> **Build done. Run `/skill:teams-verify` to walk through manual E2E verification.**
 
 ---
 
@@ -299,7 +298,7 @@ Then suggest:
 
 Ask the user:
 
-> **"Would you like to update your documentation? Run `/teams-document` to have the scribe update your README, ARCHITECTURE.md, and other docs."**
+> **"Would you like to update your documentation? Run `/skill:teams-document` to have the scribe update your README, ARCHITECTURE.md, and other docs."**
 
 If yes, invoke the `teams-document` skill.
 

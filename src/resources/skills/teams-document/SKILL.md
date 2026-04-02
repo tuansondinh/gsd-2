@@ -1,7 +1,6 @@
 ---
 name: teams-document
 description: "Update existing project docs (README.md, ARCHITECTURE.md, etc.) and the active plan file to reflect the latest build. Spawns a worker subagent scribe to find and update relevant documentation files and ensure the plan is accurate, then appends a docs status update to the plan."
-user-invocable: true
 ---
 
 # Teams: Document
@@ -9,7 +8,7 @@ user-invocable: true
 Update existing project documentation to reflect what was built in the current plan. Spawns a worker subagent that finds relevant docs and updates them — no new files created unless explicitly needed.
 
 **Prerequisite:** A `.lsd/plan/PLAN-*.md` file must exist. If none found, stop:
-> No plan files found in `.lsd/plan/`. Run `/teams-plan` first.
+> No plan files found in `.lsd/plan/`. Run `/skill:teams-plan` first.
 
 ---
 

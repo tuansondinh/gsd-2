@@ -1,5 +1,5 @@
 <overview>
-Packaging extensions for distribution via npm, git, or local paths. Creating GSD/pi packages.
+Packaging extensions for distribution via npm, git, or local paths. Creating LSD/pi packages.
 </overview>
 
 <package_manifest>
@@ -7,7 +7,7 @@ Add a `pi` manifest to `package.json`:
 
 ```json
 {
-  "name": "my-gsd-package",
+  "name": "my-lsd-package",
   "keywords": ["pi-package"],
   "pi": {
     "extensions": ["./extensions"],
@@ -21,12 +21,12 @@ Add a `pi` manifest to `package.json`:
 
 <installing>
 ```bash
-gsd install npm:@foo/bar@1.0.0
-gsd install git:github.com/user/repo@v1
-gsd install ./local/path
+lsd install npm:@foo/bar@1.0.0
+lsd install git:github.com/user/repo@v1
+lsd install ./local/path
 
 # Try without installing:
-gsd -e npm:@foo/bar
+lsd -e npm:@foo/bar
 ```
 </installing>
 

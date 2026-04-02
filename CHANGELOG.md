@@ -1,26 +1,32 @@
 # Changelog
 
-All notable changes to GSD are documented in this file.
+All notable changes to LSD are documented in this file.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [1.1.2] - 2026-04-02
+## [1.1.3] - 2026-04-02
 
 ### Added
 - **memory**: document the persistent memory system in `README.md`, including `/memories`, `/remember`, `/forget`, detached auto-extract behavior, and audit/debug files written to the project memory directory
+- **memory**: add `/dream` and `/auto-dream`, plus guarded background consolidation hooks for memory maintenance workers
 - **memory**: auto-extract now records `.last-auto-extract.txt` and `.last-auto-extract.log`, supports single-user-message transcripts, and prefers `budgetSubagentModel` when configured
 - **tui**: added a bundled `cache-timer` extension that shows elapsed cache-window time in the footer and can be toggled from settings or with `/cache-timer`
 - **tui**: settings UI now exposes toggles for Codex rotate, cache timer, and RTK shell-command compression
+- **theme**: added a persisted `Main accent` setting with preset choices (`default`, `golden-yellow`, `blue`, `green`, `violet`, `red`) in `/settings`
+- **usage**: add a bundled `/usage` command for token and cost reports aggregated from local LSD session history
 
 ### Changed
+- **skills**: rename the bundled extension-authoring skill to `create-lsd-extension` and remove obsolete slash-command generators in favor of skill-driven flows
 - **footer**: moved the cache timer into the first footer line and added compact hotkey hints such as `Ctrl+K` / `/hotkeys`
-- **docs**: refreshed `docs/FILE-SYSTEM-MAP.md` to cover the current memory extension files and responsibilities
+- **docs**: refreshed `docs/FILE-SYSTEM-MAP.md` and `docs/commands.md` to cover memory/usage command changes and current extension responsibilities
+- **theme**: accent overrides now apply consistently across accent-driven UI and the text input border palette for all thinking levels
 
 ### Fixed
 - **memory**: detached auto-extract worker now writes explicit audit status when the CLI path cannot be resolved and finalizes more reliably after headless session shutdown
 - **tui**: RTK badges in bash/tool execution views now flash while active and clean up timers correctly when renders complete or components are disposed
+- **sdk**: re-export `CONFIG_DIR_NAME` so bundled extensions importing from `@gsd/pi-coding-agent` build correctly
 
 ## [2.58.0] - 2026-03-28
 
@@ -939,7 +945,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - add extension manifest + registry for user-managed enable/disable (#1238)
 - add model health indicator to auto-mode progress widget (#1232)
 - simplify auto pipeline — merge research into planning, mechanical completion (ADR-003) (#1235)
-- add create-gsd-extension skill (#1229)
+- add create-lsd-extension skill (#1229)
 - add built-in skill authoring system (ADR-003) (#1228)
 - **prefs**: two-step provider→model picker in preferences wizard (#1218)
 - workflow templates — right-sized workflows for every task type (#1185)

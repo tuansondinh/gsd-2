@@ -97,7 +97,7 @@ describe("Skill tool", () => {
 		assert.match(message, /swift-testing/);
 	});
 
-	it("supports direct slash aliases for user-invocable skills", async () => {
+	it("expands explicit /skill:name invocations", async () => {
 		writeSkill(
 			testDir,
 			"teams-plan",
@@ -106,16 +106,29 @@ describe("Skill tool", () => {
 			"user-invocable: true",
 		);
 		const session = await createSession();
-		const loadedSkill = session.resourceLoader.getSkills().skills.find((skill) => skill.name === "teams-plan");
-		assert.equal(loadedSkill?.userInvocable, true);
 		const expanded = (session as unknown as { _expandSkillCommand: (text: string) => string })._expandSkillCommand(
-			"/teams-plan build auth",
+			"/skill:teams-plan build auth",
 		);
 		assert.match(expanded, /<skill name="teams-plan"/);
 		assert.match(expanded, /build auth/);
 	});
 
-	it("does not treat non-invocable skills as direct slash aliases", async () => {
+	it("does not expand bare /name aliases even when user-invocable is set", async () => {
+		writeSkill(
+			testDir,
+			"teams-plan",
+			"Plan and build a feature.",
+			"# Teams Plan\nUse this skill.\n",
+			"user-invocable: true",
+		);
+		const session = await createSession();
+		const expanded = (session as unknown as { _expandSkillCommand: (text: string) => string })._expandSkillCommand(
+			"/teams-plan build auth",
+		);
+		assert.equal(expanded, "/teams-plan build auth");
+	});
+
+	it("does not treat bare /name skill invocations as commands when no skill: prefix is used", async () => {
 		writeSkill(testDir, "internal-skill", "Internal only.", "# Internal\n");
 		const session = await createSession();
 		const expanded = (session as unknown as { _expandSkillCommand: (text: string) => string })._expandSkillCommand(

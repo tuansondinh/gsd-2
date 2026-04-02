@@ -1,7 +1,6 @@
 ---
 name: teams-run
 description: "Resume building a single Teams plan. Orchestrator spawns sequential or parallel builder subagents per incomplete phase, then a reviewer subagent, then applies fixes."
-user-invocable: true
 ---
 
 # Teams: Run (Resume Build)
@@ -13,7 +12,7 @@ You are the orchestrator. Resume an existing build by running all incomplete pha
 ## Step 1: Find the Plan
 
 List all files matching `.lsd/plan/PLAN-*.md`. If none exist:
-> No plan files found in `.lsd/plan/`. Use `/teams-plan` to create a plan first.
+> No plan files found in `.lsd/plan/`. Use `/skill:teams-plan` to create a plan first.
 
 If multiple plan files exist, show the list and ask the user which plan to resume. Default to the highest-numbered plan.
 
@@ -216,7 +215,7 @@ Final summary:
 ```
 
 Then suggest:
-> **Build done. Run `/teams-verify` to walk through manual E2E verification.**
+> **Build done. Run `/skill:teams-verify` to walk through manual E2E verification.**
 
 ---
 
@@ -224,7 +223,7 @@ Then suggest:
 
 Ask the user:
 
-> **"Would you like to update your documentation? Run `/teams-document` to have the scribe update your README, ARCHITECTURE.md, and other docs."**
+> **"Would you like to update your documentation? Run `/skill:teams-document` to have the scribe update your README, ARCHITECTURE.md, and other docs."**
 
 If yes, invoke the `teams-document` skill.
 

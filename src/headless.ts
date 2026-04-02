@@ -259,7 +259,8 @@ async function runHeadlessOnce(options: HeadlessOptions, restartCount: number): 
   // per-unit timeout via auto-supervisor. Disable the overall timeout unless the
   // user explicitly set --timeout.
   const isAutoMode = options.command === 'auto'
-  const isMultiTurnCommand = options.command === 'auto' || options.command === 'next'
+  let isMultiTurnCommand = options.command === 'auto' || options.command === 'next'
+  let isSingleTurnContextRun = false
   if (isAutoMode && options.timeout === 300_000) {
     options.timeout = 0
   }
@@ -290,6 +291,10 @@ async function runHeadlessOnce(options: HeadlessOptions, restartCount: number): 
   if (options.context || options.contextText) {
     try {
       contextContent = await loadContext(options)
+      isSingleTurnContextRun = !!(options.bare && contextContent)
+      if (isSingleTurnContextRun) {
+        isMultiTurnCommand = false
+      }
     } catch (err) {
       process.stderr.write(`[headless] Error loading context: ${err instanceof Error ? err.message : String(err)}\n`)
       process.exit(1)
@@ -699,8 +704,8 @@ async function runHeadlessOnce(options: HeadlessOptions, restartCount: number): 
       }
     }
 
-    // Quick commands: resolve on first agent_end
-    if (eventObj.type === 'agent_end' && isQuickCommand(options.command) && !completed) {
+    // Quick commands and bare+context runs: resolve on first agent_end
+    if (eventObj.type === 'agent_end' && (isQuickCommand(options.command) || isSingleTurnContextRun) && !completed) {
       completed = true
       resolveCompletion()
       return

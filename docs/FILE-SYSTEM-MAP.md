@@ -588,9 +588,7 @@
 | subagent/agents.ts | Subagent, Agent Core | Agent registry and discovery |
 | subagent/isolation.ts | Subagent | Execution isolation and sandboxing |
 | subagent/worker-registry.ts | Subagent | Worker process management |
-| slash-commands/index.ts | Slash Commands, Commands | Command boilerplate generators extension |
-| slash-commands/create-slash-command.ts | Slash Commands | Generator for new slash command scaffolding |
-| slash-commands/create-extension.ts | Slash Commands, Extensions | Generator for new extension scaffolding |
+| slash-commands/index.ts | Slash Commands, Commands | Bundled audit/clear/plan command extension |
 | universal-config/index.ts | Universal Config | Multi-tool configuration file discovery |
 | universal-config/discovery.ts | Universal Config | Configuration file discovery |
 | universal-config/scanners.ts | Universal Config | Tool-specific config scanners |
@@ -630,7 +628,7 @@
 | react-best-practices/ | Skills | React development patterns (62 files) |
 | userinterface-wiki/ | Skills | UI/UX guidelines and component reference (155 files) |
 | create-skill/ | Skills | Skill creation scaffolding and templates (25 files) |
-| create-gsd-extension/ | Skills, Extensions | GSD extension scaffolding (22 files) |
+| create-lsd-extension/ | Skills, Extensions | LSD extension scaffolding (22 files) |
 | code-optimizer/ | Skills | Performance optimization techniques (16 files) |
 | agent-browser/ | Skills, Browser Tools | Browser automation guidance (11 files) |
 | github-workflows/ | Skills | GitHub Actions workflow patterns (10 files) |

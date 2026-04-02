@@ -8,26 +8,32 @@
  * indexed by a MEMORY.md entrypoint that is always loaded into context.
  */
 
-import type { ExtensionAPI, ExtensionContext } from '@gsd/pi-coding-agent';
+import {
+	isToolCallEventType,
+	type ExtensionAPI,
+} from '@gsd/pi-coding-agent';
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { getMemoryDir, getMemoryEntrypoint, ensureMemoryDir } from './memory-paths.js';
 import {
-	MEMORY_TYPES,
 	MEMORY_FRONTMATTER_EXAMPLE,
 	TYPES_SECTION,
 	WHAT_NOT_TO_SAVE_SECTION,
 	WHEN_TO_ACCESS_SECTION,
 	TRUSTING_RECALL_SECTION,
 } from './memory-types.js';
-import { scanMemoryFiles, formatMemoryManifest } from './memory-scan.js';
+import { scanMemoryFiles } from './memory-scan.js';
 import { memoryAge } from './memory-age.js';
-import { findRelevantMemories } from './memory-recall.js';
 import { extractMemories } from './auto-extract.js';
+import {
+	formatDreamStatus,
+	isMaintenanceModeToolAllowed,
+	maybeStartAutoDream,
+	readAutoDreamSettings,
+	setProjectAutoDreamEnabled,
+	startDream,
+} from './dream.js';
 
 // ── Constants ────────────────────────────────────────────────────────
-
-/** Name of the entrypoint file that indexes all memories. */
-const ENTRYPOINT_NAME = 'MEMORY.md';
 
 /** Maximum number of lines loaded from MEMORY.md into context. */
 const MAX_ENTRYPOINT_LINES = 200;
@@ -144,14 +150,17 @@ ${MEMORY_FRONTMATTER_EXAMPLE.join('\n')}
  * Memory extension for LSD.
  *
  * Lifecycle:
- *   session_start     → bootstrap memory directory & MEMORY.md
+ *   session_start      → bootstrap memory directory & MEMORY.md
  *   before_agent_start → inject memory system prompt
+ *   turn_end           → check auto-dream gates and start background consolidation
  *   session_shutdown   → fire-and-forget auto-extract of new memories
  *
  * Commands:
- *   /memories  — list all saved memories
- *   /remember  — save a memory immediately
- *   /forget    — remove a memory by topic
+ *   /memories    — list all saved memories
+ *   /remember    — save a memory immediately
+ *   /forget      — remove a memory by topic
+ *   /dream       — run memory consolidation now or show dream status
+ *   /auto-dream  — enable/disable/show auto-dream status
  */
 export default function memoryExtension(pi: ExtensionAPI) {
 	let memoryCwd: string = '';
@@ -194,11 +203,52 @@ export default function memoryExtension(pi: ExtensionAPI) {
 		};
 	});
 
+	// ── turn_end: check auto-dream gates ───────────────────────────────
+	pi.on('turn_end', async (_event, ctx) => {
+		if (!memoryCwd) return;
+		const result = maybeStartAutoDream(ctx);
+		if (result.started) {
+			pi.sendMessage({
+				customType: 'memory:auto-dream',
+				content: result.message,
+				display: true,
+			});
+		}
+	});
+
+	// ── tool_call: restrict background maintenance workers ─────────────
+	pi.on('tool_call', async (event, ctx) => {
+		if (!(process.env.LSD_MEMORY_EXTRACT === '1' || process.env.LSD_MEMORY_DREAM === '1')) return;
+
+		if (isMaintenanceModeToolAllowed(event.toolName, event.input as { path?: string; command?: string }, ctx.cwd)) {
+			return;
+		}
+
+		if (isToolCallEventType('write', event) || isToolCallEventType('edit', event)) {
+			return {
+				block: true,
+				reason: `Memory maintenance workers may only write inside the memory directory. Blocked path: ${event.input.path}`,
+			};
+		}
+
+		if (isToolCallEventType('bash', event)) {
+			return {
+				block: true,
+				reason: 'Memory maintenance workers may only run read-only bash commands.',
+			};
+		}
+
+		return {
+			block: true,
+			reason: `Tool ${event.toolName} is blocked for memory maintenance workers.`,
+		};
+	});
+
 	// ── session_shutdown: trigger auto-extract ────────────────────────
 	pi.on('session_shutdown', async (_event, ctx) => {
 		if (!memoryCwd) return;
-		// Don't extract if this IS the extraction agent
-		if (process.env.LSD_MEMORY_EXTRACT === '1') return;
+		// Don't extract if this IS the extraction or dream worker
+		if (process.env.LSD_MEMORY_EXTRACT === '1' || process.env.LSD_MEMORY_DREAM === '1') return;
 		try {
 			extractMemories(ctx, memoryCwd);
 		} catch {
@@ -258,6 +308,77 @@ export default function memoryExtension(pi: ExtensionAPI) {
 			const topic = args.trim();
 			if (!topic) return;
 			pi.sendUserMessage(`Please find and remove any memories about: ${topic}`);
+		},
+	});
+
+	/**
+	 * /dream — run a consolidation pass now, or show dream status.
+	 */
+	pi.registerCommand('dream', {
+		description: 'Run memory consolidation now or show dream status',
+		handler: async (args, ctx) => {
+			if (!memoryCwd) return;
+			const subcommand = args.trim().toLowerCase();
+			if (subcommand === 'status') {
+				pi.sendMessage({
+					customType: 'memory:dream-status',
+					content: formatDreamStatus(ctx),
+					display: true,
+				});
+				return;
+			}
+
+			const result = startDream(ctx, { trigger: 'manual' });
+			pi.sendMessage({
+				customType: 'memory:dream',
+				content: result.message,
+				display: true,
+			});
+		},
+	});
+
+	/**
+	 * /auto-dream — enable, disable, or inspect project auto-dream.
+	 */
+	pi.registerCommand('auto-dream', {
+		description: 'Enable, disable, or show project auto-dream status',
+		handler: async (args, ctx) => {
+			if (!memoryCwd) return;
+			const subcommand = args.trim().toLowerCase();
+
+			if (subcommand === 'on') {
+				const settings = setProjectAutoDreamEnabled(memoryCwd, true);
+				pi.sendMessage({
+					customType: 'memory:auto-dream-settings',
+					content: `Auto-dream enabled for this project. Thresholds: ${settings.minHours}h / ${settings.minSessions} sessions.`,
+					display: true,
+				});
+				return;
+			}
+
+			if (subcommand === 'off') {
+				const settings = setProjectAutoDreamEnabled(memoryCwd, false);
+				pi.sendMessage({
+					customType: 'memory:auto-dream-settings',
+					content: `Auto-dream disabled for this project. Thresholds remain ${settings.minHours}h / ${settings.minSessions} sessions.`,
+					display: true,
+				});
+				return;
+			}
+
+			const settings = readAutoDreamSettings(memoryCwd);
+			pi.sendMessage({
+				customType: 'memory:auto-dream-status',
+				content: [
+					'Auto-Dream Settings',
+					'',
+					`- Enabled: ${settings.enabled ? 'yes' : 'no'}`,
+					`- Thresholds: ${settings.minHours}h / ${settings.minSessions} sessions`,
+					'',
+					formatDreamStatus(ctx),
+				].join('\n'),
+				display: true,
+			});
 		},
 	});
 }

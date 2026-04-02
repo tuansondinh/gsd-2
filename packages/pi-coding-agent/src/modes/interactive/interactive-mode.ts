@@ -463,7 +463,7 @@ export class InteractiveMode {
 
 			// Add changelog if provided
 			if (this.changelogMarkdown) {
-				this.headerContainer.addChild(new DynamicBorder());
+				this.headerContainer.addChild(new DynamicBorder((text) => theme.fg("borderAccent", text)));
 				if (this.settingsManager.getCollapseChangelog()) {
 					const versionMatch = this.changelogMarkdown.match(/##\s+\[?(\d+\.\d+\.\d+)\]?/);
 					const latestVersion = versionMatch ? versionMatch[1] : this.version;
@@ -477,7 +477,7 @@ export class InteractiveMode {
 					);
 					this.headerContainer.addChild(new Spacer(1));
 				}
-				this.headerContainer.addChild(new DynamicBorder());
+				this.headerContainer.addChild(new DynamicBorder((text) => theme.fg("borderAccent", text)));
 			}
 		} else {
 			// Minimal header when silenced

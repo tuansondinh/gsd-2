@@ -16,6 +16,12 @@ import { getMemoryDir } from './memory-paths.js';
 import { scanMemoryFiles, formatMemoryManifest } from './memory-scan.js';
 import { normalizeSubagentModel } from '../subagent/model-resolution.js';
 
+const AUTO_EXTRACT_ANSI_PATTERN = /\u001B\[[0-?]*[ -/]*[@-~]/g;
+
+export function stripAnsiForAutoExtractLog(text: string): string {
+  return text.replace(AUTO_EXTRACT_ANSI_PATTERN, '');
+}
+
 /**
  * Build a plain-text transcript from session entries, keeping only
  * human-readable message content (no tool_use / tool_result blocks).
@@ -211,6 +217,11 @@ let sawSessionEnded = false;
 let sessionEndTimer = null;
 let hardTimeout = null;
 let pendingLogText = '';
+const ANSI_PATTERN = /\u001B\[[0-?]*[ -/]*[@-~]/g;
+
+function stripAnsi(text) {
+  return String(text).replace(ANSI_PATTERN, '');
+}
 
 function flushLogText(text, force = false) {
   pendingLogText += text;
@@ -219,7 +230,7 @@ function flushLogText(text, force = false) {
 
   const kept = [];
   for (const rawLine of parts) {
-    const line = rawLine.trim();
+    const line = stripAnsi(rawLine).trim();
     if (!line) continue;
     if (/^\[phase\]\s+cache-timer\s*$/.test(line)) continue;
     kept.push(rawLine);

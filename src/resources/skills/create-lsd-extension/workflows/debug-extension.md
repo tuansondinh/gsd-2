@@ -24,10 +24,10 @@
 
 ```bash
 # Test in isolation
-gsd -e ./path/to/extension.ts
+lsd -e ./path/to/extension.ts
 
-# Check GSD startup output for errors
-# Extension errors are logged but don't crash GSD
+# Check LSD startup output for errors
+# Extension errors are logged but don't crash LSD
 ```
 
 ## Step 3: Verify File Location
@@ -38,7 +38,7 @@ Community extensions must be in auto-discovery paths:
 - `.gsd/extensions/*.ts`
 - `.gsd/extensions/*/index.ts`
 
-Note: `~/.gsd/agent/extensions/` is reserved for bundled extensions synced from the gsd-pi package.
+Note: `~/.gsd/agent/extensions/` is reserved for bundled extensions synced from the lsd-pi package.
 
 The file must `export default function(pi: ExtensionAPI) { ... }`.
 
@@ -49,7 +49,7 @@ Read `../references/key-rules-gotchas.md` and verify each rule against the exten
 ## Step 5: Add Debugging
 
 ```typescript
-// Temporary: log to stderr (visible in GSD output)
+// Temporary: log to stderr (visible in LSD output)
 console.error("[my-ext] Loading...");
 
 pi.on("session_start", async (_event, ctx) => {

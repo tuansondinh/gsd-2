@@ -970,10 +970,6 @@ export class AgentSession {
 		return this.resourceLoader.getSkills().skills.find((skill) => skill.name === skillName);
 	}
 
-	private _findUserInvocableSkillAlias(commandName: string) {
-		return this.resourceLoader.getSkills().skills.find((skill) => skill.userInvocable && skill.name === commandName);
-	}
-
 	private _formatMissingSkillMessage(skillName: string): string {
 		const availableSkills = this.resourceLoader.getSkills().skills.map((skill) => skill.name).join(", ") || "(none)";
 		return `Skill "${skillName}" not found. Available skills: ${availableSkills}`;
@@ -1253,7 +1249,7 @@ export class AgentSession {
 	}
 
 	/**
-	 * Expand skill commands (/skill:name args or /name args for user-invocable skills)
+	 * Expand skill commands (/skill:name args)
 	 * to their full content.
 	 * Returns the expanded text, or the original text if not a skill command or skill not found.
 	 * Emits errors via extension runner if file read fails.
@@ -1265,15 +1261,10 @@ export class AgentSession {
 		const commandName = spaceIndex === -1 ? text.slice(1) : text.slice(1, spaceIndex);
 		const args = spaceIndex === -1 ? "" : text.slice(spaceIndex + 1).trim();
 
-		let skillName: string | undefined;
-		if (commandName.startsWith("skill:")) {
-			skillName = commandName.slice(6);
-			if (!this._findSkillByName(skillName)) return text;
-		} else {
-			const skill = this._findUserInvocableSkillAlias(commandName);
-			if (!skill) return text;
-			skillName = skill.name;
-		}
+		if (!commandName.startsWith("skill:")) return text;
+
+		const skillName = commandName.slice(6);
+		if (!this._findSkillByName(skillName)) return text;
 
 		try {
 			return this._formatSkillInvocation(skillName, args);
@@ -2055,11 +2046,6 @@ export class AgentSession {
 				path: template.filePath,
 			}));
 
-			const reservedNames = new Set<string>([
-				...reservedBuiltins,
-				...extensionCommands.map((command) => command.name),
-				...templates.map((template) => template.name),
-			]);
 			const skills: SlashCommandInfo[] = [];
 			for (const skill of this._resourceLoader.getSkills().skills) {
 				skills.push({
@@ -2069,15 +2055,6 @@ export class AgentSession {
 					location: normalizeLocation(skill.source),
 					path: skill.filePath,
 				});
-				if (skill.userInvocable && !reservedNames.has(skill.name)) {
-					skills.push({
-						name: skill.name,
-						description: skill.description,
-						source: "skill",
-						location: normalizeLocation(skill.source),
-						path: skill.filePath,
-					});
-				}
 			}
 
 			return [...extensionCommands, ...templates, ...skills];

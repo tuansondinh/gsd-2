@@ -1,9 +1,9 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { buildTranscriptSummary, buildExtractionPrompt } from '../auto-extract.js';
+import { buildTranscriptSummary, buildExtractionPrompt, stripAnsiForAutoExtractLog } from '../auto-extract.js';
 
 function makeTempDir(): string {
   const dir = join(tmpdir(), `mem-extract-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -97,6 +97,14 @@ describe('buildTranscriptSummary', () => {
 });
 
 describe('buildExtractionPrompt', () => {
+  test('strips ANSI codes so session-end and cache-timer lines can be classified', () => {
+    const coloredSessionEnd = '\u001b[36m[agent]   Session ended\u001b[0m';
+    const coloredCacheTimer = '\u001b[36m[phase]   cache-timer\u001b[0m';
+
+    assert.equal(stripAnsiForAutoExtractLog(coloredSessionEnd), '[agent]   Session ended');
+    assert.equal(stripAnsiForAutoExtractLog(coloredCacheTimer), '[phase]   cache-timer');
+  });
+
   test('contains the memory directory path in output', () => {
     const memoryDir = '/tmp/test-memory';
     const entries = [
