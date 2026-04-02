@@ -24,6 +24,14 @@ import { truncateToVisualLines } from "./visual-truncate.js";
 
 // Preview line limit for bash when not expanded
 const BASH_PREVIEW_LINES = 5;
+// Flash interval for RTK badge animation (ms)
+const RTK_FLASH_INTERVAL_MS = 400;
+
+/** Returns true when RTK is active in this process. */
+function isRtkEnabled(): boolean {
+	const v = (process.env["GSD_RTK_DISABLED"] ?? "").trim().toLowerCase();
+	return v !== "1" && v !== "true" && v !== "yes";
+}
 // During partial write tool-call streaming, re-highlight the first N lines fully
 // to keep multiline tokenization mostly correct without re-highlighting the full file.
 const WRITE_PARTIAL_FULL_HIGHLIGHT_LINES = 50;
@@ -94,6 +102,9 @@ export class ToolExecutionComponent extends Container {
 	private writeHighlightCache?: WriteHighlightCache;
 	// When true, this component intentionally renders no lines
 	private hideComponent = false;
+	// RTK badge flash state
+	private rtkFlashOn = true;
+	private rtkFlashTimer: NodeJS.Timeout | null = null;
 
 	constructor(
 		toolName: string,
@@ -298,6 +309,12 @@ export class ToolExecutionComponent extends Container {
 	): void {
 		this.result = result;
 		this.isPartial = isPartial;
+		// Stop RTK flash when result arrives — settle to dim
+		if (!isPartial && this.rtkFlashTimer) {
+			clearInterval(this.rtkFlashTimer);
+			this.rtkFlashTimer = null;
+			this.rtkFlashOn = false;
+		}
 		if (this.toolName === "write" && !isPartial) {
 			const rawPath = str(this.args?.file_path ?? this.args?.path);
 			const fileContent = str(this.args?.content);
@@ -356,6 +373,13 @@ export class ToolExecutionComponent extends Container {
 	setShowImages(show: boolean): void {
 		this.showImages = show;
 		this.updateDisplay();
+	}
+
+	dispose(): void {
+		if (this.rtkFlashTimer) {
+			clearInterval(this.rtkFlashTimer);
+			this.rtkFlashTimer = null;
+		}
 	}
 
 	override invalidate(): void {
@@ -522,13 +546,26 @@ export class ToolExecutionComponent extends Container {
 	private renderBashContent(): void {
 		const command = str(this.args?.command);
 		const timeout = this.args?.timeout as number | undefined;
+		const rtkActive = isRtkEnabled();
+
+		// Start RTK flash timer on first partial render
+		if (rtkActive && this.isPartial && !this.result && !this.rtkFlashTimer) {
+			this.rtkFlashTimer = setInterval(() => {
+				this.rtkFlashOn = !this.rtkFlashOn;
+				this.updateDisplay();
+				this.ui.requestRender();
+			}, RTK_FLASH_INTERVAL_MS);
+		}
 
 		// Header
 		const timeoutSuffix = timeout ? theme.fg("muted", ` (timeout ${timeout}s)`) : "";
 		const commandDisplay =
 			command === null ? theme.fg("error", "[invalid arg]") : command ? command : theme.fg("toolOutput", "...");
+		const rtkBadge = rtkActive
+			? "  " + (this.rtkFlashOn ? theme.fg("accent", "⚡ RTK") : theme.fg("dim", "⚡ RTK"))
+			: "";
 		this.contentBox.addChild(
-			new Text(theme.fg("toolTitle", theme.bold(`$ ${commandDisplay}`)) + timeoutSuffix, 0, 0),
+			new Text(theme.fg("toolTitle", theme.bold(`$ ${commandDisplay}`)) + timeoutSuffix + rtkBadge, 0, 0),
 		);
 
 		if (this.result) {

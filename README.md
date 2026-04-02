@@ -177,6 +177,41 @@ lsd config
 
 ---
 
+## Persistent memory
+
+LSD includes a bundled **persistent memory** extension.
+
+What it does:
+
+- stores durable user/project memories under `~/.lsd/projects/<project>/memory/`
+- injects `MEMORY.md` into future turns for the same project
+- supports explicit memory commands:
+	- `/memories`
+	- `/remember <text>`
+	- `/forget <topic>`
+- runs an **auto-extract** pass on session shutdown to save durable facts from the transcript
+
+Auto-extract notes:
+
+- it runs in a detached `lsd headless --bare ...` worker after you exit a session
+- if `budgetSubagentModel` is configured in settings, auto-extract uses that model
+- otherwise it falls back to the normal default model resolution
+- it may decide that a transcript contains **nothing worth saving**
+
+For debugging auto-extract, LSD writes two files in the project memory directory:
+
+- `.last-auto-extract.txt` — latest status/result summary
+- `.last-auto-extract.log` — extractor stdout/stderr
+
+Typical results in `.last-auto-extract.txt` include:
+
+- `status: finished`
+- `result: saved_memory`
+- `result: nothing_worth_saving`
+- `completionReason: child_exit` or `completionReason: session_end_detected`
+
+---
+
 ## Core ways to use LSD
 
 ## 1. Interactive TUI
@@ -196,10 +231,18 @@ Useful built-in commands include:
 - `/model`
 - `/login`
 - `/settings`
+- `/hotkeys`
+- `/cache-timer`
 - `/clear`
 - `/exit`
 - `/thinking`
 - `/voice`
+
+A few quality-of-life touches in the TUI:
+
+- the footer can show a live cache timer for the current prompt-cache window
+- `/hotkeys` gives you a full shortcut reference on demand
+- `/settings` now includes toggles for Codex rotate, the cache timer, and RTK shell-command compression
 
 Some workflow/automation commands still use the legacy namespace:
 

@@ -10,10 +10,13 @@ import {
 	type TruncationResult,
 	truncateTail,
 } from "../../../core/tools/truncate.js";
-import { theme } from "../theme/theme.js";
+import { theme, type ThemeColor } from "../theme/theme.js";
 import { DynamicBorder } from "./dynamic-border.js";
 import { editorKey, keyHint } from "./keybinding-hints.js";
 import { truncateToVisualLines } from "./visual-truncate.js";
+
+// Flash interval for RTK badge animation (ms)
+const RTK_FLASH_INTERVAL_MS = 400;
 
 // Preview line limit when not expanded (matches tool execution behavior)
 const PREVIEW_LINES = 20;
@@ -32,16 +35,23 @@ export class BashExecutionComponent extends Container {
 	private renderMode: ToolOutputMode;
 	private contentContainer: Container;
 	private ui: TUI;
+	private colorKey: ThemeColor;
+	private rtkActive: boolean;
+	private rtkFlashOn = true;
+	private rtkFlashTimer: NodeJS.Timeout | null = null;
+	// Dedicated header node — updated in-place to avoid full container rebuild on flash tick
+	private headerText: Text;
 
-	constructor(command: string, ui: TUI, excludeFromContext = false, renderMode: ToolOutputMode = "normal") {
+	constructor(command: string, ui: TUI, excludeFromContext = false, renderMode: ToolOutputMode = "normal", rtkActive = false) {
 		super();
 		this.command = command;
 		this.ui = ui;
 		this.renderMode = renderMode;
+		this.rtkActive = rtkActive;
 
 		// Use dim border for excluded-from-context commands (!! prefix)
-		const colorKey = excludeFromContext ? "dim" : "bashMode";
-		const borderColor = (str: string) => theme.fg(colorKey, str);
+		this.colorKey = (excludeFromContext ? "dim" : "bashMode") as ThemeColor;
+		const borderColor = (str: string) => theme.fg(this.colorKey, str);
 
 		// Add spacer
 		this.addChild(new Spacer(1));
@@ -53,14 +63,14 @@ export class BashExecutionComponent extends Container {
 		this.contentContainer = new Container();
 		this.addChild(this.contentContainer);
 
-		// Command header
-		const header = new Text(theme.fg(colorKey, theme.bold(`$ ${command}`)), 1, 0);
-		this.contentContainer.addChild(header);
+		// Dedicated header Text node — updated directly for flash without full rebuild
+		this.headerText = new Text(this.buildHeaderText(), 1, 0);
+		this.contentContainer.addChild(this.headerText);
 
 		// Loader
 		this.loader = new Loader(
 			ui,
-			(spinner) => theme.fg(colorKey, spinner),
+			(spinner) => theme.fg(this.colorKey, spinner),
 			(text) => theme.fg("muted", text),
 			`Running... (${editorKey("selectCancel")} to cancel)`, // Plain text for loader
 		);
@@ -68,6 +78,40 @@ export class BashExecutionComponent extends Container {
 
 		// Bottom border
 		this.addChild(new DynamicBorder(borderColor));
+
+		// Start RTK flash animation if active
+		if (this.rtkActive) {
+			this.rtkFlashTimer = setInterval(() => {
+				this.rtkFlashOn = !this.rtkFlashOn;
+				// Only update the header node — no full container rebuild
+				this.headerText.setText(this.buildHeaderText());
+				this.ui.requestRender();
+			}, RTK_FLASH_INTERVAL_MS);
+		}
+	}
+
+	/** Build the header line text including the RTK badge when active. */
+	private buildHeaderText(): string {
+		let text = theme.fg(this.colorKey, theme.bold(`$ ${this.command}`));
+		if (this.rtkActive) {
+			const badge = this.rtkFlashOn
+				? theme.fg("accent", "⚡ RTK")
+				: theme.fg("dim", "⚡ RTK");
+			text = `${text}  ${badge}`;
+		}
+		return text;
+	}
+
+	/**
+	 * Stop all timers and release resources. Call when removing the component
+	 * from the tree before setComplete() has been called (e.g. on clear/cancel).
+	 */
+	dispose(): void {
+		if (this.rtkFlashTimer) {
+			clearInterval(this.rtkFlashTimer);
+			this.rtkFlashTimer = null;
+		}
+		this.loader.dispose();
 	}
 
 	/**
@@ -126,6 +170,15 @@ export class BashExecutionComponent extends Container {
 		// Stop loader
 		this.loader.stop();
 
+		// Stop RTK flash — settle to steady dim state
+		if (this.rtkFlashTimer) {
+			clearInterval(this.rtkFlashTimer);
+			this.rtkFlashTimer = null;
+			this.rtkFlashOn = false;
+			// Final header update to ensure dim badge is shown
+			this.headerText.setText(this.buildHeaderText());
+		}
+
 		this.updateDisplay();
 	}
 
@@ -147,9 +200,8 @@ export class BashExecutionComponent extends Container {
 		// Rebuild content container
 		this.contentContainer.clear();
 
-		// Command header
-		const header = new Text(theme.fg("bashMode", theme.bold(`$ ${this.command}`)), 1, 0);
-		this.contentContainer.addChild(header);
+		// Header — re-add the dedicated node (clear() removed it, setText keeps its current value)
+		this.contentContainer.addChild(this.headerText);
 
 		// Output
 		if (availableLines.length > 0) {

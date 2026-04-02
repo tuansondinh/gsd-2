@@ -5,6 +5,7 @@
 import type { OAuthCredentials } from "@gsd/pi-ai";
 import { loginOpenAICodex, refreshOpenAICodexToken } from "@gsd/pi-ai/oauth";
 import type { CodexAccount } from "./types.js";
+import { logCodexRotateError } from "./logger.js";
 
 function getAccountId(credentials: OAuthCredentials): string {
 	if (typeof credentials.accountId !== "string" || credentials.accountId.length === 0) {
@@ -33,19 +34,11 @@ export async function performOAuthLogin(
 	email?: string,
 ): Promise<Omit<CodexAccount, "id" | "addedAt" | "lastUsed" | "disabled">> {
 	const credentials: OAuthCredentials = await loginOpenAICodex({
-		onAuth: (info) => {
-			console.log(`[codex-rotate] Opening browser for OAuth login...`);
-			console.log(`[codex-rotate] URL: ${info.url}`);
-			if (info.instructions) {
-				console.log(`[codex-rotate] ${info.instructions}`);
-			}
-		},
+		onAuth: () => {},
 		onPrompt: async () => {
 			throw new Error("OAuth browser flow failed. Please try again.");
 		},
-		onProgress: (message) => {
-			console.log(`[codex-rotate] ${message}`);
-		},
+		onProgress: () => {},
 	});
 
 	return {
@@ -74,7 +67,7 @@ export async function refreshAccountToken(
 			expiresAt: credentials.expires,
 		};
 	} catch (error) {
-		console.error(`[codex-rotate] Failed to refresh token for account ${account.id}:`, error);
+		logCodexRotateError(`Failed to refresh token for account ${account.id}:`, error);
 		throw error;
 	}
 }
@@ -91,20 +84,17 @@ export async function importFromExistingCodexAuth(): Promise<CodexAccount | null
 		const codexAuthPath = join(homedir(), ".codex", "auth.json");
 
 		if (!existsSync(codexAuthPath)) {
-			console.log("[codex-rotate] No existing ~/.codex/auth.json found");
 			return null;
 		}
 
 		const content = readFileSync(codexAuthPath, "utf-8");
 		const data = asObject(JSON.parse(content));
 		if (!data) {
-			console.log("[codex-rotate] ~/.codex/auth.json did not contain an object payload");
 			return null;
 		}
 
 		const refreshToken = getRequiredRefreshToken(data);
 		if (!refreshToken) {
-			console.log("[codex-rotate] No refresh token found in ~/.codex/auth.json");
 			return null;
 		}
 
@@ -122,7 +112,7 @@ export async function importFromExistingCodexAuth(): Promise<CodexAccount | null
 			disabled: false,
 		};
 	} catch (error) {
-		console.error("[codex-rotate] Failed to import from ~/.codex/auth.json:", error);
+		logCodexRotateError("Failed to import from ~/.codex/auth.json:", error);
 		return null;
 	}
 }
@@ -139,7 +129,6 @@ export async function importFromCockpit(): Promise<CodexAccount[]> {
 		const cockpitDir = join(homedir(), ".antigravity_cockpit", "codex_accounts");
 
 		if (!existsSync(cockpitDir)) {
-			console.log("[codex-rotate] No Cockpit Tools store found");
 			return [];
 		}
 
@@ -169,13 +158,13 @@ export async function importFromCockpit(): Promise<CodexAccount[]> {
 					disabled: false,
 				});
 			} catch (error) {
-				console.error(`[codex-rotate] Failed to import ${file}:`, error);
+				logCodexRotateError(`Failed to import ${file}:`, error);
 			}
 		}
 
 		return accounts;
 	} catch (error) {
-		console.error("[codex-rotate] Failed to import from Cockpit Tools:", error);
+		logCodexRotateError("Failed to import from Cockpit Tools:", error);
 		return [];
 	}
 }

@@ -87,7 +87,7 @@ export const DEFAULT_EDITOR_KEYBINDINGS: Required<EditorKeybindingsConfig> = {
 	deleteWordBackward: ["ctrl+w", "alt+backspace"],
 	deleteWordForward: ["alt+d", "alt+delete"],
 	deleteToLineStart: "ctrl+u",
-	deleteToLineEnd: "ctrl+k",
+	deleteToLineEnd: "ctrl+shift+k",
 	// Text input
 	newLine: "shift+enter",
 	submit: "enter",

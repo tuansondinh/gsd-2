@@ -4,6 +4,7 @@
 
 import type { CodexErrorType } from "./types.js";
 import { QUOTA_ERROR_PATTERNS, AUTH_ERROR_PATTERNS } from "./config.js";
+import { logCodexRotateError } from "./logger.js";
 
 /**
  * Detect if an error is a quota/rate limit error
@@ -112,7 +113,7 @@ export function markCredentialBackoff(
 
 		return anotherAvailable;
 	} catch (error) {
-		console.error("[codex-rotate] Failed to mark credential backoff:", error);
+		logCodexRotateError("Failed to mark credential backoff:", error);
 		return false;
 	}
 }

@@ -146,11 +146,29 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions = {}): strin
 	const hasRead = tools.includes("read");
 	const hasLsp = tools.includes("lsp");
 
-	// File exploration guidelines
+	// LSP guideline — must come FIRST so it outranks grep/bash in the model's priority
+	if (hasLsp) {
+		addGuideline(
+			`Use lsp as the primary tool for code navigation in typed codebases:
+- Navigation: definition, type_definition, implementation, references, incoming_calls, outgoing_calls
+- Understanding: hover (types + docs), signature (parameter info), symbols (file/workspace search)
+- Refactoring: rename (project-wide), code_actions (quick-fixes, imports, refactors), format (formatter)
+- Verification: diagnostics after edits to catch type errors immediately
+- When lsp is available, ALWAYS prefer it over grep/bash/find for: finding definitions, finding references, getting type info, renaming symbols, listing symbols in a file or workspace, checking diagnostics/errors, and formatting
+- Never grep for a symbol definition when lsp can resolve it semantically
+- Never shell out to a formatter when lsp format is available`,
+		);
+	}
+
+	// File exploration guidelines (only for tasks lsp cannot do: raw text search, non-code files, etc.)
 	if (hasBash && !hasGrep && !hasFind && !hasLs) {
 		addGuideline("Use bash for file operations like ls, rg, find");
 	} else if (hasBash && (hasGrep || hasFind || hasLs)) {
-		addGuideline("Prefer grep/find/ls tools over bash for file exploration (faster, respects .gitignore)");
+		if (hasLsp) {
+			addGuideline("Prefer grep/find/ls tools over bash for file exploration (faster, respects .gitignore) — but prefer lsp over grep/find when navigating typed code");
+		} else {
+			addGuideline("Prefer grep/find/ls tools over bash for file exploration (faster, respects .gitignore)");
+		}
 	}
 
 	// Read before edit guideline
@@ -166,19 +184,6 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions = {}): strin
 	// Write guideline
 	if (hasWrite) {
 		addGuideline("Use write only for new files or complete rewrites");
-	}
-
-	// LSP guideline
-	if (hasLsp) {
-		addGuideline(
-			`Use lsp as the primary tool for code navigation in typed codebases:
-- Navigation: definition, type_definition, implementation, references, incoming_calls, outgoing_calls
-- Understanding: hover (types + docs), signature (parameter info), symbols (file/workspace search)
-- Refactoring: rename (project-wide), code_actions (quick-fixes, imports, refactors), format (formatter)
-- Verification: diagnostics after edits to catch type errors immediately
-- Never grep for a symbol definition when lsp can resolve it semantically
-- Never shell out to a formatter when lsp format is available`,
-		);
 	}
 
 	// Output guideline (only when actually writing or executing)

@@ -134,6 +134,9 @@ See [Parallel Orchestration](./parallel-orchestration.md) for full documentation
 | `/kill` | Kill GSD process immediately |
 | `/model` | Switch the active model |
 | `/login` | Log in to an LLM provider |
+| `/settings` | Open interactive settings, including Codex rotate, cache timer, and RTK toggles |
+| `/hotkeys` | Show the full keyboard shortcut reference |
+| `/cache-timer` | Toggle the footer cache elapsed-time indicator |
 | `/thinking` | Toggle thinking level during sessions |
 | `/voice` | Toggle real-time speech-to-text (macOS, Linux) |
 

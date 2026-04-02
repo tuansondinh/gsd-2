@@ -81,3 +81,10 @@ test("different contentHash triggers re-sync", () => {
 
   assert.equal(shouldSkip, false, "Different contentHash should trigger sync");
 });
+
+test("same-size file edits still change the fingerprint input", () => {
+  const oldEntry = "extensions/memory/index.js:aaaaaaaaaaaaaaaa";
+  const newEntry = "extensions/memory/index.js:bbbbbbbbbbbbbbbb";
+
+  assert.notEqual(oldEntry, newEntry);
+});

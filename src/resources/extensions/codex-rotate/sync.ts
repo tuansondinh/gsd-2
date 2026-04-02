@@ -7,6 +7,7 @@ import { join } from "path";
 import { FileAuthStorageBackend, getAgentDir } from "@gsd/pi-coding-agent";
 import type { CodexAccount } from "./types.js";
 import { PROVIDER_NAME } from "./config.js";
+import { logCodexRotateError } from "./logger.js";
 
 type LockResult<T> = {
 	result: T;
@@ -43,8 +44,8 @@ export async function syncAccountsToAuth(accounts: CodexAccount[]): Promise<bool
 			if (current) {
 				try {
 					authData = JSON.parse(current);
-				} catch (error) {
-					console.error("[codex-rotate] Failed to parse auth.json:", error);
+				} catch {
+					// Ignore malformed existing auth.json here; a fresh value will be written below.
 				}
 			}
 
@@ -69,7 +70,7 @@ export async function syncAccountsToAuth(accounts: CodexAccount[]): Promise<bool
 
 		return true;
 	} catch (error) {
-		console.error("[codex-rotate] Failed to sync accounts to auth.json:", error);
+		logCodexRotateError("Failed to sync accounts to auth.json:", error);
 		return false;
 	}
 }
@@ -86,8 +87,8 @@ export async function removeCodexFromAuth(): Promise<boolean> {
 			if (current) {
 				try {
 					authData = JSON.parse(current);
-				} catch (error) {
-					console.error("[codex-rotate] Failed to parse auth.json:", error);
+				} catch {
+					// Ignore malformed existing auth.json here; a fresh value will be written below.
 				}
 			}
 
@@ -101,7 +102,7 @@ export async function removeCodexFromAuth(): Promise<boolean> {
 
 		return true;
 	} catch (error) {
-		console.error("[codex-rotate] Failed to remove codex from auth.json:", error);
+		logCodexRotateError("Failed to remove codex from auth.json:", error);
 		return false;
 	}
 }
@@ -121,7 +122,7 @@ export function hasCodexInAuth(): boolean {
 		const authData = JSON.parse(content) as AuthStorageData;
 		return PROVIDER_NAME in authData;
 	} catch (error) {
-		console.error("[codex-rotate] Failed to check auth.json:", error);
+		logCodexRotateError("Failed to check auth.json:", error);
 		return false;
 	}
 }

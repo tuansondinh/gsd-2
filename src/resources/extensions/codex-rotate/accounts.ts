@@ -6,6 +6,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "f
 import { dirname, join } from "path";
 import type { CodexAccount, CodexAccountsStore } from "./types.js";
 import { ACCOUNTS_FILE, REFRESH_BEFORE_EXPIRY_MS } from "./config.js";
+import { logCodexRotateError } from "./logger.js";
 
 let agentDir: string | null = null;
 
@@ -40,7 +41,7 @@ function ensureAccountsFile(): CodexAccountsStore {
 		const content = readFileSync(path, "utf-8");
 		return JSON.parse(content) as CodexAccountsStore;
 	} catch (error) {
-		console.error("[codex-rotate] Failed to read accounts file:", error);
+		logCodexRotateError("Failed to read accounts file:", error);
 		return { accounts: [], version: 1 };
 	}
 }

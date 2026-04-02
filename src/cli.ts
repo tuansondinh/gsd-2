@@ -126,12 +126,19 @@ const isPrintMode = cliFlags.print || cliFlags.mode !== undefined
 async function ensureRtkBootstrap(): Promise<void> {
   if ((ensureRtkBootstrap as { _done?: boolean })._done) return
 
-  // RTK is opt-in via experimental.rtk preference. Default: disabled.
-  // Honor GSD_RTK_DISABLED if already explicitly set in the environment
-  // (env var takes precedence over preferences for manual override).
+  // RTK is opt-in. Resolution order (highest to lowest precedence):
+  //   1. GSD_RTK_DISABLED env var — already set, respect it unconditionally
+  //   2. settings.json `rtk` field — explicitly set by the user via /settings
+  //   3. PREFERENCES.md `experimental.rtk` — legacy opt-in path
+  //   4. Default: disabled
   if (!process.env[GSD_RTK_DISABLED_ENV]) {
+    const sm = SettingsManager.create()
+    const rawSettingsRtk: boolean | undefined = sm.getGlobalSettings().rtk;
     const prefs = loadEffectivePreferences();
-    const rtkEnabled = prefs?.preferences.experimental?.rtk === true;
+    const prefsRtk = prefs?.preferences.experimental?.rtk === true;
+    // If settings.json explicitly set rtk (true or false), it wins over prefs.
+    // If unset (undefined), fall through to prefs, then default false.
+    const rtkEnabled = rawSettingsRtk ?? prefsRtk ?? false;
     if (!rtkEnabled) {
       process.env[GSD_RTK_DISABLED_ENV] = "1";
     }

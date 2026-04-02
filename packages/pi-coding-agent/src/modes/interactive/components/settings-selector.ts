@@ -32,6 +32,8 @@ export interface SettingsConfig {
 	autoResizeImages: boolean;
 	blockImages: boolean;
 	enableSkillCommands: boolean;
+	codexRotate: boolean;
+	cacheTimer: boolean;
 	steeringMode: "all" | "one-at-a-time";
 	followUpMode: "all" | "one-at-a-time";
 	transport: Transport;
@@ -51,6 +53,7 @@ export interface SettingsConfig {
 	clearOnShrink: boolean;
 	timestampFormat: "date-time-iso" | "date-time-us";
 	toolOutputMode: "minimal" | "normal";
+	rtk: boolean;
 	classifierModelSubmenu?: (currentValue: string, done: (selectedValue?: string) => void) => Component;
 	budgetSubagentModelSubmenu?: (currentValue: string, done: (selectedValue?: string) => void) => Component;
 }
@@ -64,6 +67,8 @@ export interface SettingsCallbacks {
 	onAutoResizeImagesChange: (enabled: boolean) => void;
 	onBlockImagesChange: (blocked: boolean) => void;
 	onEnableSkillCommandsChange: (enabled: boolean) => void;
+	onCodexRotateChange: (enabled: boolean) => void;
+	onCacheTimerChange: (enabled: boolean) => void;
 	onSteeringModeChange: (mode: "all" | "one-at-a-time") => void;
 	onFollowUpModeChange: (mode: "all" | "one-at-a-time") => void;
 	onTransportChange: (transport: Transport) => void;
@@ -82,6 +87,7 @@ export interface SettingsCallbacks {
 	onClearOnShrinkChange: (enabled: boolean) => void;
 	onTimestampFormatChange: (format: "date-time-iso" | "date-time-us") => void;
 	onToolOutputModeChange: (mode: "minimal" | "normal") => void;
+	onRtkChange: (enabled: boolean) => void;
 	onCancel: () => void;
 }
 
@@ -349,6 +355,36 @@ export class SettingsSelectorComponent extends Container {
 		// Hardware cursor toggle (insert after skill-commands)
 		const skillCommandsIndex = items.findIndex((item) => item.id === "skill-commands");
 		items.splice(skillCommandsIndex + 1, 0, {
+			id: "codex-rotate",
+			label: "Codex rotate",
+			description: "Enable automatic Codex account rotation extension",
+			currentValue: config.codexRotate ? "true" : "false",
+			values: ["true", "false"],
+		});
+
+		// Cache timer toggle (insert after codex-rotate)
+		const codexRotateIndex = items.findIndex((item) => item.id === "codex-rotate");
+		items.splice(codexRotateIndex + 1, 0, {
+			id: "cache-timer",
+			label: "Cache timer",
+			description: "Show elapsed time since last response in the footer (tracks 5-min cache window)",
+			currentValue: config.cacheTimer ? "true" : "false",
+			values: ["true", "false"],
+		});
+
+		// RTK toggle (insert after cache-timer)
+		const cacheTimerIndex = items.findIndex((item) => item.id === "cache-timer");
+		items.splice(cacheTimerIndex + 1, 0, {
+			id: "rtk",
+			label: "RTK",
+			description: "Enable RTK shell-command compression (requires restart)",
+			currentValue: config.rtk ? "true" : "false",
+			values: ["true", "false"],
+		});
+
+		// Hardware cursor toggle (insert after rtk)
+		const rtkIndex = items.findIndex((item) => item.id === "rtk");
+		items.splice(rtkIndex + 1, 0, {
 			id: "show-hardware-cursor",
 			label: "Show hardware cursor",
 			description: "Show the terminal cursor while still positioning it for IME support",
@@ -438,6 +474,15 @@ export class SettingsSelectorComponent extends Container {
 						break;
 					case "skill-commands":
 						callbacks.onEnableSkillCommandsChange(newValue === "true");
+						break;
+					case "codex-rotate":
+						callbacks.onCodexRotateChange(newValue === "true");
+						break;
+					case "cache-timer":
+						callbacks.onCacheTimerChange(newValue === "true");
+						break;
+					case "rtk":
+						callbacks.onRtkChange(newValue === "true");
 						break;
 					case "steering-mode":
 						callbacks.onSteeringModeChange(newValue as "all" | "one-at-a-time");

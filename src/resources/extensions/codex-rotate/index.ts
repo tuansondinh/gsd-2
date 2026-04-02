@@ -11,6 +11,7 @@ import { syncAccountsToAuth } from "./sync.js";
 import { registerCodexCommand } from "./commands.js";
 import { classifyError, markCredentialBackoff, shouldBackoffCredential } from "./quota.js";
 import { REFRESH_INTERVAL_MS, PROVIDER_NAME } from "./config.js";
+import { logCodexRotateError, logCodexRotateSwitch } from "./logger.js";
 
 let refreshTimer: NodeJS.Timeout | null = null;
 
@@ -25,8 +26,6 @@ async function refreshExpiringAccounts(): Promise<void> {
 			return;
 		}
 
-		console.log(`[codex-rotate] Refreshing ${accountsNeedingRefresh.length} expiring account(s)`);
-
 		const { refreshAccountToken } = await import("./oauth.js");
 		let successCount = 0;
 		let failCount = 0;
@@ -36,10 +35,9 @@ async function refreshExpiringAccounts(): Promise<void> {
 				const refreshed = await refreshAccountToken(account);
 				updateAccount(account.id, refreshed);
 				successCount++;
-				console.log(`[codex-rotate] Refreshed account: ${account.email || account.accountId}`);
 			} catch (error) {
 				failCount++;
-				console.error(`[codex-rotate] Failed to refresh account ${account.id}:`, error);
+				logCodexRotateError(`Failed to refresh account ${account.id}:`, error);
 				// Disable the account if refresh fails
 				updateAccount(account.id, {
 					disabled: true,
@@ -52,14 +50,13 @@ async function refreshExpiringAccounts(): Promise<void> {
 			// Sync refreshed accounts to auth.json
 			const allAccounts = getAllAccounts();
 			await syncAccountsToAuth(allAccounts);
-			console.log(`[codex-rotate] Synced ${successCount} refreshed account(s) to auth.json`);
 		}
 
-		if (failCount > 0) {
-			console.warn(`[codex-rotate] Failed to refresh ${failCount} account(s)`);
+		if (failCount > 0 && successCount === 0) {
+			logCodexRotateError(`Failed to refresh ${failCount} account(s)`);
 		}
 	} catch (error) {
-		console.error("[codex-rotate] Error in refresh task:", error);
+		logCodexRotateError("Error in refresh task:", error);
 	}
 }
 
@@ -74,8 +71,6 @@ function startRefreshTimer(): void {
 	refreshTimer = setInterval(() => {
 		void refreshExpiringAccounts();
 	}, REFRESH_INTERVAL_MS);
-
-	console.log(`[codex-rotate] Background refresh timer started (interval: ${REFRESH_INTERVAL_MS / 1000 / 60}m)`);
 }
 
 /**
@@ -85,7 +80,6 @@ function stopRefreshTimer(): void {
 	if (refreshTimer) {
 		clearInterval(refreshTimer);
 		refreshTimer = null;
-		console.log("[codex-rotate] Background refresh timer stopped");
 	}
 }
 
@@ -93,23 +87,17 @@ function stopRefreshTimer(): void {
  * Main extension entry point
  */
 export default function CodexRotateExtension(pi: ExtensionAPI) {
-	console.log("[codex-rotate] Initializing Codex OAuth rotation extension");
 
 	// Register commands
 	registerCodexCommand(pi);
 
 	// Session start hook
-	pi.on("session_start", async (_event, ctx) => {
-		console.log("[codex-rotate] Session started");
-
+	pi.on("session_start", async (_event) => {
 		const accounts = getAllAccounts();
 
 		if (accounts.length === 0) {
-			console.log("[codex-rotate] No accounts configured, extension ready but inactive");
 			return;
 		}
-
-		console.log(`[codex-rotate] Found ${accounts.length} account(s)`);
 
 		// Refresh any expiring accounts immediately
 		await refreshExpiringAccounts();
@@ -123,7 +111,6 @@ export default function CodexRotateExtension(pi: ExtensionAPI) {
 
 	// Session shutdown hook
 	pi.on("session_shutdown", () => {
-		console.log("[codex-rotate] Session shutting down");
 		stopRefreshTimer();
 	});
 
@@ -138,18 +125,18 @@ export default function CodexRotateExtension(pi: ExtensionAPI) {
 			if (!shouldBackoffCredential(errorMessage)) return;
 
 			const errorType = classifyError(errorMessage);
-			console.log(`[codex-rotate] Detected credential error (${errorType}): ${errorMessage}`);
-
 			const sessionId = ctx.sessionManager.getSessionId();
 			const anotherAvailable = markCredentialBackoff(PROVIDER_NAME, sessionId, errorType);
 
 			if (anotherAvailable) {
+				logCodexRotateSwitch(`Auto-switched account after ${errorType} error`);
 				ctx.ui.notify("Codex credential backed off, rotating to next account", "info");
 			} else {
+				logCodexRotateError(`All accounts backed off after ${errorType} error`);
 				ctx.ui.notify("All Codex credentials are backed off. Please wait before retrying.", "warning");
 			}
 		} catch (error) {
-			console.error("[codex-rotate] Error in agent_end handler:", error);
+			logCodexRotateError("Error in agent_end handler:", error);
 		}
 	});
 }

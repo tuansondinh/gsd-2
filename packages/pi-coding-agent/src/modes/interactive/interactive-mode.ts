@@ -98,7 +98,7 @@ import { ToolExecutionComponent } from "./components/tool-execution.js";
 import { TreeSelectorComponent } from "./components/tree-selector.js";
 import { UserMessageComponent } from "./components/user-message.js";
 import { UserMessageSelectorComponent } from "./components/user-message-selector.js";
-import { type SlashCommandContext, dispatchSlashCommand, getAppKeyDisplay } from "./slash-command-handlers.js";
+import { type SlashCommandContext, dispatchSlashCommand, getAppKeyDisplay, showHotkeys } from "./slash-command-handlers.js";
 import { handleAgentEvent } from "./controllers/chat-controller.js";
 import { createExtensionUIContext as buildExtensionUIContext } from "./controllers/extension-ui-controller.js";
 import { setupEditorSubmitHandler as setupEditorSubmitHandlerController } from "./controllers/input-controller.js";
@@ -123,6 +123,12 @@ import {
 	type ThemeColor,
 	theme,
 } from "./theme/theme.js";
+/** Returns true when RTK shell-command compression is active in this process.
+ *  GSD_RTK_DISABLED=1/true/yes means disabled; absent or any other value means enabled. */
+function isRtkEnabled(): boolean {
+	const v = (process.env["GSD_RTK_DISABLED"] ?? "").trim().toLowerCase();
+	return v !== "1" && v !== "true" && v !== "yes";
+}
 
 /** Interface for components that can be expanded/collapsed */
 interface Expandable {
@@ -391,10 +397,14 @@ export class InteractiveMode {
 			for (const skill of this.session.resourceLoader.getSkills().skills) {
 				const commandName = `skill:${skill.name}`;
 				this.skillCommands.set(commandName, skill.filePath);
-				skillCommandList.push({ name: commandName, description: skill.description });
 				if (skill.userInvocable && !reservedSkillNames.has(skill.name)) {
+					// Register short name in the map and show only the short name in autocomplete
+					// to avoid showing both "teams-plan" and "skill:teams-plan" as duplicates
 					this.skillCommands.set(skill.name, skill.filePath);
 					skillCommandList.push({ name: skill.name, description: skill.description });
+				} else {
+					// Not user-invocable or name is reserved — show only the skill: prefixed version
+					skillCommandList.push({ name: commandName, description: skill.description });
 				}
 			}
 		}
@@ -2010,6 +2020,7 @@ export class InteractiveMode {
 		this.defaultEditor.onAction("cycleModelForward", () => this.cycleModel("forward"));
 		this.defaultEditor.onAction("cycleModelBackward", () => this.cycleModel("backward"));
 		this.defaultEditor.onAction("cyclePermissionMode", () => this.cyclePermissionMode());
+		this.defaultEditor.onAction("showHotkeys", () => showHotkeys(this.getSlashCommandContext()));
 
 		// Global debug handler on TUI (works regardless of focus)
 		this.ui.onDebug = () => this.handleDebugCommand();
@@ -2201,6 +2212,7 @@ export class InteractiveMode {
 					this.ui,
 					message.excludeFromContext,
 					this.settingsManager.getToolOutputMode(),
+					false, // history items: don't show RTK badge (state unknown at record time)
 				);
 				if (message.output) {
 					component.appendOutput(message.output);
@@ -2953,6 +2965,8 @@ export class InteractiveMode {
 					autoResizeImages: this.settingsManager.getImageAutoResize(),
 					blockImages: this.settingsManager.getBlockImages(),
 					enableSkillCommands: this.settingsManager.getEnableSkillCommands(),
+					codexRotate: this.settingsManager.getCodexRotate(),
+					cacheTimer: this.settingsManager.getCacheTimer(),
 					steeringMode: this.session.steeringMode,
 					followUpMode: this.session.followUpMode,
 					transport: this.settingsManager.getTransport(),
@@ -2972,6 +2986,7 @@ export class InteractiveMode {
 					clearOnShrink: this.settingsManager.getClearOnShrink(),
 					timestampFormat: this.settingsManager.getTimestampFormat(),
 					toolOutputMode: this.settingsManager.getToolOutputMode(),
+					rtk: this.settingsManager.getRtk(),
 					classifierModelSubmenu: (_currentValue, submenuDone) =>
 						new ModelSelectorComponent(
 							this.ui,
@@ -3029,6 +3044,18 @@ export class InteractiveMode {
 					onEnableSkillCommandsChange: (enabled) => {
 						this.settingsManager.setEnableSkillCommands(enabled);
 						this.setupAutocomplete();
+					},
+					onCodexRotateChange: (enabled) => {
+						this.settingsManager.setCodexRotate(enabled);
+						this.showStatus(`Codex rotate: ${enabled ? "enabled" : "disabled"} (restart required)`);
+					},
+					onCacheTimerChange: (enabled) => {
+						this.settingsManager.setCacheTimer(enabled);
+						this.showStatus(`Cache timer: ${enabled ? "enabled" : "disabled"}`);
+					},
+					onRtkChange: (enabled) => {
+						this.settingsManager.setRtk(enabled);
+						this.showStatus(`RTK: ${enabled ? "enabled" : "disabled"} (restart required)`);
 					},
 					onSteeringModeChange: (mode) => {
 						this.session.setSteeringMode(mode);
@@ -3889,6 +3916,7 @@ export class InteractiveMode {
 				this.ui,
 				excludeFromContext,
 				this.settingsManager.getToolOutputMode(),
+				isRtkEnabled(),
 			);
 			this.bashComponent.setExpanded(this.toolOutputExpanded);
 			if (this.session.isStreaming) {
@@ -3923,6 +3951,7 @@ export class InteractiveMode {
 			this.ui,
 			excludeFromContext,
 			this.settingsManager.getToolOutputMode(),
+			isRtkEnabled(),
 		);
 		this.bashComponent.setExpanded(this.toolOutputExpanded);
 

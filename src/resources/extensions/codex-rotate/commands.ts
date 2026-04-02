@@ -16,6 +16,7 @@ import {
 import { performOAuthLogin, refreshAccountToken, importFromExistingCodexAuth, importFromCockpit } from "./oauth.js";
 import { syncAccountsToAuth, removeCodexFromAuth } from "./sync.js";
 import { PROVIDER_NAME } from "./config.js";
+import { logCodexRotateError } from "./logger.js";
 
 /**
  * Format a timestamp for display
@@ -324,7 +325,7 @@ export function registerCodexCommand(pi: ExtensionAPI): void {
 								updateAccount(acc.id, refreshed);
 								results.success++;
 							} catch (error) {
-								console.error(`[codex-rotate] Failed to refresh ${acc.id}:`, error);
+								logCodexRotateError(`Failed to refresh ${acc.id}:`, error);
 								results.failed++;
 							}
 						}

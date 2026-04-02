@@ -420,9 +420,13 @@
 
 | File | System Label(s) | Description |
 |------|-----------------|-------------|
-| resources/extensions/memory/index.ts | Memory Extension | Memory extension index and setup |
-| resources/extensions/memory/pipeline.ts | Memory Extension | Memory processing pipeline |
-| resources/extensions/memory/storage.ts | Memory Extension | Memory persistence storage |
+| resources/extensions/memory/index.ts | Memory Extension | Bootstraps per-project memory, injects the memory prompt, registers `/memories`, `/remember`, `/forget`, and triggers auto-extract on shutdown |
+| resources/extensions/memory/auto-extract.ts | Memory Extension, Headless Mode | Builds transcript summaries, spawns the detached headless extractor, and writes `.last-auto-extract.txt` / `.last-auto-extract.log` audit files |
+| resources/extensions/memory/memory-paths.ts | Memory Extension | Resolves per-project memory directory and entrypoint paths |
+| resources/extensions/memory/memory-scan.ts | Memory Extension | Scans memory markdown files and formats manifest summaries |
+| resources/extensions/memory/memory-recall.ts | Memory Extension | Selects relevant saved memories for a query |
+| resources/extensions/memory/memory-types.ts | Memory Extension | Defines memory taxonomy, examples, and save/recall guidance |
+| resources/extensions/memory/memory-age.ts | Memory Extension | Formats memory age/freshness hints |
 
 ---
 

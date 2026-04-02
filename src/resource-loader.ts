@@ -125,13 +125,12 @@ function readManagedResourceManifest(agentDir: string): ManagedResourceManifest 
 }
 
 /**
- * Computes a lightweight content fingerprint of the bundled resources directory.
+ * Computes a content fingerprint of the bundled resources directory.
  *
- * Walks all files under resourcesDir and hashes their relative paths + sizes.
- * This catches same-version content changes (npm link dev workflow, hotfixes
- * within a release) without the cost of reading every file's contents.
- *
- * ~1ms for a typical resources tree (~100 files) — just stat calls, no reads.
+ * Walks all files under resourcesDir and hashes their relative paths plus file
+ * contents. This catches same-version content changes even when the edited file
+ * keeps the same byte size — a common dev-workflow failure mode for bundled
+ * extensions synced into ~/.lsd/agent/extensions/.
  */
 function computeResourceFingerprint(): string {
   const entries: string[] = []
@@ -148,8 +147,8 @@ function collectFileEntries(dir: string, root: string, out: string[]): void {
       collectFileEntries(fullPath, root, out)
     } else {
       const rel = relative(root, fullPath)
-      const size = statSync(fullPath).size
-      out.push(`${rel}:${size}`)
+      const contentHash = createHash('sha256').update(readFileSync(fullPath)).digest('hex').slice(0, 16)
+      out.push(`${rel}:${contentHash}`)
     }
   }
 }

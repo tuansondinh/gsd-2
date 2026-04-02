@@ -34,13 +34,16 @@ export async function readStdin(): Promise<string> {
 // ---------------------------------------------------------------------------
 
 export async function loadContext(options: ContextOptions): Promise<string> {
-  if (options.contextText) return options.contextText
+  // Prefer --context file over --context-text when both are provided,
+  // so callers (e.g. memory auto-extract) can pass a file for the main
+  // content and --context-text as a trailing instruction.
   if (options.context === '-') {
     return readStdin()
   }
   if (options.context) {
     return readFileSync(resolve(options.context), 'utf-8')
   }
+  if (options.contextText) return options.contextText
   throw new Error('No context provided. Use --context <file> or --context-text <text>')
 }
 

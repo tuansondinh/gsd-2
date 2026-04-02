@@ -140,6 +140,7 @@ export interface Settings {
 	images?: ImageSettings;
 	enabledModels?: string[]; // Model patterns for cycling (same format as --models CLI flag)
 	codexRotate?: boolean; // Enable the bundled codex-rotate extension (default: false)
+	cacheTimer?: boolean; // Show elapsed time since last response in the footer (default: true)
 	doubleEscapeAction?: "fork" | "tree" | "none"; // Action for double-escape with empty editor (default: "tree")
 	treeFilterMode?: "default" | "no-tools" | "user-only" | "labeled-only" | "all"; // Default filter when opening /tree
 	thinkingBudgets?: ThinkingBudgetsSettings; // Custom token budgets for thinking levels
@@ -160,6 +161,7 @@ export interface Settings {
 	toolOutputMode?: "minimal" | "normal"; // Collapsed tool rendering mode. "minimal" hides previews until expanded.
 	lspAutoInstall?: boolean; // default: false — whether to auto-install missing language servers during onboarding
 	lspInstalledServers?: string[]; // list of server names installed via the onboarding wizard
+	rtk?: boolean; // default: false — enable RTK shell-command compression (requires restart)
 }
 
 /** Deep merge settings: project/overrides take precedence, nested objects merge recursively */
@@ -997,6 +999,14 @@ export class SettingsManager {
 		this.setGlobalSetting("codexRotate", enabled);
 	}
 
+	getCacheTimer(): boolean {
+		return this.settings.cacheTimer ?? true;
+	}
+
+	setCacheTimer(enabled: boolean): void {
+		this.setGlobalSetting("cacheTimer", enabled);
+	}
+
 	getDoubleEscapeAction(): "fork" | "tree" | "none" {
 		return this.settings.doubleEscapeAction ?? "tree";
 	}
@@ -1180,5 +1190,13 @@ export class SettingsManager {
 
 	setLspInstalledServers(v: string[]): void {
 		this.setGlobalSetting("lspInstalledServers", v);
+	}
+
+	getRtk(): boolean {
+		return this.settings.rtk ?? false;
+	}
+
+	setRtk(enabled: boolean): void {
+		this.setGlobalSetting("rtk", enabled);
 	}
 }

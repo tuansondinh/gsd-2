@@ -117,6 +117,34 @@ export class FooterComponent implements Component {
 			pwd = `${pwd} • ${sessionName}`;
 		}
 
+		const extensionStatuses = this.footerData.getExtensionStatuses();
+		const cacheTimerStatusRaw = extensionStatuses.get("cache-timer");
+		const cacheTimerStatus = cacheTimerStatusRaw ? sanitizeStatusText(cacheTimerStatusRaw) : "";
+		const hotkeysHints = ["Ctrl+K • /hotkeys", "/hotkeys", "Ctrl+K"];
+		const firstLineMinPadding = 2;
+		const firstLineRightParts = cacheTimerStatus ? [cacheTimerStatus] : [];
+		const firstLineRightBase = firstLineRightParts.join("  ");
+		const hotkeysHint = hotkeysHints.find((hint) => {
+			const candidate = firstLineRightBase ? `${firstLineRightBase}  ${hint}` : hint;
+			return visibleWidth(pwd) + firstLineMinPadding + visibleWidth(candidate) <= width;
+		}) ?? "";
+		if (hotkeysHint) {
+			firstLineRightParts.push(theme.fg("dim", hotkeysHint));
+		}
+		const firstLineRight = firstLineRightParts.join("  ");
+
+		let pwdLine: string;
+		if (firstLineRight) {
+			const rightWidth = visibleWidth(firstLineRight);
+			const availableForPwd = Math.max(0, width - rightWidth - firstLineMinPadding);
+			const truncatedPwd = truncateToWidth(theme.fg("dim", pwd), availableForPwd, theme.fg("dim", "..."));
+			const truncatedPwdWidth = visibleWidth(truncatedPwd);
+			const padding = " ".repeat(Math.max(firstLineMinPadding, width - truncatedPwdWidth - rightWidth));
+			pwdLine = truncatedPwd + padding + firstLineRight;
+		} else {
+			pwdLine = truncateToWidth(theme.fg("dim", pwd), width, theme.fg("dim", "..."));
+		}
+
 		// Build stats line
 		const statsParts = [];
 		if (totalInput) statsParts.push(`↑${formatTokens(totalInput)}`);
@@ -231,13 +259,13 @@ export class FooterComponent implements Component {
 		const remainder = statsLine.slice(statsLeft.length); // padding + rightSide
 		const dimRemainder = theme.fg("dim", remainder);
 
-		const pwdLine = truncateToWidth(theme.fg("dim", pwd), width, theme.fg("dim", "..."));
 		const lines = [pwdLine, dimStatsLeft + dimRemainder];
 
-		// Add extension statuses on a single line, sorted by key alphabetically
-		const extensionStatuses = this.footerData.getExtensionStatuses();
-		if (extensionStatuses.size > 0) {
-			const sortedStatuses = Array.from(extensionStatuses.entries())
+		// Add extension statuses on a single line, sorted by key alphabetically.
+		// cache-timer is surfaced on the first line instead of this extension-status line.
+		const nonTimerStatuses = Array.from(extensionStatuses.entries()).filter(([key]) => key !== "cache-timer");
+		if (nonTimerStatuses.length > 0) {
+			const sortedStatuses = nonTimerStatuses
 				.sort(([a], [b]) => a.localeCompare(b))
 				.map(([, text]) => sanitizeStatusText(text));
 			const statusLine = sortedStatuses.join(" ");

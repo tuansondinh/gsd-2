@@ -6,14 +6,23 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-04-02
+
 ### Added
-- **lsp**: auto-install language servers via onboarding wizard (`/setup`) — detects missing servers for the current project and offers a multiselect prompt to install them; pre-selects `typescript-language-server` for JS/TS projects
-- **lsp**: `src/lsp-install.ts` utility — `detectMissingServers()`, `detectInstalledServers()`, `installServer()`, `getInstallCommand()` with install map for 9 common servers (TypeScript, Python, Go, Rust, Bash, YAML, JSON, HTML, CSS)
-- **lsp**: file-type-specific install hints when "no language server found" — e.g. `npm i -g typescript-language-server typescript` for `.ts` files
-- **settings**: `lspAutoInstall` and `lspInstalledServers` fields to track user consent and installed servers across sessions
+- **memory**: document the persistent memory system in `README.md`, including `/memories`, `/remember`, `/forget`, detached auto-extract behavior, and audit/debug files written to the project memory directory
+- **memory**: auto-extract now records `.last-auto-extract.txt` and `.last-auto-extract.log`, supports single-user-message transcripts, and prefers `budgetSubagentModel` when configured
+- **tui**: added a bundled `cache-timer` extension that shows elapsed cache-window time in the footer and can be toggled from settings or with `/cache-timer`
+- **tui**: settings UI now exposes toggles for Codex rotate, cache timer, and RTK shell-command compression
+
+### Changed
+- **footer**: moved the cache timer into the first footer line and added compact hotkey hints such as `Ctrl+K` / `/hotkeys`
+- **docs**: refreshed `docs/FILE-SYSTEM-MAP.md` to cover the current memory extension files and responsibilities
 
 ### Fixed
-- **lsp**: "No language server found" messages now include specific install instructions and a `/setup` prompt instead of a bare error
+- **memory**: detached auto-extract worker now writes explicit audit status when the CLI path cannot be resolved and finalizes more reliably after headless session shutdown
+- **tui**: RTK badges in bash/tool execution views now flash while active and clean up timers correctly when renders complete or components are disposed
+
+## [2.58.0] - 2026-03-28
 
 ## [2.58.0] - 2026-03-28
 

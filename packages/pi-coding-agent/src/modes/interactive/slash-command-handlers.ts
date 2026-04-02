@@ -163,7 +163,7 @@ export async function dispatchSlashCommand(
 		return true;
 	}
 	if (text === "/hotkeys") {
-		handleHotkeysCommand(ctx);
+		showHotkeys(ctx);
 		return true;
 	}
 	if (text === "/fork") {
@@ -477,7 +477,7 @@ function getEditorKeyDisplay(action: EditorAction): string {
 	return capitalizeKey(editorKey(action));
 }
 
-function handleHotkeysCommand(ctx: SlashCommandContext): void {
+export function showHotkeys(ctx: SlashCommandContext): void {
 	// Navigation keybindings
 	const cursorWordLeft = getEditorKeyDisplay("cursorWordLeft");
 	const cursorWordRight = getEditorKeyDisplay("cursorWordRight");

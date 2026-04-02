@@ -12,16 +12,25 @@ function makeTempDir(): string {
 }
 
 describe('buildTranscriptSummary', () => {
-  test('returns empty string for fewer than 3 messages', () => {
+  test('returns transcript even for a short conversation when there is user-authored content', () => {
     const entries = [
       { type: 'message', message: { role: 'user', content: 'hello' } },
       { type: 'message', message: { role: 'assistant', content: 'hi' } },
     ];
-    assert.equal(buildTranscriptSummary(entries), '');
+    const summary = buildTranscriptSummary(entries);
+    assert.ok(summary.includes('User: hello'));
+    assert.ok(summary.includes('Assistant: hi'));
   });
 
   test('returns empty string for empty array', () => {
     assert.equal(buildTranscriptSummary([]), '');
+  });
+
+  test('returns empty string when there is no user-authored content', () => {
+    const entries = [
+      { type: 'message', message: { role: 'assistant', content: 'hi' } },
+    ];
+    assert.equal(buildTranscriptSummary(entries), '');
   });
 
   test('extracts user and assistant text messages', () => {

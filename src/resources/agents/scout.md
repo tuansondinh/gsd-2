@@ -1,7 +1,7 @@
 ---
 name: scout
 description: Fast codebase recon that returns compressed context for handoff to other agents
-tools: read, grep, find, ls, bash
+tools: read, lsp, grep, find, ls, bash
 model: $budget_model
 ---
 
@@ -17,8 +17,8 @@ Thoroughness (infer from task, default medium):
 
 Strategy:
 
-1. grep/find to locate relevant code
-2. Read key sections (not entire files)
+1. **Prefer lsp over grep/find for typed codebases** — use `lsp symbols` to search for types/functions, `lsp definition` to jump to declarations, `lsp references` to find usages, `lsp hover` to get type info without reading files. Only fall back to grep/find for raw text search or non-code files.
+2. Read key sections (not entire files) — use lsp to pinpoint exact locations first
 3. Identify types, interfaces, key functions
 4. Note dependencies between files
 

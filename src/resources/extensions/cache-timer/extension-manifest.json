@@ -1,0 +1,13 @@
+{
+	"id": "cache-timer",
+	"name": "Cache Timer",
+	"version": "1.0.0",
+	"description": "Shows elapsed time since last LLM response in the footer (useful for tracking Claude's 5-minute cache window)",
+	"tier": "bundled",
+	"defaultEnabled": true,
+	"requires": { "platform": ">=2.29.0" },
+	"provides": {
+		"commands": ["cache-timer"],
+		"hooks": ["agent_start", "agent_end", "session_shutdown"]
+	}
+}
