@@ -72,6 +72,37 @@ export { lspSchema } from "./types.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const lspDescription = fsSync.readFileSync(path.join(__dirname, "lsp.md"), "utf-8");
 
+// Quick-reference: file extension → install hint for "no server found" messages
+const EXT_INSTALL_HINT: Record<string, string> = {
+	".ts": "npm i -g typescript-language-server typescript",
+	".tsx": "npm i -g typescript-language-server typescript",
+	".js": "npm i -g typescript-language-server typescript",
+	".jsx": "npm i -g typescript-language-server typescript",
+	".mjs": "npm i -g typescript-language-server typescript",
+	".cjs": "npm i -g typescript-language-server typescript",
+	".py": "npm i -g pyright  (or: pip install pyright)",
+	".pyi": "npm i -g pyright  (or: pip install pyright)",
+	".go": "go install golang.org/x/tools/gopls@latest",
+	".rs": "rustup component add rust-analyzer",
+	".sh": "npm i -g bash-language-server",
+	".bash": "npm i -g bash-language-server",
+	".yaml": "npm i -g yaml-language-server",
+	".yml": "npm i -g yaml-language-server",
+	".json": "npm i -g vscode-langservers-extracted",
+	".jsonc": "npm i -g vscode-langservers-extracted",
+	".html": "npm i -g vscode-langservers-extracted",
+	".css": "npm i -g vscode-langservers-extracted",
+	".scss": "npm i -g vscode-langservers-extracted",
+};
+
+function getInstallHint(filePath: string): string {
+	const ext = path.extname(filePath).toLowerCase();
+	const hint = EXT_INSTALL_HINT[ext];
+	return hint
+		? `\nTo enable LSP for this file type, install the language server:\n  ${hint}\nThen run /setup or restart LSD.`
+		: "\nRun /setup to install language servers, or check 'lsp status' for details.";
+}
+
 // =============================================================================
 // Warmup API
 // =============================================================================
@@ -453,7 +484,7 @@ export function createLspTool(cwd: string): AgentTool<typeof lspSchema, LspToolD
 					if (matchedButMissing.length > 0) {
 						diagnostics.push("\nDetected projects missing language servers:");
 						diagnostics.push(...matchedButMissing);
-						diagnostics.push("\nInstall the missing server command and restart GSD, or run: lsp reload");
+						diagnostics.push("\nRun /setup to install missing language servers automatically, or install manually and restart.");
 					} else {
 						diagnostics.push("No recognized project markers found in the working directory.");
 						diagnostics.push("LSP auto-detects projects via files like package.json, Cargo.toml, go.mod, pyproject.toml, etc.");
@@ -518,7 +549,8 @@ export function createLspTool(cwd: string): AgentTool<typeof lspSchema, LspToolD
 					const resolved = resolveToCwd(target, cwd);
 					const servers = getServersForFile(config, resolved);
 					if (servers.length === 0) {
-						results.push(`[E] ${target}: No language server found`);
+						const hint = getInstallHint(resolved);
+						results.push(`[E] ${target}: No language server found.${hint}`);
 						continue;
 					}
 
@@ -710,8 +742,9 @@ export function createLspTool(cwd: string): AgentTool<typeof lspSchema, LspToolD
 			// File-specific actions
 			const serverInfo = resolvedFile ? getServerForFile(config, resolvedFile) : null;
 			if (!serverInfo) {
+				const hint = resolvedFile ? getInstallHint(resolvedFile) : "\nRun /setup to install language servers, or check 'lsp status' for details.";
 				return {
-					content: [{ type: "text", text: "No language server found for this action" }],
+					content: [{ type: "text", text: `No language server found for this file type.${hint}` }],
 					details: { action, success: false },
 				};
 			}

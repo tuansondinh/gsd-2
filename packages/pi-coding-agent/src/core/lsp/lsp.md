@@ -36,4 +36,5 @@ Interacts with Language Server Protocol servers for code intelligence.
 - Some operations require file to be saved to disk
 - Diagnostics glob mode samples up to 20 files per request to avoid long-running stalls on broad patterns
 - When `symbol` is provided for position-based actions, missing symbols or out-of-bounds `occurrence` values return an explicit error instead of silently falling back
+- If no language server is found for a file, run `/setup` to install the appropriate server automatically, or check `lsp status` for install instructions
 </caution>
