@@ -49,6 +49,8 @@ import {
 } from "./model-resolution.js";
 import { loadEffectivePreferences } from "../shared/preferences.js";
 import { CmuxClient, shellEscape } from "../cmux/index.js";
+import { BackgroundJobManager } from "./background-job-manager.js";
+import { runSubagentInBackground } from "./background-runner.js";
 
 const MAX_PARALLEL_TASKS = 8;
 const MAX_CONCURRENCY = 4;
@@ -585,11 +587,158 @@ const SubagentParams = Type.Object({
 			default: false,
 		}),
 	),
+	background: Type.Optional(
+		Type.Boolean({
+			description:
+				"Run in detached background mode — returns immediately with a job ID (sa_xxxx). " +
+				"Only valid for single mode ({ agent, task }). " +
+				"The main session stays free while the subagent runs. " +
+				"Completion is announced back into the session automatically. " +
+				"Use /subagents to list, cancel, or inspect background jobs.",
+			default: false,
+		}),
+	),
 });
 
 export default function (pi: ExtensionAPI) {
+	let bgManager: BackgroundJobManager | null = null;
+
+	function getBgManager(): BackgroundJobManager {
+		if (!bgManager) throw new Error("BackgroundJobManager not initialized.");
+		return bgManager;
+	}
+
+	pi.on("session_start", async (_event, ctx) => {
+		bgManager = new BackgroundJobManager({
+			onJobComplete: (job) => {
+				if (job.awaited) return;
+				const statusEmoji = job.status === "completed" ? "✓" : job.status === "cancelled" ? "✗ cancelled" : "✗ failed";
+				const elapsed = ((Date.now() - job.startedAt) / 1000).toFixed(1);
+				const taskPreview = job.task.length > 80 ? `${job.task.slice(0, 80)}…` : job.task;
+				const output = job.status === "completed"
+					? (job.resultSummary ?? "(no output)")
+					: `Error: ${job.stderr ?? "unknown error"}`;
+
+				pi.sendMessage(
+					{
+						customType: "background_subagent_result",
+						content: [
+							`**Background subagent ${statusEmoji}: ${job.id}** (${job.agentName}, ${elapsed}s)`,
+							`> ${taskPreview}`,
+							"",
+							output,
+						].join("\n"),
+						display: true,
+					},
+					{ deliverAs: "followUp" },
+				);
+			},
+		});
+	});
+
+	pi.on("session_before_switch", async () => {
+		if (bgManager) {
+			for (const job of bgManager.getRunningJobs()) {
+				bgManager.cancel(job.id);
+			}
+		}
+	});
+
 	pi.on("session_shutdown", async () => {
 		await stopLiveSubagents();
+		if (bgManager) {
+			bgManager.shutdown();
+			bgManager = null;
+		}
+	});
+
+	// /subagents command
+	pi.registerCommand("subagents", {
+		description: "List and manage background subagent jobs. Subcommands: list, cancel <id>, output <id>, info <id>",
+		handler: async (args: string, ctx) => {
+			const manager = bgManager;
+			if (!manager) {
+				pi.sendMessage({ customType: "subagents_list", content: "No background subagent manager active.", display: true });
+				return;
+			}
+
+			const parts = args.trim().split(/\s+/);
+			const sub = parts[0] || "list";
+			const jobId = parts[1];
+
+			if (sub === "cancel" && jobId) {
+				const result = manager.cancel(jobId);
+				const msg = result === "cancelled"
+					? `Cancelled background subagent **${jobId}**.`
+					: result === "not_found"
+						? `Job **${jobId}** not found.`
+						: `Job **${jobId}** is already done (${result}).`;
+				pi.sendMessage({ customType: "subagents_cancel", content: msg, display: true });
+				return;
+			}
+
+			if ((sub === "output" || sub === "info") && jobId) {
+				const job = manager.getJob(jobId);
+				if (!job) {
+					pi.sendMessage({ customType: "subagents_info", content: `Job **${jobId}** not found.`, display: true });
+					return;
+				}
+				const elapsed = ((( job.completedAt ?? Date.now()) - job.startedAt) / 1000).toFixed(1);
+				const lines = [
+					`## Background Subagent: ${job.id}`,
+					`- **Status:** ${job.status}`,
+					`- **Agent:** ${job.agentName}`,
+					`- **CWD:** ${job.cwd}`,
+					`- **Started:** ${new Date(job.startedAt).toISOString()}`,
+					job.completedAt ? `- **Completed:** ${new Date(job.completedAt).toISOString()} (${elapsed}s)` : `- **Elapsed:** ${elapsed}s`,
+					job.model ? `- **Model:** ${job.model}` : "",
+					job.exitCode !== undefined ? `- **Exit code:** ${job.exitCode}` : "",
+					"",
+					"### Task",
+					job.task,
+				];
+				if (sub === "output" || sub === "info") {
+					if (job.resultSummary) {
+						lines.push("", "### Output", job.resultSummary);
+					}
+					if (job.stderr) {
+						lines.push("", "### Stderr", job.stderr);
+					}
+				}
+				pi.sendMessage({ customType: "subagents_info", content: lines.filter(l => l !== undefined).join("\n"), display: true });
+				return;
+			}
+
+			// Default: list
+			const running = manager.getRunningJobs();
+			const recent = manager.getRecentJobs(10);
+			const done = recent.filter((j) => j.status !== "running");
+			const lines: string[] = ["## Background Subagents"];
+
+			if (running.length === 0 && done.length === 0) {
+				lines.push("", "No background subagent jobs.");
+			} else {
+				if (running.length > 0) {
+					lines.push("", "### Running");
+					for (const job of running) {
+						const elapsed = ((Date.now() - job.startedAt) / 1000).toFixed(0);
+						const preview = job.task.length > 50 ? `${job.task.slice(0, 50)}…` : job.task;
+						lines.push(`- **${job.id}** [${job.agentName}] ${elapsed}s — ${preview}`);
+					}
+				}
+				if (done.length > 0) {
+					lines.push("", "### Recent");
+					for (const job of done) {
+						const elapsed = (((job.completedAt ?? Date.now()) - job.startedAt) / 1000).toFixed(1);
+						const preview = job.task.length > 50 ? `${job.task.slice(0, 50)}…` : job.task;
+						lines.push(`- **${job.id}** [${job.agentName}] ${job.status}, ${elapsed}s — ${preview}`);
+					}
+				}
+			}
+			lines.push("", "_Use `/subagents cancel <id>`, `/subagents output <id>`, `/subagents info <id>`_");
+
+			pi.sendMessage({ customType: "subagents_list", content: lines.join("\n"), display: true });
+		},
 	});
 
 	// /subagent command - list available agents
@@ -619,6 +768,7 @@ export default function (pi: ExtensionAPI) {
 			"Agents are defined as .md files in the configured user agent directory (for LSD this is typically ~/.lsd/agent/agents/) or project-local .lsd/agents/, with legacy support for .gsd/agents/ and .pi/agents/.",
 			"Use the /subagent command to list available agents and their descriptions.",
 			"Use chain mode to pipeline: scout finds context, planner designs, worker implements.",
+			"Set background: true (single mode only) to run detached — returns immediately with a sa_xxxx job ID. Completion is announced back into the session. Use /subagents to manage background jobs.",
 		].join(" "),
 		promptGuidelines: [
 			"Use subagent to delegate self-contained tasks that benefit from an isolated context window.",
@@ -626,6 +776,7 @@ export default function (pi: ExtensionAPI) {
 			"Use chain mode for scout→planner→worker or worker→reviewer→worker pipelines.",
 			"Use parallel mode when tasks are independent and don't need each other's output.",
 			"Always check available agents with /subagent before choosing one.",
+			"Use background: true when the user wants to keep chatting while a long-running agent works in parallel.",
 		],
 		parameters: SubagentParams,
 
@@ -665,6 +816,14 @@ export default function (pi: ExtensionAPI) {
 						},
 					],
 					details: makeDetails("single")([]),
+				};
+			}
+
+			if (params.background && !hasSingle) {
+				return {
+					content: [{ type: "text", text: "background: true is only supported in single mode ({ agent, task }). Not valid for parallel or chain modes." }],
+					details: makeDetails(hasChain ? "chain" : "parallel")([]),
+					isError: true,
 				};
 			}
 
@@ -851,6 +1010,74 @@ export default function (pi: ExtensionAPI) {
 			}
 
 			if (params.agent && params.task) {
+				// ── Background mode ──────────────────────────────────────────
+				if (params.background) {
+					const manager = bgManager;
+					if (!manager) {
+						return {
+							content: [{ type: "text", text: "Background subagent manager not initialized." }],
+							details: makeDetails("single")([]),
+							isError: true,
+						};
+					}
+
+					const agentForBg = agents.find((a) => a.name === params.agent);
+					if (!agentForBg) {
+						const available = agents.map((a) => `"${a.name}"`).join(", ") || "none";
+						return {
+							content: [{ type: "text", text: `Unknown agent: "${params.agent}". Available: ${available}` }],
+							details: makeDetails("single")([]),
+							isError: true,
+						};
+					}
+
+					let jobId: string;
+					try {
+						jobId = runSubagentInBackground(
+							manager,
+							agents,
+							params.agent,
+							params.task,
+							params.cwd,
+							params.model,
+							{ defaultCwd: ctx.cwd, model: ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined },
+							async (bgSignal) => {
+								const result = await runSingleAgent(
+									ctx.cwd,
+									agents,
+									params.agent!,
+									params.task!,
+									params.cwd,
+									undefined,
+									params.model,
+									ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined,
+									bgSignal,
+									undefined, // no streaming updates for background jobs
+									makeDetails("single"),
+								);
+								return {
+									exitCode: result.exitCode,
+									finalOutput: getFinalOutput(result.messages),
+									stderr: result.stderr,
+									model: result.model,
+								};
+							},
+						);
+					} catch (err) {
+						return {
+							content: [{ type: "text", text: err instanceof Error ? err.message : String(err) }],
+							details: makeDetails("single")([]),
+							isError: true,
+						};
+					}
+
+					return {
+						content: [{ type: "text", text: `Background subagent started. Job ID: **${jobId}**\nAgent: ${params.agent}\nUse \`/subagents\` to check status or \`/subagents cancel ${jobId}\` to stop it.` }],
+						details: makeDetails("single")([]),
+					};
+				}
+
+				// ── Foreground (blocking) mode ───────────────────────────────
 				let isolation: IsolationEnvironment | null = null;
 				let mergeResult: MergeResult | undefined;
 				try {
