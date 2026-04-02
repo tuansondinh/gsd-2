@@ -88,11 +88,15 @@ ${transcript}`;
  * Returns null if no valid CLI binary can be found.
  */
 export function resolveCliPath(): string | null {
-  // Primary: the entry point used to launch the current process
+  // Prefer env vars set by loader.ts — reliable across all invocation styles
+  const envPath = process.env.LSD_BIN_PATH || process.env.GSD_BIN_PATH;
+  if (envPath && existsSync(envPath)) return envPath;
+
+  // Fallback: the entry point used to launch the current process
   const argv1 = process.argv[1];
   if (argv1 && existsSync(argv1)) return argv1;
 
-  // Fallback: walk up from argv1 to find a bin/ sibling
+  // Last resort: walk up from argv1 to find a bin/ sibling
   if (argv1) {
     const binDir = join(dirname(argv1), '..', 'bin');
     for (const name of ['lsd', 'gsd']) {

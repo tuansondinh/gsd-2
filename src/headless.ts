@@ -285,18 +285,21 @@ async function runHeadlessOnce(options: HeadlessOptions, restartCount: number): 
     }
   }
 
-  // For new-milestone, load context and bootstrap .gsd/ before spawning RPC child
-  if (isNewMilestone) {
-    if (!options.context && !options.contextText) {
-      process.stderr.write('[headless] Error: new-milestone requires --context <file> or --context-text <text>\n')
-      process.exit(1)
-    }
-
-    let contextContent: string
+  // Load context generically if --context or --context-text are provided
+  let contextContent: string | undefined
+  if (options.context || options.contextText) {
     try {
       contextContent = await loadContext(options)
     } catch (err) {
       process.stderr.write(`[headless] Error loading context: ${err instanceof Error ? err.message : String(err)}\n`)
+      process.exit(1)
+    }
+  }
+
+  // For new-milestone, validate context and bootstrap .gsd/ before spawning RPC child
+  if (isNewMilestone) {
+    if (!contextContent) {
+      process.stderr.write('[headless] Error: new-milestone requires --context <file> or --context-text <text>\n')
       process.exit(1)
     }
 
@@ -315,9 +318,9 @@ async function runHeadlessOnce(options: HeadlessOptions, restartCount: number): 
     writeFileSync(join(runtimeDir, 'headless-context.md'), contextContent, 'utf-8')
   }
 
-  // Validate .gsd/ directory (skip for new-milestone since we just bootstrapped it)
+  // Validate .gsd/ directory — skip for new-milestone (just bootstrapped) and bare mode
   const gsdDir = join(process.cwd(), '.gsd')
-  if (!isNewMilestone && !existsSync(gsdDir)) {
+  if (!isNewMilestone && !options.bare && !existsSync(gsdDir)) {
     process.stderr.write('[headless] Error: No .gsd/ directory found in current directory.\n')
     process.stderr.write("[headless] Run 'gsd' interactively first to initialize a project.\n")
     process.exit(1)
@@ -808,14 +811,31 @@ async function runHeadlessOnce(options: HeadlessOptions, restartCount: number): 
     })
   }
 
-  if (!options.json) {
-    process.stderr.write(`[headless] Running /gsd ${options.command}${options.commandArgs.length > 0 ? ' ' + options.commandArgs.join(' ') : ''}...\n`)
+  // Determine what prompt to send
+  let promptMessage: string
+  if (options.bare && contextContent) {
+    // Bare + context mode (e.g. memory extraction): send the context directly as the user
+    // prompt, appending contextText as a trailing instruction if both were provided.
+    // When only --context-text is set, loadContext() returns that text directly, so we
+    // don't need to append it a second time.
+    if (options.context && options.contextText) {
+      promptMessage = `${contextContent}\n\n${options.contextText}`
+    } else {
+      promptMessage = contextContent
+    }
+    if (!options.json) {
+      process.stderr.write('[headless] Running bare+context mode...\n')
+    }
+  } else {
+    promptMessage = `/gsd ${options.command}${options.commandArgs.length > 0 ? ' ' + options.commandArgs.join(' ') : ''}`
+    if (!options.json) {
+      process.stderr.write(`[headless] Running /gsd ${options.command}${options.commandArgs.length > 0 ? ' ' + options.commandArgs.join(' ') : ''}...\n`)
+    }
   }
 
-  // Send the command
-  const command = `/gsd ${options.command}${options.commandArgs.length > 0 ? ' ' + options.commandArgs.join(' ') : ''}`
+  // Send the prompt
   try {
-    await client.prompt(command)
+    await client.prompt(promptMessage)
   } catch (err) {
     process.stderr.write(`[headless] Error: Failed to send prompt: ${err instanceof Error ? err.message : String(err)}\n`)
     exitCode = EXIT_ERROR
