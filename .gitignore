@@ -56,8 +56,9 @@ TODOS.md
 .audits/
 docs/coherence-audit/
 
-# ── GSD project state (per-worktree, never committed) ──
+# ── Project-local agent state (per-worktree, never committed) ──
 .gsd/
+.lsd/
 
 # ── Stale lock files (npm is canonical) ──
 pnpm-lock.yaml
