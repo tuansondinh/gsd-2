@@ -57,6 +57,7 @@ export interface SettingsConfig {
 	timestampFormat: "date-time-iso" | "date-time-us";
 	toolOutputMode: "minimal" | "normal";
 	rtk: boolean;
+	editorScheme: "auto" | "vscode" | "cursor" | "zed" | "jetbrains" | "sublime" | "file";
 	classifierModelSubmenu?: (currentValue: string, done: (selectedValue?: string) => void) => Component;
 	budgetSubagentModelSubmenu?: (currentValue: string, done: (selectedValue?: string) => void) => Component;
 	planModeReasoningModelSubmenu?: (currentValue: string, done: (selectedValue?: string) => void) => Component;
@@ -94,6 +95,7 @@ export interface SettingsCallbacks {
 	onTimestampFormatChange: (format: "date-time-iso" | "date-time-us") => void;
 	onToolOutputModeChange: (mode: "minimal" | "normal") => void;
 	onRtkChange: (enabled: boolean) => void;
+	onEditorSchemeChange: (scheme: "auto" | "vscode" | "cursor" | "zed" | "jetbrains" | "sublime" | "file") => void;
 	onCancel: () => void;
 }
 
@@ -477,6 +479,16 @@ export class SettingsSelectorComponent extends Container {
 			values: ["date-time-iso", "date-time-us"],
 		});
 
+		// Editor link scheme (insert after timestamp-format)
+		const timestampIndex = items.findIndex((item) => item.id === "timestamp-format");
+		items.splice(timestampIndex + 1, 0, {
+			id: "editor-scheme",
+			label: "Editor link scheme",
+			description: "URI scheme for Cmd+click file path links (auto detects from $VISUAL/$EDITOR)",
+			currentValue: config.editorScheme,
+			values: ["auto", "vscode", "cursor", "zed", "jetbrains", "sublime", "file"],
+		});
+
 		// Add borders
 		this.addChild(new DynamicBorder());
 
@@ -568,6 +580,11 @@ export class SettingsSelectorComponent extends Container {
 						break;
 					case "timestamp-format":
 						callbacks.onTimestampFormatChange(newValue as "date-time-iso" | "date-time-us");
+						break;
+					case "editor-scheme":
+						callbacks.onEditorSchemeChange(
+							newValue as "auto" | "vscode" | "cursor" | "zed" | "jetbrains" | "sublime" | "file",
+						);
 						break;
 				}
 			},

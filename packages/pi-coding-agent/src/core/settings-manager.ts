@@ -164,6 +164,7 @@ export interface Settings {
 	lspAutoInstall?: boolean; // default: false — whether to auto-install missing language servers during onboarding
 	lspInstalledServers?: string[]; // list of server names installed via the onboarding wizard
 	rtk?: boolean; // default: false — enable RTK shell-command compression (requires restart)
+	editorScheme?: "auto" | "vscode" | "cursor" | "zed" | "jetbrains" | "sublime" | "file"; // URI scheme for Cmd+click file links (default: "auto")
 }
 
 function isQualifiedProviderModelRef(value: unknown): value is string {
@@ -1249,5 +1250,13 @@ export class SettingsManager {
 
 	setRtk(enabled: boolean): void {
 		this.setGlobalSetting("rtk", enabled);
+	}
+
+	getEditorScheme(): "auto" | "vscode" | "cursor" | "zed" | "jetbrains" | "sublime" | "file" {
+		return this.settings.editorScheme ?? "auto";
+	}
+
+	setEditorScheme(scheme: "auto" | "vscode" | "cursor" | "zed" | "jetbrains" | "sublime" | "file"): void {
+		this.setGlobalSetting("editorScheme", scheme);
 	}
 }

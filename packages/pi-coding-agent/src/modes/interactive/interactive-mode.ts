@@ -2978,6 +2978,7 @@ export class InteractiveMode {
 					timestampFormat: this.settingsManager.getTimestampFormat(),
 					toolOutputMode: this.settingsManager.getToolOutputMode(),
 					rtk: this.settingsManager.getRtk(),
+					editorScheme: this.settingsManager.getEditorScheme(),
 					classifierModelSubmenu: (_currentValue, submenuDone) =>
 						new ModelSelectorComponent(
 							this.ui,
@@ -3161,6 +3162,10 @@ export class InteractiveMode {
 					},
 					onTimestampFormatChange: (format) => {
 						this.settingsManager.setTimestampFormat(format);
+					},
+					onEditorSchemeChange: (scheme) => {
+						this.settingsManager.setEditorScheme(scheme);
+						this.showStatus(`Editor link scheme: ${scheme}`);
 					},
 					onToolOutputModeChange: (mode) => {
 						this.settingsManager.setToolOutputMode(mode);

@@ -17,6 +17,7 @@ import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize } from "../../../core/
 import { convertToPng } from "../../../utils/image-convert.js";
 import { sanitizeBinaryOutput } from "../../../utils/shell.js";
 import { getLanguageFromPath, highlightCode, theme } from "../theme/theme.js";
+import { type EditorScheme, editorLink } from "../utils/editor-link.js";
 import { shortenPath } from "../utils/shorten-path.js";
 import { renderDiff } from "./diff.js";
 import { keyHint } from "./keybinding-hints.js";
@@ -61,6 +62,7 @@ function str(value: unknown): string | null {
 export interface ToolExecutionOptions {
 	showImages?: boolean; // default: true (only used if terminal supports images)
 	renderMode?: "minimal" | "normal";
+	editorScheme?: EditorScheme; // URI scheme for Cmd+click file links (default: "auto")
 }
 
 type WriteHighlightCache = {
@@ -84,6 +86,7 @@ export class ToolExecutionComponent extends Container {
 	private expanded = false;
 	private renderMode: "minimal" | "normal";
 	private showImages: boolean;
+	private editorScheme: EditorScheme;
 	private isPartial = true;
 	private toolDefinition?: ToolDefinition;
 	private ui: TUI;
@@ -119,6 +122,7 @@ export class ToolExecutionComponent extends Container {
 		this.args = args;
 		this.showImages = options.showImages ?? true;
 		this.renderMode = options.renderMode ?? "normal";
+		this.editorScheme = options.editorScheme ?? "auto";
 		this.toolDefinition = toolDefinition;
 		this.ui = ui;
 		this.cwd = cwd;

@@ -298,7 +298,8 @@ export async function showInterviewRound(
 			// Auto-open the notes field when "None of the above" is selected
 			// so the user can immediately provide a free-text explanation
 			// instead of being trapped in a re-asking loop (bug #2715).
-			if (!isMultiSelect(currentIdx) && states[currentIdx].cursorIndex === noneOrDoneIdx(currentIdx)) {
+			// Skip if notes are already visible (user already typed a note and pressed Enter to confirm).
+			if (!isMultiSelect(currentIdx) && states[currentIdx].cursorIndex === noneOrDoneIdx(currentIdx) && !states[currentIdx].notesVisible) {
 				states[currentIdx].notesVisible = true;
 				focusNotes = true;
 				loadStateToEditor();
