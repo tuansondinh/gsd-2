@@ -163,6 +163,7 @@ const discoveredExtensionPaths = discoverExtensionEntryPaths(bundledExtDir)
   })
 
 process.env.LSD_BUNDLED_EXTENSION_PATHS = serializeBundledExtensionPaths(discoveredExtensionPaths)
+process.env.GSD_BUNDLED_EXTENSION_PATHS = process.env.LSD_BUNDLED_EXTENSION_PATHS
 
 // Respect HTTP_PROXY / HTTPS_PROXY / NO_PROXY env vars for all outbound requests.
 // pi-coding-agent's cli.ts sets this, but GSD bypasses that entry point — so we

@@ -12,7 +12,7 @@
  * Uses JSON mode to capture structured output from subagents.
  */
 
-import { spawn, execSync, type ChildProcess } from "node:child_process";
+import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -42,7 +42,10 @@ import {
 import { registerWorker, updateWorker } from "./worker-registry.js";
 import { handleSubagentPermissionRequest, isSubagentPermissionRequest } from "./approval-proxy.js";
 import { resolveConfiguredSubagentModel } from "./configured-model.js";
-import { resolveSubagentModel } from "./model-resolution.js";
+import {
+	normalizeSubagentModel,
+	resolveSubagentModel,
+} from "./model-resolution.js";
 import { loadEffectivePreferences } from "../shared/preferences.js";
 import { CmuxClient, shellEscape } from "../cmux/index.js";
 
@@ -274,10 +277,25 @@ function readBudgetSubagentModelFromSettings(): string | undefined {
 		if (!fs.existsSync(settingsPath)) return undefined;
 		const raw = fs.readFileSync(settingsPath, "utf-8");
 		const parsed = JSON.parse(raw) as { budgetSubagentModel?: unknown };
-		return typeof parsed.budgetSubagentModel === "string" ? parsed.budgetSubagentModel.trim() || undefined : undefined;
+		return typeof parsed.budgetSubagentModel === "string"
+			? normalizeSubagentModel(parsed.budgetSubagentModel)
+			: undefined;
 	} catch {
 		return undefined;
 	}
+}
+
+function getBundledExtensionPathsFromEnv(env: NodeJS.ProcessEnv = process.env): string[] {
+	const rawPaths = [env.GSD_BUNDLED_EXTENSION_PATHS, env.LSD_BUNDLED_EXTENSION_PATHS]
+		.map((value) => value?.trim())
+		.filter((value): value is string => Boolean(value));
+	const unique = new Set<string>();
+	for (const raw of rawPaths) {
+		for (const entry of raw.split(path.delimiter).map((value) => value.trim()).filter(Boolean)) {
+			unique.add(entry);
+		}
+	}
+	return Array.from(unique);
 }
 
 function buildSubagentProcessArgs(
@@ -310,7 +328,7 @@ function resolveSubagentCliPath(defaultCwd: string): string | null {
 
 	for (const binName of ["lsd", "gsd"]) {
 		try {
-			const resolved = execSync(`which ${binName}`, { encoding: "utf-8" }).trim();
+			const resolved = execFileSync("which", [binName], { encoding: "utf-8" }).trim();
 			if (resolved) return resolved;
 		} catch {
 			/* ignore */
@@ -453,8 +471,8 @@ async function runSingleAgent(
 		let wasAborted = false;
 
 		const exitCode = await new Promise<number>((resolve) => {
-			const bundledPaths = (process.env.GSD_BUNDLED_EXTENSION_PATHS ?? "").split(path.delimiter).map(s => s.trim()).filter(Boolean);
-			const extensionArgs = bundledPaths.flatMap(p => ["--extension", p]);
+			const bundledPaths = getBundledExtensionPathsFromEnv();
+			const extensionArgs = bundledPaths.flatMap((p) => ["--extension", p]);
 			const cliPath = resolveSubagentCliPath(cwd ?? defaultCwd);
 			if (!cliPath) {
 				currentResult.stderr += "Unable to resolve LSD/GSD CLI path for subagent launch.";

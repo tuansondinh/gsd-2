@@ -4,39 +4,53 @@ import { resolveConfiguredSubagentModel } from '../resources/extensions/subagent
 import type { AgentConfig } from '../resources/extensions/subagent/agents.ts'
 
 function agent(overrides: Partial<AgentConfig> = {}): AgentConfig {
-  return {
-    name: 'scout',
-    description: 'Scout agent',
-    systemPrompt: 'test',
-    source: 'user',
-    filePath: '/tmp/scout.md',
-    ...overrides,
-  }
+	return {
+		name: 'scout',
+		description: 'Scout agent',
+		systemPrompt: 'test',
+		source: 'user',
+		filePath: '/tmp/scout.md',
+		...overrides,
+	}
 }
 
 describe('resolveConfiguredSubagentModel', () => {
-  it('resolves $budget_model from preferences', () => {
-    const result = resolveConfiguredSubagentModel(
-      agent({ model: '$budget_model' }),
-      { subagent: { budget_model: 'claude-haiku-4-5-20250414' } },
-      'claude-haiku-4-5-20250414',
-    )
+	it('resolves $budget_model from settings and normalizes it to provider/id', () => {
+		const result = resolveConfiguredSubagentModel(
+			agent({ model: '$budget_model' }),
+			{ subagent: { budget_model: 'google/gemini-2.5-flash' } },
+			'claude-haiku-4-5',
+		)
 
-    assert.equal(result, 'claude-haiku-4-5-20250414')
-  })
+		assert.equal(result, 'anthropic/claude-haiku-4-5')
+	})
 
-  it('falls back to undefined when budget model is not configured', () => {
-    const result = resolveConfiguredSubagentModel(agent({ model: '$budget_model' }), {}, undefined)
-    assert.equal(result, undefined)
-  })
+	it('falls back to preferences when settings are empty', () => {
+		const result = resolveConfiguredSubagentModel(
+			agent({ model: '$budget_model' }),
+			{ subagent: { budget_model: 'gemini-2.5-flash' } },
+			'   ',
+		)
+		assert.equal(result, 'google/gemini-2.5-flash')
+	})
 
-  it('keeps explicit non-placeholder models unchanged', () => {
-    const result = resolveConfiguredSubagentModel(
-      agent({ model: 'claude-sonnet-4-6' }),
-      { subagent: { budget_model: 'claude-haiku-4-5-20250414' } },
-      'claude-haiku-4-5-20250414',
-    )
+	it('falls back to undefined when budget model is not configured', () => {
+		const result = resolveConfiguredSubagentModel(agent({ model: '$budget_model' }), {}, undefined)
+		assert.equal(result, undefined)
+	})
 
-    assert.equal(result, 'claude-sonnet-4-6')
-  })
+	it('returns undefined for malformed configured budget models', () => {
+		const result = resolveConfiguredSubagentModel(agent({ model: '$budget_model' }), {}, 'not/a/valid/model')
+		assert.equal(result, undefined)
+	})
+
+	it('normalizes explicit non-placeholder models', () => {
+		const result = resolveConfiguredSubagentModel(
+			agent({ model: 'claude-sonnet-4-6' }),
+			{ subagent: { budget_model: 'claude-haiku-4-5' } },
+			'claude-haiku-4-5',
+		)
+
+		assert.equal(result, 'anthropic/claude-sonnet-4-6')
+	})
 })

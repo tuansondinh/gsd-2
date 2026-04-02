@@ -1,5 +1,6 @@
 import type { AgentConfig } from "./agents.js";
 import type { SharedPreferences } from "../shared/preferences.js";
+import { normalizeSubagentModel } from "./model-resolution.js";
 
 export function resolveConfiguredSubagentModel(
 	agent: AgentConfig,
@@ -9,7 +10,7 @@ export function resolveConfiguredSubagentModel(
 	const configuredModel = agent.model?.trim();
 	if (!configuredModel) return undefined;
 	if (configuredModel === "$budget_model") {
-		return settingsBudgetModel?.trim() || preferences?.subagent?.budget_model?.trim() || undefined;
+		return normalizeSubagentModel(settingsBudgetModel) ?? normalizeSubagentModel(preferences?.subagent?.budget_model);
 	}
-	return configuredModel;
+	return normalizeSubagentModel(configuredModel);
 }

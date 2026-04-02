@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto';
 import { getAgentDir } from '@gsd/pi-coding-agent';
 import { getMemoryDir } from './memory-paths.js';
 import { scanMemoryFiles, formatMemoryManifest } from './memory-scan.js';
+import { normalizeSubagentModel } from '../subagent/model-resolution.js';
 
 /**
  * Build a plain-text transcript from session entries, keeping only
@@ -119,7 +120,7 @@ export function readBudgetMemoryModel(): string | undefined {
     const raw = readFileSync(settingsPath, 'utf-8');
     const parsed = JSON.parse(raw) as { budgetSubagentModel?: unknown };
     return typeof parsed.budgetSubagentModel === 'string'
-      ? parsed.budgetSubagentModel.trim() || undefined
+      ? normalizeSubagentModel(parsed.budgetSubagentModel)
       : undefined;
   } catch {
     return undefined;
@@ -201,7 +202,7 @@ export function extractMemories(ctx: any, cwd: string): void {
   const helperScript = `
 const { spawn } = require('node:child_process');
 const { appendFileSync, writeFileSync, readFileSync, readdirSync, statSync, existsSync } = require('node:fs');
-const { join } = require('node:path');
+const { join, delimiter } = require('node:path');
 
 const [cliPath, cwd, tmpPromptPath, auditPath, logPath, memoryDir, instruction, model, userMessageCount, transcriptLength] = process.argv.slice(1);
 const startedAt = new Date().toISOString();
@@ -302,6 +303,14 @@ writeFileSync(logPath, '', 'utf-8');
 writeAudit('running', ['startedAt: ' + startedAt]);
 
 const childArgs = [cliPath, 'headless'];
+const bundledPaths = Array.from(
+  new Set(
+    [process.env.GSD_BUNDLED_EXTENSION_PATHS, process.env.LSD_BUNDLED_EXTENSION_PATHS]
+      .filter(Boolean)
+      .flatMap((value) => String(value).split(delimiter).map((entry) => entry.trim()).filter(Boolean)),
+  ),
+);
+for (const extensionPath of bundledPaths) childArgs.push('--extension', extensionPath);
 if (model) childArgs.push('--model', model);
 childArgs.push('--bare', '--context', tmpPromptPath, '--context-text', instruction);
 

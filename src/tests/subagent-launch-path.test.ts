@@ -15,7 +15,7 @@ test('subagent launch resolves CLI path via env, argv, cwd fallbacks, and PATH',
   assert.ok(src.includes('process.argv[1]'), 'checks argv[1] fallback')
   assert.ok(src.includes('path.join(defaultCwd, "dist", "loader.js")'), 'checks built local loader fallback')
   assert.ok(src.includes('path.join(defaultCwd, "scripts", "dev-cli.js")'), 'checks local dev CLI fallback')
-  assert.ok(src.includes('which ${binName}'), 'checks PATH fallback via which')
+  assert.ok(src.includes('execFileSync("which", [binName]'), 'checks PATH fallback via which')
 })
 
 test('loader exports both legacy and rebranded bin path env vars', () => {
@@ -23,4 +23,5 @@ test('loader exports both legacy and rebranded bin path env vars', () => {
 
   assert.ok(src.includes('process.env.GSD_BIN_PATH = process.argv[1]'), 'sets GSD_BIN_PATH')
   assert.ok(src.includes('process.env.LSD_BIN_PATH = process.argv[1]'), 'sets LSD_BIN_PATH')
+  assert.ok(src.includes('process.env.GSD_BUNDLED_EXTENSION_PATHS = process.env.LSD_BUNDLED_EXTENSION_PATHS'), 'mirrors bundled extension env for legacy child processes')
 })
