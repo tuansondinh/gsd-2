@@ -65,7 +65,7 @@ export function printWelcomeScreen(opts: WelcomeScreenOptions): void {
 
   // Narrow terminal fallback
   if (termWidth < 70) {
-    process.stderr.write(`\n  Lucent Software Dev Cli v${version}\n  ${shortCwd}\n\n`)
+    process.stderr.write(`\n  Looks Sort of Done v${version}\n  ${shortCwd}\n\n`)
     return
   }
 
@@ -96,7 +96,7 @@ export function printWelcomeScreen(opts: WelcomeScreenOptions): void {
   const leftRows: (readonly [string, string, string] | null)[] = [null, ...GSD_LOGO_SEGMENTS, null]
 
   // ── Right rows (8 total, null = divider) ────────────────────────────────────
-  const titleLeft = `  ${TITLE_MARK('L')}${TITLE_BASE('ucent ')}${TITLE_MARK('S')}${TITLE_BASE('oftware ')}${TITLE_MARK('D')}${TITLE_BASE('ev Cli')}`
+  const titleLeft = `  ${TITLE_MARK('L')}${TITLE_BASE('ooks Sort of ')}${TITLE_MARK('D')}${TITLE_BASE('one')}`
   const titleRight = VERSION(`v${version}`)
   const titleFill = RIGHT_INNER - visLen(titleLeft) - visLen(titleRight)
   const titleRow = titleLeft + ' '.repeat(Math.max(1, titleFill)) + titleRight

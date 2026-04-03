@@ -394,7 +394,7 @@ export class ToolExecutionComponent extends Container {
 		if (this.hideComponent) {
 			return [];
 		}
-		return super.render(width);
+		return [...super.render(width), ""];
 	}
 
 	private updateDisplay(): void {

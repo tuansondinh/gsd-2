@@ -1,7 +1,7 @@
 {
   "name": "lsd-pi",
-  "version": "1.1.5",
-  "description": "LSD — let stuff develop coding agent",
+  "version": "1.1.6",
+  "description": "LSD — Looks Sort of Done coding agent",
   "license": "MIT",
   "repository": {
     "type": "git",

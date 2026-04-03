@@ -18,6 +18,7 @@ import { getAgentDir } from "@gsd/pi-coding-agent";
 
 const STATUS_KEY = "cache-timer";
 const IS_MEMORY_MAINTENANCE_WORKER = process.env.LSD_MEMORY_EXTRACT === "1" || process.env.LSD_MEMORY_DREAM === "1";
+const IS_CACHE_TIMER_FORCED_OFF = process.env.LSD_DISABLE_CACHE_TIMER === "1" || process.env.GSD_DISABLE_CACHE_TIMER === "1";
 
 // ANSI color codes for timer display
 const ANSI_RESET = "\x1b[0m";
@@ -72,7 +73,7 @@ function formatElapsed(ms: number): string {
 }
 
 export default function cacheTimerExtension(pi: ExtensionAPI) {
-    if (IS_MEMORY_MAINTENANCE_WORKER) {
+    if (IS_MEMORY_MAINTENANCE_WORKER || IS_CACHE_TIMER_FORCED_OFF) {
         return;
     }
 

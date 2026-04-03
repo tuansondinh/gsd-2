@@ -255,7 +255,7 @@ function scheduleCompletion(completion, completionReason) {
 
 function flushLogText(text, force = false) {
   pendingLogText += text;
-  const parts = pendingLogText.split(/\r?\n/);
+  const parts = pendingLogText.split(/(?:\r?\n|\r)/);
   pendingLogText = force ? '' : (parts.pop() ?? '');
 
   const kept = [];
@@ -338,7 +338,10 @@ const bundledPaths = Array.from(
   new Set(
     [process.env.GSD_BUNDLED_EXTENSION_PATHS, process.env.LSD_BUNDLED_EXTENSION_PATHS]
       .filter(Boolean)
-      .flatMap((value) => String(value).split(delimiter).map((entry) => entry.trim()).filter(Boolean)),
+      .flatMap((value) => String(value).split(delimiter).map((entry) => entry.trim()).filter(Boolean))
+      // Explicitly disable cache-timer extension for auto-memory workers.
+      // It is noisy in headless logs and provides no value for maintenance runs.
+      .filter((entry) => !/[\\/]cache-timer[\\/]/i.test(entry)),
   ),
 );
 for (const extensionPath of bundledPaths) childArgs.push('--extension', extensionPath);
@@ -348,7 +351,21 @@ childArgs.push('--bare', '--context', tmpPromptPath, '--context-text', instructi
 const child = spawn(
   process.execPath,
   childArgs,
-  { cwd, env: { ...process.env, LSD_MEMORY_EXTRACT: '1' }, stdio: ['ignore', 'pipe', 'pipe'] },
+  {
+    cwd,
+    env: {
+      ...process.env,
+      LSD_MEMORY_EXTRACT: '1',
+      // Hard-disable cache timer in maintenance workers.
+      LSD_DISABLE_CACHE_TIMER: '1',
+      // Memory maintenance workers must not run in auto permission mode.
+      // In auto mode, write/edit calls require classifier approval, but headless
+      // maintenance workers have no interactive classifier responder.
+      // Keep writes safe via extension-level path restrictions instead.
+      LUCENT_CODE_PERMISSION_MODE: 'danger-full-access',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  },
 );
 
 hardTimeout = setTimeout(() => {

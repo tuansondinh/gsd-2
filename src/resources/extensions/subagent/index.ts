@@ -1487,6 +1487,7 @@ export default function(pi: ExtensionAPI) {
                 theme.fg("accent", agentName) +
                 theme.fg("muted", ` [${scope}]`);
             text += `\n  ${theme.fg("dim", preview)}`;
+            text += `\n  ${theme.fg("muted", "(Ctrl+B to background)")}`;
             return new Text(text, 0, 0);
         },
 

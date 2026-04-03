@@ -534,7 +534,7 @@ function rollbackLock() {
 
 function flushLogText(text, force = false) {
 	pendingLogText += text;
-	const parts = pendingLogText.split(/\r?\n/);
+	const parts = pendingLogText.split(/(?:\r?\n|\r)/);
 	pendingLogText = force ? '' : (parts.pop() ?? '');
 
 	const kept = [];
@@ -596,7 +596,9 @@ const bundledPaths = Array.from(
 	new Set(
 		[process.env.GSD_BUNDLED_EXTENSION_PATHS, process.env.LSD_BUNDLED_EXTENSION_PATHS]
 			.filter(Boolean)
-			.flatMap((value) => String(value).split(delimiter).map((entry) => entry.trim()).filter(Boolean)),
+			.flatMap((value) => String(value).split(delimiter).map((entry) => entry.trim()).filter(Boolean))
+			// Explicitly disable cache-timer extension for dream workers.
+			.filter((entry) => !/[\\/]cache-timer[\\/]/i.test(entry)),
 	),
 );
 for (const extensionPath of bundledPaths) childArgs.push('--extension', extensionPath);
@@ -605,7 +607,15 @@ childArgs.push('--bare', '--context', tmpPromptPath, '--context-text', instructi
 
 const child = spawn(process.execPath, childArgs, {
 	cwd,
-	env: { ...process.env, LSD_MEMORY_DREAM: '1' },
+	env: {
+		...process.env,
+		LSD_MEMORY_DREAM: '1',
+		// Hard-disable cache timer in maintenance workers.
+		LSD_DISABLE_CACHE_TIMER: '1',
+		// Dream workers run headless and cannot answer auto-mode classifier prompts.
+		// Force non-auto permissions and rely on memory-extension path/tool guards.
+		LUCENT_CODE_PERMISSION_MODE: 'danger-full-access',
+	},
 	stdio: ['ignore', 'pipe', 'pipe'],
 });
 

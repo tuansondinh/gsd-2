@@ -6,6 +6,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.6] - 2026-04-03
+
+### Changed
+- **branding**: rename LSD expansion to **Looks Sort of Done** — welcome screen title updated to reflect the new tagline
+
 ## [1.1.5] - 2026-04-03
 
 ### Added
