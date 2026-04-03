@@ -110,6 +110,7 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 					host.hideThinkingBlock,
 					host.getMarkdownThemeWithSettings(),
 					host.settingsManager.getTimestampFormat(),
+					host.session?.thinkingLevel || "off",
 				);
 				host.streamingMessage = event.message;
 				host.chatContainer.addChild(host.streamingComponent);

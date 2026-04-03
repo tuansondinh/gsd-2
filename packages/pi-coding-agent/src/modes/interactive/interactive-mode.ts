@@ -2450,6 +2450,7 @@ export class InteractiveMode {
 					this.hideThinkingBlock,
 					this.getMarkdownThemeWithSettings(),
 					this.settingsManager.getTimestampFormat(),
+					this.session.thinkingLevel || "off",
 				);
 				this.chatContainer.addChild(assistantComponent);
 				break;

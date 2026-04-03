@@ -198,79 +198,8 @@ export function readBudgetMemoryModel(): string | undefined {
     }
 }
 
-/**
- * Main entry point — called from the session_shutdown hook.
- *
- * Reads the conversation transcript, builds an extraction prompt,
- * and spawns a detached headless agent to process it.
- * Fire-and-forget: the parent can exit without killing the child.
- */
-export function extractMemories(ctx: any, cwd: string): void {
-    // Guard: prevent recursive extraction
-    if (process.env.LSD_MEMORY_EXTRACT === '1') return;
-
-    // Guard: user opt-out
-    if (process.env.CLAUDE_CODE_DISABLE_AUTO_MEMORY) return;
-
-    const entries = ctx.sessionManager.getEntries();
-
-    // Guard: need at least one user message to extract from
-    const userMessageCount = entries.filter(
-        (e: any) => e.type === 'message' && e.message?.role === 'user',
-    ).length;
-    if (userMessageCount < 1) return;
-
-    const transcript = buildTranscriptSummary(entries);
-    if (!transcript) return;
-
-    const memoryDir = getMemoryDir(cwd);
-    mkdirSync(memoryDir, { recursive: true });
-
-    const prompt = buildExtractionPrompt(memoryDir, transcript);
-    const auditPath = join(memoryDir, '.last-auto-extract.txt');
-    const logPath = join(memoryDir, '.last-auto-extract.log');
-
-    // Write prompt to a temp file so the spawned agent can read it
-    const tmpPromptPath = join(tmpdir(), `lsd-memory-extract-${randomUUID()}.md`);
-    writeFileSync(tmpPromptPath, prompt, 'utf-8');
-
-    const cliPath = resolveCliPath();
-    const budgetModel = readBudgetMemoryModel();
-    if (!cliPath) {
-        writeFileSync(
-            auditPath,
-            [
-                `timestamp: ${new Date().toISOString()}`,
-                'status: skipped',
-                'reason: cli_path_not_found',
-                `cwd: ${cwd}`,
-                `userMessages: ${userMessageCount}`,
-                `transcriptLength: ${transcript.length}`,
-                `budgetModel: ${budgetModel ?? 'default'}`,
-            ].join('\n') + '\n',
-            'utf-8',
-        );
-        return;
-    }
-
-    writeFileSync(
-        auditPath,
-        [
-            `timestamp: ${new Date().toISOString()}`,
-            'status: spawning',
-            `cwd: ${cwd}`,
-            `userMessages: ${userMessageCount}`,
-            `transcriptLength: ${transcript.length}`,
-            `cliPath: ${cliPath}`,
-            `budgetModel: ${budgetModel ?? 'default'}`,
-            `logPath: ${logPath}`,
-        ].join('\n') + '\n',
-        'utf-8',
-    );
-
-    const instruction = 'Extract memories from the transcript above. Write any worth-saving memories to the memory directory, then update MEMORY.md.';
-
-    const helperScript = `
+export function buildAutoExtractHelperScript(): string {
+    return String.raw`
 const { spawn } = require('node:child_process');
 const { appendFileSync, writeFileSync, readFileSync, readdirSync, statSync, existsSync } = require('node:fs');
 const { join, delimiter } = require('node:path');
@@ -360,7 +289,7 @@ function writeAudit(status, extra = []) {
       'model: ' + (model || 'default'),
       'logPath: ' + logPath,
       ...extra,
-    ].join('\\n') + '\\n', 'utf-8');
+    ].join('\n') + '\n', 'utf-8');
   } catch {}
 }
 
@@ -432,7 +361,7 @@ hardTimeout.unref();
 child.stdout.on('data', appendLog);
 child.stderr.on('data', appendLog);
 child.on('error', (err) => {
-  appendLog(String(err && err.stack ? err.stack : err) + '\\n');
+  appendLog(String(err && err.stack ? err.stack : err) + '\n');
   flushLogText('', true);
   finalize('failed', null, 'spawn_error', String(err && err.message ? err.message : err));
 });
@@ -441,6 +370,80 @@ child.on('exit', (code, signal) => {
   finalize(code === 0 ? 'finished' : 'failed', code, signal, 'child_exit');
 });
 `;
+}
+
+/**
+ * Main entry point — called from the session_shutdown hook.
+ *
+ * Reads the conversation transcript, builds an extraction prompt,
+ * and spawns a detached headless agent to process it.
+ * Fire-and-forget: the parent can exit without killing the child.
+ */
+export function extractMemories(ctx: any, cwd: string): void {
+    // Guard: prevent recursive extraction
+    if (process.env.LSD_MEMORY_EXTRACT === '1') return;
+
+    // Guard: user opt-out
+    if (process.env.CLAUDE_CODE_DISABLE_AUTO_MEMORY) return;
+
+    const entries = ctx.sessionManager.getEntries();
+
+    // Guard: need at least one user message to extract from
+    const userMessageCount = entries.filter(
+        (e: any) => e.type === 'message' && e.message?.role === 'user',
+    ).length;
+    if (userMessageCount < 1) return;
+
+    const transcript = buildTranscriptSummary(entries);
+    if (!transcript) return;
+
+    const memoryDir = getMemoryDir(cwd);
+    mkdirSync(memoryDir, { recursive: true });
+
+    const prompt = buildExtractionPrompt(memoryDir, transcript);
+    const auditPath = join(memoryDir, '.last-auto-extract.txt');
+    const logPath = join(memoryDir, '.last-auto-extract.log');
+
+    // Write prompt to a temp file so the spawned agent can read it
+    const tmpPromptPath = join(tmpdir(), `lsd-memory-extract-${randomUUID()}.md`);
+    writeFileSync(tmpPromptPath, prompt, 'utf-8');
+
+    const cliPath = resolveCliPath();
+    const budgetModel = readBudgetMemoryModel();
+    if (!cliPath) {
+        writeFileSync(
+            auditPath,
+            [
+                `timestamp: ${new Date().toISOString()}`,
+                'status: skipped',
+                'reason: cli_path_not_found',
+                `cwd: ${cwd}`,
+                `userMessages: ${userMessageCount}`,
+                `transcriptLength: ${transcript.length}`,
+                `budgetModel: ${budgetModel ?? 'default'}`,
+            ].join('\n') + '\n',
+            'utf-8',
+        );
+        return;
+    }
+
+    writeFileSync(
+        auditPath,
+        [
+            `timestamp: ${new Date().toISOString()}`,
+            'status: spawning',
+            `cwd: ${cwd}`,
+            `userMessages: ${userMessageCount}`,
+            `transcriptLength: ${transcript.length}`,
+            `cliPath: ${cliPath}`,
+            `budgetModel: ${budgetModel ?? 'default'}`,
+            `logPath: ${logPath}`,
+        ].join('\n') + '\n',
+        'utf-8',
+    );
+
+    const instruction = 'Extract memories from the transcript above. Write any worth-saving memories to the memory directory, then update MEMORY.md.';
+    const helperScript = buildAutoExtractHelperScript();
 
     const proc = spawn(
         process.execPath,

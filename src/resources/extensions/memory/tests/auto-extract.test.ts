@@ -1,9 +1,10 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { buildTranscriptSummary, buildExtractionPrompt, stripAnsiForAutoExtractLog, classifyAutoExtractLogLine } from '../auto-extract.js';
+import { buildTranscriptSummary, buildExtractionPrompt, stripAnsiForAutoExtractLog, classifyAutoExtractLogLine, buildAutoExtractHelperScript } from '../auto-extract.js';
 
 function makeTempDir(): string {
     const dir = join(tmpdir(), `mem-extract-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -93,6 +94,23 @@ describe('buildTranscriptSummary', () => {
         const summary = buildTranscriptSummary(entries);
         assert.ok(summary.includes('User:'));
         assert.ok(summary.includes('Assistant:'));
+    });
+});
+
+describe('buildAutoExtractHelperScript', () => {
+    test('preserves regex escapes in the generated helper source', () => {
+        const script = buildAutoExtractHelperScript();
+
+        assert.ok(script.includes(String.raw`const CACHE_TIMER_RE = /^\[phase\]\s+cache-timer\s*$/;`));
+        assert.ok(script.includes(String.raw`const SESSION_ENDED_RE = /^\[agent\]\s+Session ended/;`));
+        assert.ok(script.includes(String.raw`const HEADLESS_STATUS_RE = /^\[headless\]\s+Status:\s+(\w+)\s*$/i;`));
+        assert.ok(script.includes(String.raw`const parts = pendingLogText.split(/\r?\n/);`));
+        assert.ok(script.includes(`appendFileSync(logPath, kept.join('\\n') + '\\n')`));
+    });
+
+    test('generates syntactically valid helper code', () => {
+        const script = buildAutoExtractHelperScript();
+        assert.doesNotThrow(() => new vm.Script(script));
     });
 });
 

@@ -9,6 +9,7 @@ import { formatTimestamp, type TimestampFormat } from "./timestamp.js";
 export class AssistantMessageComponent extends Container {
 	private contentContainer: Container;
 	private hideThinkingBlock: boolean;
+	private thinkingLevel: string;
 	private markdownTheme: MarkdownTheme;
 	private lastMessage?: AssistantMessage;
 	private timestampFormat: TimestampFormat;
@@ -18,10 +19,12 @@ export class AssistantMessageComponent extends Container {
 		hideThinkingBlock = false,
 		markdownTheme: MarkdownTheme = getMarkdownTheme(),
 		timestampFormat: TimestampFormat = "date-time-iso",
+		thinkingLevel = "off",
 	) {
 		super();
 
 		this.hideThinkingBlock = hideThinkingBlock;
+		this.thinkingLevel = thinkingLevel;
 		this.markdownTheme = markdownTheme;
 		this.timestampFormat = timestampFormat;
 
@@ -43,6 +46,10 @@ export class AssistantMessageComponent extends Container {
 
 	setHideThinkingBlock(hide: boolean): void {
 		this.hideThinkingBlock = hide;
+	}
+
+	setThinkingLevel(level: string): void {
+		this.thinkingLevel = level;
 	}
 
 	updateContent(message: AssistantMessage): void {
@@ -74,6 +81,8 @@ export class AssistantMessageComponent extends Container {
 					.some((c) => (c.type === "text" && c.text.trim()) || (c.type === "thinking" && c.thinking.trim()));
 
 				if (this.hideThinkingBlock) {
+					// Skip "Thinking..." label when thinking is disabled in settings
+					if (this.thinkingLevel === "off") continue;
 					// Show static "Thinking..." label when hidden
 					this.contentContainer.addChild(new Text(theme.italic(theme.fg("thinkingText", "Thinking...")), 1, 0));
 					if (hasVisibleContentAfter) {
