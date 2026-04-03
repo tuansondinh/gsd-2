@@ -140,6 +140,7 @@
     "@gsd-build/engine-linux-arm64-gnu": ">=2.10.2",
     "@gsd-build/engine-linux-x64-gnu": ">=2.10.2",
     "@gsd-build/engine-win32-x64-msvc": ">=2.10.2",
+    "@lydell/node-pty": "^1.2.0-beta.3",
     "fsevents": "~2.3.3",
     "koffi": "^2.9.0"
   },

@@ -69,12 +69,14 @@ import {
 	type PermissionMode,
 } from "../../core/tool-approval.js";
 import type { TruncationResult } from "../../core/tools/truncate.js";
+import { isPtyAvailable } from "../../core/pty-executor.js";
 import { getChangelogPath, getNewEntries, parseChangelog } from "../../utils/changelog.js";
 import { extensionForImageMimeType, readClipboardImage } from "../../utils/clipboard-image.js";
 import { resetStdinForTui } from "../../utils/reset-stdin.js";
 import { ensureTool } from "../../utils/tools-manager.js";
 import { AssistantMessageComponent } from "./components/assistant-message.js";
 import { BashExecutionComponent } from "./components/bash-execution.js";
+import { EmbeddedTerminalComponent } from "./components/embedded-terminal.js";
 import { BorderedLoader } from "./components/bordered-loader.js";
 import { BranchSummaryMessageComponent } from "./components/branch-summary-message.js";
 import { CompactionSummaryMessageComponent } from "./components/compaction-summary-message.js";
@@ -137,6 +139,8 @@ interface Expandable {
 	setExpanded(expanded: boolean): void;
 }
 
+type InteractiveBashComponent = BashExecutionComponent | EmbeddedTerminalComponent;
+
 function isExpandable(obj: unknown): obj is Expandable {
 	return typeof obj === "object" && obj !== null && "setExpanded" in obj && typeof obj.setExpanded === "function";
 }
@@ -192,7 +196,24 @@ export class InteractiveMode {
 	private onInputCallback?: (text: string) => void;
 	private loadingAnimation: Loader | undefined = undefined;
 	private pendingWorkingMessage: string | undefined = undefined;
-	private readonly defaultWorkingMessage = "Working...";
+	private readonly defaultWorkingMessage = "Cooking…";
+	private readonly workingMessages = [
+		"Cooking…",
+		"Vibing…",
+		"Brainworming…",
+		"Scheming…",
+		"Spelunking…",
+		"Manifesting…",
+		"Yak shaving…",
+		"Grokking…",
+		"Pondering…",
+		"Going deep…",
+		"Caffeinating…",
+		"On a mission…",
+		"Consulting the void…",
+		"Doing the thing…",
+		"Almost maybe…",
+	];
 
 	private lastSigintTime = 0;
 	private lastEscapeTime = 0;
@@ -225,10 +246,11 @@ export class InteractiveMode {
 	private isBashMode = false;
 
 	// Track current bash execution component
-	private bashComponent: BashExecutionComponent | undefined = undefined;
+	private bashComponent: InteractiveBashComponent | undefined = undefined;
 
 	// Track pending bash components (shown in pending area, moved to chat on submit)
-	private pendingBashComponents: BashExecutionComponent[] = [];
+	private pendingBashComponents: InteractiveBashComponent[] = [];
+	private focusedEmbeddedTerminal?: EmbeddedTerminalComponent;
 
 	// Auto-compaction state
 	private autoCompactionLoader: Loader | undefined = undefined;
@@ -1403,9 +1425,7 @@ export class InteractiveMode {
 		this.defaultEditor.onExtensionShortcut = undefined;
 		this.updateTerminalTitle();
 		if (this.loadingAnimation) {
-			this.loadingAnimation.setMessage(
-				`${this.defaultWorkingMessage} (${appKey(this.keybindings, "interrupt")} to interrupt)`,
-			);
+			this.loadingAnimation.restoreCycle(this.workingMessages);
 		}
 	}
 
@@ -1619,6 +1639,13 @@ export class InteractiveMode {
 		return result === "Yes";
 	}
 
+	/** Reset the loading animation back to cycling working messages. */
+	private resetLoadingMessage(): void {
+		if (this.loadingAnimation) {
+			this.loadingAnimation.restoreCycle(this.workingMessages);
+		}
+	}
+
 	private _registerApprovalHandlers(): void {
 		const classifierService = new ClassifierService(this.session.modelRegistry.authStorage);
 
@@ -1629,9 +1656,7 @@ export class InteractiveMode {
 			const title = `Allow ${actionLabel}: ${request.path}\n${request.message}`;
 			const approved = await this._showApprovalConfirm(title);
 
-			if (this.loadingAnimation) {
-				this.loadingAnimation.setMessage(this.defaultWorkingMessage);
-			}
+			this.resetLoadingMessage();
 			return approved;
 		});
 
@@ -1671,9 +1696,7 @@ export class InteractiveMode {
 			});
 
 			if (decision.approved) {
-				if (this.loadingAnimation) {
-					this.loadingAnimation.setMessage(this.defaultWorkingMessage);
-				}
+				this.resetLoadingMessage();
 				return true;
 			}
 
@@ -1681,9 +1704,7 @@ export class InteractiveMode {
 			const title = `Classifier ${decision.source === "rule" ? "blocked" : "did not approve"} ${request.toolName}\n${decision.reason}\n${argsPreview}`;
 			const approved = await this._showApprovalConfirm(title);
 
-			if (this.loadingAnimation) {
-				this.loadingAnimation.setMessage(this.defaultWorkingMessage);
-			}
+			this.resetLoadingMessage();
 			return approved;
 		});
 
@@ -1693,9 +1714,7 @@ export class InteractiveMode {
 				`${request.message}\n${request.command}`,
 				["Allow once", "Allow for session", "Deny"],
 			);
-			if (this.loadingAnimation) {
-				this.loadingAnimation.setMessage(this.defaultWorkingMessage);
-			}
+			this.resetLoadingMessage();
 			if (result === "Allow once") return "allow-once";
 			if (result === "Allow for session") return "allow-session";
 			return "deny";
@@ -2027,6 +2046,7 @@ export class InteractiveMode {
 		this.defaultEditor.onAction("cycleModelBackward", () => this.cycleModel("backward"));
 		this.defaultEditor.onAction("cyclePermissionMode", () => this.cyclePermissionMode());
 		this.defaultEditor.onAction("showHotkeys", () => showHotkeys(this.getSlashCommandContext()));
+		this.defaultEditor.onAction("terminalFocus", () => this.toggleEmbeddedTerminalFocus());
 
 		// Global debug handler on TUI (works regardless of focus)
 		this.ui.onDebug = () => this.handleDebugCommand();
@@ -2432,6 +2452,7 @@ export class InteractiveMode {
 							this.ui,
 						);
 						component.setExpanded(this.toolOutputExpanded);
+						this.chatContainer.addChild(new Spacer(1));
 						this.chatContainer.addChild(component);
 
 						if (message.stopReason === "aborted" || message.stopReason === "error") {
@@ -2463,6 +2484,7 @@ export class InteractiveMode {
 							this.ui,
 						);
 						component.setExpanded(this.toolOutputExpanded);
+						this.chatContainer.addChild(new Spacer(1));
 						this.chatContainer.addChild(component);
 						// Find matching webSearchResult in this message's content
 						const resultBlock = message.content.find(
@@ -2727,7 +2749,40 @@ export class InteractiveMode {
 		for (const component of this.pendingBashComponents) {
 			component.setExpanded(expanded);
 		}
+		this.updateEditorExpandHint();
 		this.ui.requestRender();
+	}
+
+	/** Append/remove the "ctrl+o to expand" hint in the editor bottom border. */
+	updateEditorExpandHint(): void {
+		const expandKey = appKey(this.keybindings, "expandTools");
+		const collapseHint = `${theme.fg("dim", expandKey)}${theme.fg("muted", " collapse")}`;
+		const expandHint = `${theme.fg("dim", expandKey)}${theme.fg("muted", " expand")}`;
+		// The base hint set during agent_start
+		const enterKey = theme.fg("dim", "↵");
+		const followUpKey = theme.fg("dim", appKey(this.keybindings, "followUp"));
+		const steerLabel = theme.fg("muted", " steer");
+		const queueLabel = theme.fg("muted", " queue");
+		const baseHint = `${enterKey}${steerLabel}  ${followUpKey}${queueLabel}`;
+
+		// Check if there are any expandable tool outputs in the chat
+		const hasToolOutputs =
+			this.chatContainer.children.some(isExpandable) ||
+			!!this.bashComponent ||
+			this.pendingBashComponents.length > 0;
+
+		const activeHint = this.toolOutputExpanded ? collapseHint : expandHint;
+
+		if (this.loadingAnimation) {
+			// Agent is running — always show expand/collapse hint when there are tool outputs
+			this.defaultEditor.bottomHint = hasToolOutputs
+				? `${baseHint}  ${activeHint}`
+				: baseHint;
+		} else if (hasToolOutputs) {
+			// Idle — show expand/collapse hint so user knows ctrl+o works
+			this.defaultEditor.bottomHint = activeHint;
+		}
+		// If no tool outputs and idle, leave bottomHint as-is (cleared by agent_end)
 	}
 
 	private toggleThinkingBlockVisibility(): void {
@@ -4042,6 +4097,31 @@ export class InteractiveMode {
 		}
 	}
 
+	private focusEmbeddedTerminal(component: EmbeddedTerminalComponent): void {
+		this.focusedEmbeddedTerminal = component;
+		this.ui.setFocus(component);
+		component.invalidate();
+		this.ui.requestRender();
+	}
+
+	private releaseEmbeddedTerminalFocus(): void {
+		const focused = this.focusedEmbeddedTerminal;
+		this.focusedEmbeddedTerminal = undefined;
+		this.ui.setFocus(this.editor);
+		focused?.invalidate();
+		this.ui.requestRender();
+	}
+
+	private toggleEmbeddedTerminalFocus(): void {
+		if (this.focusedEmbeddedTerminal) {
+			this.releaseEmbeddedTerminalFocus();
+			return;
+		}
+		if (this.bashComponent instanceof EmbeddedTerminalComponent) {
+			this.focusEmbeddedTerminal(this.bashComponent);
+		}
+	}
+
 	private async handleBashCommand(command: string, excludeFromContext = false, displayCommand?: string, loginShell?: boolean): Promise<void> {
 		const extensionRunner = this.session.extensionRunner;
 		const label = displayCommand || command;
@@ -4061,7 +4141,7 @@ export class InteractiveMode {
 			const result = eventResult.result;
 
 			// Create UI component for display
-			this.bashComponent = new BashExecutionComponent(
+			const component = new BashExecutionComponent(
 				label,
 				this.ui,
 				excludeFromContext,
@@ -4069,19 +4149,20 @@ export class InteractiveMode {
 				isRtkEnabled(),
 				result.sandboxed ?? false,
 			);
-			this.bashComponent.setExpanded(this.toolOutputExpanded);
+			this.bashComponent = component;
+			component.setExpanded(this.toolOutputExpanded);
 			if (this.session.isStreaming) {
-				this.pendingMessagesContainer.addChild(this.bashComponent);
-				this.pendingBashComponents.push(this.bashComponent);
+				this.pendingMessagesContainer.addChild(component);
+				this.pendingBashComponents.push(component);
 			} else {
-				this.chatContainer.addChild(this.bashComponent);
+				this.chatContainer.addChild(component);
 			}
 
 			// Show output and complete
 			if (result.output) {
-				this.bashComponent.appendOutput(result.output);
+				component.appendOutput(result.output);
 			}
-			this.bashComponent.setComplete(
+			component.setComplete(
 				result.exitCode,
 				result.cancelled,
 				result.truncated ? ({ truncated: true, content: result.output } as TruncationResult) : undefined,
@@ -4098,7 +4179,60 @@ export class InteractiveMode {
 
 		// Normal execution path (possibly with custom operations)
 		const isDeferred = this.session.isStreaming;
-		this.bashComponent = new BashExecutionComponent(
+		const canUsePty = !eventResult?.operations && await isPtyAvailable();
+
+		if (canUsePty) {
+			const component = new EmbeddedTerminalComponent(
+				label,
+				this.ui,
+				this.settingsManager.getToolOutputMode(),
+				appKey(this.keybindings, "terminalFocus"),
+				excludeFromContext,
+			);
+			this.bashComponent = component;
+			component.setExpanded(this.toolOutputExpanded);
+
+			if (isDeferred) {
+				this.pendingMessagesContainer.addChild(component);
+				this.pendingBashComponents.push(component);
+			} else {
+				this.chatContainer.addChild(component);
+			}
+			this.ui.requestRender();
+
+			try {
+				const session = await this.session.executeBashInteractive(command, {
+					onChunk: (chunk) => {
+						component.appendOutput(chunk);
+						this.ui.requestRender();
+					},
+					cols: Math.max(40, this.ui.terminal.columns - 2),
+					rows: Math.max(10, this.ui.terminal.rows - 8),
+					loginShell,
+				});
+				component.setHandle(session.handle, () => this.releaseEmbeddedTerminalFocus());
+				if (!isDeferred) {
+					this.focusEmbeddedTerminal(component);
+				}
+
+				const result = await session.result;
+				component.setComplete(result.exitCode, result.cancelled);
+				this.session.recordBashResult(command, result, { excludeFromContext });
+			} catch (error) {
+				component.setComplete(undefined, false);
+				this.showError(`Bash command failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+			} finally {
+				if (this.focusedEmbeddedTerminal === component) {
+					this.releaseEmbeddedTerminalFocus();
+				}
+				this.session.clearBashAbortController();
+				this.bashComponent = undefined;
+				this.ui.requestRender();
+			}
+			return;
+		}
+
+		const fallbackComponent = new BashExecutionComponent(
 			label,
 			this.ui,
 			excludeFromContext,
@@ -4106,15 +4240,16 @@ export class InteractiveMode {
 			isRtkEnabled(),
 			false,
 		);
-		this.bashComponent.setExpanded(this.toolOutputExpanded);
+		this.bashComponent = fallbackComponent;
+		fallbackComponent.setExpanded(this.toolOutputExpanded);
 
 		if (isDeferred) {
 			// Show in pending area when agent is streaming
-			this.pendingMessagesContainer.addChild(this.bashComponent);
-			this.pendingBashComponents.push(this.bashComponent);
+			this.pendingMessagesContainer.addChild(fallbackComponent);
+			this.pendingBashComponents.push(fallbackComponent);
 		} else {
 			// Show in chat immediately when agent is idle
-			this.chatContainer.addChild(this.bashComponent);
+			this.chatContainer.addChild(fallbackComponent);
 		}
 		this.ui.requestRender();
 
@@ -4122,27 +4257,21 @@ export class InteractiveMode {
 			const result = await this.session.executeBash(
 				command,
 				(chunk) => {
-					if (this.bashComponent) {
-						this.bashComponent.appendOutput(chunk);
-						this.ui.requestRender();
-					}
+					fallbackComponent.appendOutput(chunk);
+					this.ui.requestRender();
 				},
 				{ excludeFromContext, operations: eventResult?.operations, loginShell },
 			);
 
-			if (this.bashComponent) {
-				this.bashComponent.setComplete(
-					result.exitCode,
-					result.cancelled,
-					result.truncated ? ({ truncated: true, content: result.output } as TruncationResult) : undefined,
-					result.fullOutputPath,
-					result.sandboxed,
-				);
-			}
+			fallbackComponent.setComplete(
+				result.exitCode,
+				result.cancelled,
+				result.truncated ? ({ truncated: true, content: result.output } as TruncationResult) : undefined,
+				result.fullOutputPath,
+				result.sandboxed,
+			);
 		} catch (error) {
-			if (this.bashComponent) {
-				this.bashComponent.setComplete(undefined, false);
-			}
+			fallbackComponent.setComplete(undefined, false);
 			this.showError(`Bash command failed: ${error instanceof Error ? error.message : "Unknown error"}`);
 		}
 

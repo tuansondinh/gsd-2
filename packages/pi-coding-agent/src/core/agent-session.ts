@@ -31,6 +31,7 @@ import { getErrorMessage } from "../utils/error.js";
 import { theme } from "../modes/interactive/theme/theme.js";
 import { stripFrontmatter } from "../utils/frontmatter.js";
 import { type BashResult, executeBash as executeBashCommand, executeBashWithOperations } from "./bash-executor.js";
+import { executeBashInPty, type PtyExecutionSession } from "./pty-executor.js";
 import {
 	type CompactionResult,
 	calculateContextTokens,
@@ -2412,6 +2413,33 @@ export class AgentSession {
 		} finally {
 			this._bashAbortController = undefined;
 		}
+	}
+
+	async executeBashInteractive(
+		command: string,
+		options?: { onChunk?: (chunk: string) => void; cols?: number; rows?: number; loginShell?: boolean },
+	): Promise<PtyExecutionSession> {
+		this._bashAbortController = new AbortController();
+
+		const prefix = this.settingsManager.getShellCommandPrefix();
+		const resolvedCommand = prefix ? `${prefix}\n${command}` : command;
+
+		try {
+			return await executeBashInPty(resolvedCommand, {
+				onChunk: options?.onChunk,
+				signal: this._bashAbortController.signal,
+				cols: options?.cols,
+				rows: options?.rows,
+				loginShell: options?.loginShell,
+			});
+		} catch (error) {
+			this._bashAbortController = undefined;
+			throw error;
+		}
+	}
+
+	clearBashAbortController(): void {
+		this._bashAbortController = undefined;
 	}
 
 	/**

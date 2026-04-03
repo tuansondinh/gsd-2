@@ -35,7 +35,8 @@ export type AppAction =
 	| "fork"
 	| "resume"
 	| "cyclePermissionMode"
-	| "showHotkeys";
+	| "showHotkeys"
+	| "terminalFocus";
 
 /**
  * All configurable actions.
@@ -74,6 +75,7 @@ const DEFAULT_APP_KEYBINDINGS: Record<AppAction, KeyId | KeyId[]> = {
 	resume: [],
 	cyclePermissionMode: "shift+tab",
 	showHotkeys: "ctrl+k",
+	terminalFocus: "ctrl+f",
 };
 
 /**
@@ -107,6 +109,7 @@ const APP_ACTIONS: AppAction[] = [
 	"resume",
 	"cyclePermissionMode",
 	"showHotkeys",
+	"terminalFocus",
 ];
 
 function isAppAction(action: string): action is AppAction {
