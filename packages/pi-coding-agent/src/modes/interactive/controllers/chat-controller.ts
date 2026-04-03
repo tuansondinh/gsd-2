@@ -316,6 +316,8 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 			break;
 
 		case "auto_retry_start":
+			host.chatContainer.clear();
+			host.rebuildChatFromMessages();
 			host.retryEscapeHandler = host.defaultEditor.onEscape;
 			host.defaultEditor.onEscape = () => host.session.abortRetry();
 			host.statusContainer.clear();

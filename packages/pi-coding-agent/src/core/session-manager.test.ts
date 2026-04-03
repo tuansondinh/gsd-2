@@ -62,4 +62,26 @@ describe("SessionManager usage totals", () => {
 			cost: 0,
 		});
 	});
+
+	it("can remove a transient assistant error at the leaf", () => {
+		dir = mkdtempSync(join(tmpdir(), "gsd-session-manager-test-"));
+		const manager = SessionManager.create(dir, dir);
+		manager.appendMessage({ role: "user", content: [{ type: "text", text: "hello" }] } as any);
+		const transientError = {
+			role: "assistant",
+			content: [],
+			stopReason: "error",
+			errorMessage: "You have hit your ChatGPT usage limit (team plan). Try again in ~118 min.",
+		} as any;
+		manager.appendMessage(transientError);
+
+		const removed = manager.removeLastAssistantMessageIf((message) => message === transientError);
+		assert.equal(removed, true);
+		assert.equal(manager.getEntries().length, 1);
+		const leaf = manager.getLeafEntry();
+		assert.equal(leaf?.type, "message");
+		if (leaf?.type === "message") {
+			assert.equal(leaf.message.role, "user");
+		}
+	});
 });

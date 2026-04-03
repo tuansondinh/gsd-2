@@ -517,7 +517,10 @@ export class AgentSession {
 			// Check for retryable errors first (overloaded, rate limit, server errors)
 			if (this._retryHandler.isRetryableError(msg)) {
 				const didRetry = await this._retryHandler.handleRetryableError(msg);
-				if (didRetry) return; // Retry was initiated, don't proceed to compaction
+				if (didRetry) {
+					this.sessionManager.removeLastAssistantMessageIf((message) => message === msg);
+					return; // Retry was initiated, don't proceed to compaction
+				}
 			}
 
 			// Check for image dimension overflow (many-image 400 error).

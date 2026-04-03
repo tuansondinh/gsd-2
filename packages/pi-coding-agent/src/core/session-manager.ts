@@ -1057,6 +1057,26 @@ export class SessionManager {
 		return entry.id;
 	}
 
+	/**
+	 * Remove the current leaf entry when it is a transient assistant error that should
+	 * not remain in session history (for example, a credential-rotation retry hop).
+	 * Returns true when an entry was removed.
+	 */
+	removeLastAssistantMessageIf(predicate: (message: Message) => boolean): boolean {
+		const leaf = this.getLeafEntry();
+		if (!leaf || leaf.type !== "message" || leaf.message.role !== "assistant") {
+			return false;
+		}
+		if (!predicate(leaf.message)) {
+			return false;
+		}
+
+		this.fileEntries = this.fileEntries.filter((entry) => entry.type === "session" || entry.id !== leaf.id);
+		this._buildIndex();
+		this._rewriteFile();
+		return true;
+	}
+
 	/** Append a thinking level change as child of current leaf, then advance leaf. Returns entry id. */
 	appendThinkingLevelChange(thinkingLevel: string): string {
 		const entry: ThinkingLevelChangeEntry = {

@@ -86,7 +86,7 @@ function isRetryableError(status: number, errorText: string): boolean {
 	// Usage/quota limit 429s should NOT be retried at the provider level —
 	// they need to bubble up to the RetryHandler for credential rotation.
 	if (status === 429) {
-		if (/usage_limit_reached|usage_not_included|usage.?limit|quota/i.test(errorText)) {
+		if (/usage_limit_reached|usage_not_included|usage.?limit|quota|rate_limit_exceeded|plan_type|resets_at/i.test(errorText)) {
 			return false;
 		}
 		return true;
