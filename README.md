@@ -323,6 +323,84 @@ LSD supports:
 - combined search-and-read workflows
 - Context7 library docs lookup
 
+## Telegram integration
+
+LSD can relay permission prompts and questions to a Telegram chat while it runs autonomously. This lets you approve tool calls or answer agent questions from your phone without being in front of the terminal.
+
+### How it works
+
+When LSD needs input (e.g. in auto mode), it sends a message to your Telegram chat. You reply directly in Telegram and LSD continues.
+
+### Step 1 — create a Telegram bot
+
+1. Open Telegram and search for **@BotFather**
+2. Send `/newbot` and follow the prompts to name your bot
+3. BotFather gives you a **bot token** that looks like `123456789:ABCdefGHI...`
+
+### Step 2 — get your chat ID
+
+You need the numeric ID of the chat (personal or group) where LSD will send messages.
+
+**Easiest way:** forward any message to **@userinfobot** — it replies with the chat ID.
+
+**Alternative:** open `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates` in a browser after sending your bot any message — look for `"chat":{"id":...}` in the JSON.
+
+Group chat IDs are negative numbers starting with `-100` (e.g. `-1001234567890`).
+
+### Step 3 — connect inside LSD
+
+Run the setup wizard at any time:
+
+```bash
+/lsd remote telegram
+```
+
+LSD prompts you for:
+1. **Bot token** — paste the token from BotFather
+2. **Chat ID** — paste the numeric chat ID from Step 2
+
+LSD validates the token, sends a test message to confirm the connection, then saves the config.
+
+**Alternative — run during initial setup:**
+
+```bash
+lsd config
+```
+
+The setup wizard includes the Telegram step.
+
+### Step 4 — verify the connection
+
+```bash
+/lsd remote status
+```
+
+This prints the active channel, timeout, and poll interval. You should also see `LSD remote questions connected.` in your Telegram chat from the setup step.
+
+### Disconnect
+
+```bash
+/lsd remote disconnect
+```
+
+This removes the saved token and config.
+
+### Configuration reference
+
+The remote questions config is stored in `~/.lsd/PREFERENCES.md` frontmatter:
+
+```yaml
+remote_questions:
+  channel: telegram
+  channel_id: "-1001234567890"
+  timeout_minutes: 5        # how long LSD waits for a reply (1–30)
+  poll_interval_seconds: 5  # how often LSD polls for replies (2–30)
+```
+
+Edit this file directly for advanced tuning.
+
+---
+
 ## MCP integrations
 
 LSD can discover and connect to MCP servers configured in the project:
