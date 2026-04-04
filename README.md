@@ -1,17 +1,8 @@
 # LSD
 
-**Looks Sort of Done** — a standalone coding-agent CLI built on the Pi SDK. Use all your AI providers and all your loved features from other Claude Code, Codex and Gemini in one place. 
+**Looks Sort of Done** — a standalone coding-agent CLI built on the Pi SDK. Use all your AI providers and all your loved features from Claude Code, Codex, and Gemini in one place.
 
 ![LSD Screenshot](./lsd.png)
-
-It is a **fork of GSD 2**, but positioned differently:
-
-- the heavy **GSD workflow/orchestration layer** was stripped away
-- built on top features from your beloved Ai Cli tools: Interactive terminal UI like Gemini, Memory system and permission modes like Claude Code, Sandbox system like Codex
-- special permission mode: Auto Mode (inspired by claude). Uses a classifier model to classify certain tool calls.
-- connect your session with telegram and code from there
-- and many more like: background subagents, skills, global and project lsd.md for instructions, usage tracking
-- using token saving tools like LSP and RTK
 
 ```bash
 npm install -g lsd-pi@latest
@@ -21,7 +12,14 @@ npm install -g lsd-pi@latest
 
 ## What LSD is
 
-LSD is the product and CLI.
+LSD is a general-purpose coding agent CLI. It combines:
+
+- **Interactive TUI** inspired by Gemini CLI
+- **Memory system and permission modes** inspired by Claude Code
+- **Sandbox isolation** inspired by Codex
+- **Auto mode** — a classifier-based autonomous execution mode
+- **Remote questions** — relay agent prompts to Telegram, Discord, or Slack so you can respond from your phone
+- **Background subagents, skills, worktrees, sessions, usage tracking, and more**
 
 - **Package:** `lsd-pi`
 - **Binary:** `lsd`
@@ -29,53 +27,9 @@ LSD is the product and CLI.
 - **Project config dir:** `.lsd/`
 - **User config dir:** `~/.lsd/`
 
-It is built on the Pi SDK and ships with a rich tool/runtime layer for:
-
-- code editing and file operations
-- shell execution (`bash`, `async_bash`, `bg_shell`)
-- browser automation and verification
-- web search and page extraction
-- MCP integrations
-- sessions and resumability
-- worktree-based parallel work
-- interactive and headless execution
-- configurable permission modes
-
 ### Fork lineage
 
-LSD is a fork of **GSD 2**.
-
-What changed:
-
-- the old GSD-specific project workflow layer is no longer the identity of the tool
-- LSD is centered on being a **general-purpose coding agent CLI**
-- the agent shell, tools, TUI, browser tools, sessions, worktrees, and integrations remain the core
-- auto execution still exists, but it is treated as **one operating mode among several**
-
-### Permission modes
-
-LSD supports different permission modes for how aggressively it can act in your environment.
-
-A key point of the LSD model is:
-
-- **auto** is a special permission mode / execution style
-- it is not the whole product
-- you can use LSD interactively, cautiously, or autonomously depending on the task
-
-## Important note on naming
-
-LSD has evolved from earlier GSD-branded work and is a fork of GSD 2. Some internal commands, docs, or compatibility surfaces may still use names like `/gsd`.
-
-**For users, the tool is LSD.**
-
-That means:
-
-- install with `npm install -g lsd-pi`
-- launch with `lsd`
-- use `.lsd/` for project state
-- use `~/.lsd/` for global LSD state
-
-Inside the interactive session, some slash commands still use the legacy `/gsd ...` namespace for compatibility, but the LSD direction is broader than the old workflow-centric GSD model.
+LSD is a fork of **GSD 2**. The GSD-specific project workflow layer was stripped out. LSD is centered on being a general-purpose coding agent CLI — the agent shell, tools, TUI, browser tools, sessions, worktrees, and integrations remain core.
 
 ---
 
@@ -83,11 +37,9 @@ Inside the interactive session, some slash commands still use the legacy `/gsd .
 
 ### Requirements
 
-- Node.js **>= 22**
+- Node.js **>= 22** (Node 24 LTS recommended)
 - Git
 - macOS, Linux, or Windows
-
-Node 24 LTS is recommended.
 
 ### Global install
 
@@ -105,277 +57,278 @@ Then ensure `$(npm prefix -g)/bin` is on your `PATH`.
 
 ### Local development build
 
-From this repo:
-
 ```bash
 npm install
 npm run build
 npm link
 ```
 
-That makes the local build available as `lsd` on your machine.
-
 ---
 
 ## Quick start
 
-### Start an interactive session
-
 ```bash
-lsd
-```
-
-### Resume the last session for the current directory
-
-```bash
-lsd --continue
-# or
-lsd -c
-```
-
-### One-shot prompt mode
-
-```bash
-lsd --print "summarize this repository"
-```
-
-
-```bash
-```
-
-### Start in a git worktree
-
-```bash
-lsd -w
-lsd -w my-feature
+lsd                          # start interactive session
+lsd -c                       # resume last session
+lsd --print "summarize repo" # one-shot mode
+lsd -w                       # start in an isolated git worktree
+lsd config                   # re-run setup wizard
 ```
 
 ---
 
 ## First launch
 
-On first run, LSD opens a setup flow for:
+On first run, LSD opens an interactive setup wizard for:
 
-- LLM provider login or API key setup
-- optional web search provider setup
-- optional tool/API credentials
-- optional remote-question integrations
+- LLM provider login or API key (Anthropic, OpenAI, Google, GitHub Copilot, and others)
+- Web search provider (Brave, Tavily, built-in)
+- Remote questions channel (Telegram, Discord, Slack)
+- Tool API keys (Context7, Jina, Groq for voice)
 
-LSD supports multiple providers including Anthropic, OpenAI, Google, GitHub Copilot, and others depending on configuration and installed extensions.
-
-Re-run setup any time with:
+Re-run setup any time:
 
 ```bash
 lsd config
 ```
+
+---
+
+## Permission modes
+
+LSD supports different permission modes controlling how aggressively it acts in your environment:
+
+| Mode | Behaviour |
+|------|-----------|
+| **interactive** (default) | Asks for approval before write/edit/shell operations |
+| **auto** | Uses a classifier model to approve low-risk tool calls automatically; still asks for high-risk ones |
+| **bypass** | Runs without asking (used internally by headless/subagent workers) |
+
+Switch modes with `/gsd auto` inside a session or pass flags to headless commands.
+
+---
+
+## Sandbox
+
+LSD supports filesystem sandboxing:
+
+```bash
+lsd --sandbox workspace-write   # restrict writes to the current directory tree
+lsd --sandbox none               # no sandbox (default)
+lsd --no-sandbox                 # explicit no-sandbox
+```
+
+`workspace-write` prevents the agent from writing outside the project directory.
+
+---
+
+## Context files (lsd.md / CLAUDE.md / AGENTS.md)
+
+LSD automatically loads project instructions from these files (in order of preference):
+
+- `lsd.md` — LSD-native project instructions
+- `CLAUDE.md` — Claude Code-compatible instructions
+- `AGENTS.md` — Codex-compatible instructions
+
+Place one of these files at the project root (or in `.lsd/`) to give the agent persistent per-project context, coding conventions, and rules.
+
+The `--bare` flag suppresses all of these (useful for CI):
+
+```bash
+lsd headless --bare auto
+```
+
+---
+
+## Interactive TUI
+
+The default `lsd` experience is a full terminal UI with:
+
+- scrollable message history and tool execution rendering
+- slash commands
+- model switching (`/model`)
+- session management
+- background process management
+- settings panel (`/settings`)
+
+### TUI slash commands
+
+| Command | Description |
+|---------|-------------|
+| `/model` | Switch model |
+| `/login` | Add or switch provider credentials |
+| `/settings` | Open settings panel |
+| `/hotkeys` | Show keyboard shortcut reference |
+| `/cache-timer` | Toggle the prompt-cache countdown in the footer |
+| `/thinking` | Toggle extended thinking |
+| `/voice` | Toggle voice input mode |
+| `/clear` | Clear the current conversation |
+| `/exit` | Exit LSD |
+
+### Memory commands
+
+| Command | Description |
+|---------|-------------|
+| `/memories` | Browse saved memories for this project |
+| `/remember <text>` | Save a memory immediately |
+| `/forget <topic>` | Remove a memory |
+| `/dream` | Run a memory consolidation pass manually |
+
+### Remote questions commands
+
+| Command | Description |
+|---------|-------------|
+| `/lsd remote` | Show remote questions menu |
+| `/lsd remote telegram` | Connect Telegram |
+| `/lsd remote discord` | Connect Discord |
+| `/lsd remote slack` | Connect Slack |
+| `/lsd remote status` | Show current connection status |
+| `/lsd remote disconnect` | Disconnect and remove saved token |
+
+### Background process commands
+
+| Command | Description |
+|---------|-------------|
+| `/bg <cmd>` | Start a background shell process |
+| `/jobs` | List running async jobs |
+
+### Codex account commands
+
+| Command | Description |
+|---------|-------------|
+| `/codex add` | Add a ChatGPT/Codex OAuth account |
+| `/codex list` | List configured accounts |
+| `/codex status` | Show rotation state and token expiry |
+| `/codex remove <n>` | Remove an account |
+| `/codex enable <n>` | Re-enable a disabled account |
+| `/codex disable <n>` | Temporarily disable an account |
+| `/codex import` | Import from `~/.codex/auth.json` |
+| `/codex import-cockpit` | Import from Cockpit Tools |
+| `/codex sync` | Force refresh all tokens |
+
+### Other commands
+
+| Command | Description |
+|---------|-------------|
+| `/usage [today\|7d\|YYYY-MM-DD]` | Show token and cost usage |
+| `/subagents` | List background subagent jobs |
+| `/subagent` | Manage a specific subagent |
+| `/configs` | Discover config files from other AI tools (Claude Code, Cursor, Copilot, etc.) |
+| `/plan` | Create and run a multi-step plan |
+| `/audit` | Run a codebase audit |
+| `/search-provider` | Switch web search provider |
+
+### Legacy `/gsd` commands (still usable)
+
+```
+/gsd auto        — start auto mode
+/gsd status      — show auto-mode queue status
+/gsd config      — open config
+/gsd doctor      — run diagnostics
+/gsd update      — update LSD
+/gsd queue       — manage the auto-mode queue
+/gsd remote ...  — alias for /lsd remote
+```
+
+### TUI settings
+
+The settings panel (`/settings`) includes toggles for:
+
+- **Codex rotate** — enable multi-account OAuth rotation
+- **Cache timer** — show a prompt-cache countdown in the footer
+- **Pin last prompt** — keep your most recent non-command prompt visible above the editor
+- **RTK shell compression** — compress repetitive shell output to save tokens
+- **Main accent** — change the accent color across the UI and thinking-level indicators
 
 ---
 
 ## Persistent memory
 
-LSD includes a bundled **persistent memory** extension.
+LSD includes a built-in **persistent memory** extension.
 
-What it does:
+- Stores durable facts under `~/.lsd/projects/<project>/memory/`
+- Injects `MEMORY.md` into future sessions for the same project
+- Runs an **auto-extract** pass on session shutdown (detached worker, uses `budgetSubagentModel` if configured)
 
-- stores durable user/project memories under `~/.lsd/projects/<project>/memory/`
-- injects `MEMORY.md` into future turns for the same project
-- supports explicit memory commands:
-	- `/memories`
-	- `/remember <text>`
-	- `/forget <topic>`
-- runs an **auto-extract** pass on session shutdown to save durable facts from the transcript
+Debug files written to the project memory directory:
 
-Auto-extract notes:
-
-- it runs in a detached `lsd headless --bare ...` worker after you exit a session
-- if `budgetSubagentModel` is configured in settings, auto-extract uses that model
-- otherwise it falls back to the normal default model resolution
-- it may decide that a transcript contains **nothing worth saving**
-
-For debugging auto-extract, LSD writes two files in the project memory directory:
-
-- `.last-auto-extract.txt` — latest status/result summary
+- `.last-auto-extract.txt` — latest status (`saved_memory`, `nothing_worth_saving`, etc.)
 - `.last-auto-extract.log` — extractor stdout/stderr
 
-Typical results in `.last-auto-extract.txt` include:
+---
 
-- `status: finished`
-- `result: saved_memory`
-- `result: nothing_worth_saving`
-- `completionReason: child_exit` or `completionReason: session_end_detected`
+## Codex multi-account rotation
+
+LSD bundles a Codex OAuth rotation extension for managing multiple ChatGPT/Codex accounts.
+
+- Round-robin credential selection across accounts
+- Background token refresh every 10 minutes
+- Automatic quota/rate-limit detection and per-account backoff
+- Import from `~/.codex/auth.json` or Cockpit Tools
+
+See `/codex` commands above. Stored in `~/.lsd/agent/codex-accounts.json`.
 
 ---
 
-## Core ways to use LSD
+## Voice input
 
-## 1. Interactive TUI
+LSD supports voice input via microphone:
 
-The default `lsd` experience is an interactive terminal UI with:
+- **macOS** — uses a compiled Swift speech recognizer (built automatically on first use via `swiftc`)
+- **Linux** — uses a Python speech recognizer (requires `GROQ_API_KEY` and `python3` with `sounddevice`)
 
-- message history
-- tool execution rendering
-- slash commands
-- model switching
-- sessions
-- background process management
-- settings
-
-Useful built-in commands include:
-
-- `/model`
-- `/login`
-- `/settings`
-- `/hotkeys`
-- `/cache-timer`
-- `/clear`
-- `/exit`
-- `/thinking`
-- `/voice`
-
-A few quality-of-life touches in the TUI:
-
-- the footer can show a live cache timer for the current prompt-cache window
-- `/hotkeys` gives you a full shortcut reference on demand
-- `/settings` now includes toggles for Codex rotate, the cache timer, **Pin last prompt**, RTK shell-command compression, and a configurable **Main accent** preset
-- changing the main accent also updates accent-driven UI elements and the text input border across thinking levels
-- when **Pin last prompt** is enabled, LSD keeps your most recent non-command prompt visible above the editor as a lightweight reminder
-
-Some workflow/automation commands still use the legacy namespace:
-
-- `/gsd`
-- `/gsd auto`
-- `/gsd status`
-- `/gsd config`
-- `/gsd doctor`
-- `/gsd update`
-
-## 2. Headless mode
-
-Run LSD without the TUI for CI, scripts, or automation:
-
-```bash
-lsd headless
-lsd headless next
-lsd headless status
-```
-
-Examples:
-
-```bash
-lsd headless --timeout 60000 auto
-lsd headless --output-format json auto
-lsd headless --json status
-```
-
-## 3. Web UI
-
-Run LSD with a browser interface:
-
-```bash
-```
-
-This is useful for local dashboards, session monitoring, and browser-based interaction.
-
-## 4. Worktree workflow
-
-LSD supports isolated git worktrees for parallel streams of work:
-
-```bash
-lsd -w my-feature
-lsd worktree list
-lsd worktree merge my-feature
-lsd worktree clean
-```
+Toggle with `/voice` or the keyboard shortcut `Ctrl+Alt+V`.
 
 ---
 
-## Features
+## Usage tracking
 
-## Coding + shell tools
+Track token consumption and cost across sessions:
 
-LSD includes file and shell tools such as:
+```bash
+/usage              # today, grouped by model
+/usage 7d           # last 7 days
+/usage 2024-03-01   # specific date
+/usage today --by project-model   # by project + model
+/usage --all-projects             # across all projects
+/usage --json                     # machine-readable output
+```
 
-- `read`, `write`, `edit`
-- `bash`
-- `async_bash`
-- `bg_shell`
-- LSP-backed navigation and diagnostics (hover, definition, references, rename, code actions, formatting)
-- Language server auto-detection — run `/setup` to install missing servers for your project (TypeScript, Python, Go, Rust, and more)
-
-## Browser automation
-
-Browser tools support:
-
-- local app verification
-- screenshots
-- assertions
-- form filling
-- DOM inspection
-- interaction recording and debug bundles
-
-## Web research
-
-LSD supports:
-
-- Google-backed search (`google_search`)
-- Brave/Tavily-style web search flows
-- page extraction
-- combined search-and-read workflows
-- Context7 library docs lookup
+---
 
 ## Telegram integration
 
-LSD can relay permission prompts and questions to a Telegram chat while it runs autonomously. This lets you approve tool calls or answer agent questions from your phone without being in front of the terminal.
-
-### How it works
-
-When LSD needs input (e.g. in auto mode), it sends a message to your Telegram chat. You reply directly in Telegram and LSD continues.
+LSD can relay permission prompts and questions to a Telegram chat while running autonomously. Reply from your phone and LSD continues.
 
 ### Step 1 — create a Telegram bot
 
 1. Open Telegram and search for **@BotFather**
-2. Send `/newbot` and follow the prompts to name your bot
-3. BotFather gives you a **bot token** that looks like `123456789:ABCdefGHI...`
+2. Send `/newbot` and follow the prompts
+3. Copy the **bot token** (looks like `123456789:ABCdefGHI...`)
 
 ### Step 2 — get your chat ID
 
-You need the numeric ID of the chat (personal or group) where LSD will send messages.
+**Easiest:** forward any message to **@userinfobot** — it replies with your chat ID.
 
-**Easiest way:** forward any message to **@userinfobot** — it replies with the chat ID.
-
-**Alternative:** open `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates` in a browser after sending your bot any message — look for `"chat":{"id":...}` in the JSON.
+**Alternative:** open `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates` after sending your bot a message — look for `"chat":{"id":...}` in the response.
 
 Group chat IDs are negative numbers starting with `-100` (e.g. `-1001234567890`).
 
-### Step 3 — connect inside LSD
-
-Run the setup wizard at any time:
+### Step 3 — connect
 
 ```bash
 /lsd remote telegram
 ```
 
-LSD prompts you for:
-1. **Bot token** — paste the token from BotFather
-2. **Chat ID** — paste the numeric chat ID from Step 2
+LSD prompts for your bot token and chat ID, validates both, and sends a test message.
 
-LSD validates the token, sends a test message to confirm the connection, then saves the config.
+You can also connect during initial setup with `lsd config`.
 
-**Alternative — run during initial setup:**
-
-```bash
-lsd config
-```
-
-The setup wizard includes the Telegram step.
-
-### Step 4 — verify the connection
+### Step 4 — verify
 
 ```bash
 /lsd remote status
 ```
-
-This prints the active channel, timeout, and poll interval. You should also see `LSD remote questions connected.` in your Telegram chat from the setup step.
 
 ### Disconnect
 
@@ -383,154 +336,241 @@ This prints the active channel, timeout, and poll interval. You should also see 
 /lsd remote disconnect
 ```
 
-This removes the saved token and config.
-
-### Configuration reference
-
-The remote questions config is stored in `~/.lsd/PREFERENCES.md` frontmatter:
+### PREFERENCES.md reference
 
 ```yaml
 remote_questions:
   channel: telegram
   channel_id: "-1001234567890"
-  timeout_minutes: 5        # how long LSD waits for a reply (1–30)
-  poll_interval_seconds: 5  # how often LSD polls for replies (2–30)
+  timeout_minutes: 5        # 1–30, how long LSD waits for a reply
+  poll_interval_seconds: 5  # 2–30, how often LSD polls
 ```
 
-Edit this file directly for advanced tuning.
+Stored in `~/.lsd/PREFERENCES.md`. Project-level overrides go in `.lsd/PREFERENCES.md`.
+
+---
+
+## Discord & Slack integration
+
+Same flow as Telegram — run `/lsd remote discord` or `/lsd remote slack`. Both support:
+
+- bot token validation
+- channel auto-discovery (Discord lists your servers and channels; Slack lists channels)
+- manual channel ID entry as fallback
+- test message on connect
 
 ---
 
 ## MCP integrations
 
-LSD can discover and connect to MCP servers configured in the project:
+LSD discovers and connects to MCP servers configured in:
 
 - `.mcp.json`
 - `.lsd/mcp.json`
+
+Use `/configs` inside a session to scan for MCP servers from other AI tools (Claude Code, Cursor, Copilot, etc.) and import them.
+
+---
 
 ## Sessions
 
 LSD stores per-project sessions and can resume prior work.
 
-Browse sessions with:
-
 ```bash
-lsd sessions
+lsd sessions     # browse and pick a session to resume
+lsd -c           # resume the most recent session automatically
 ```
-
-## Extensions, themes, and skills
-
-LSD supports:
-
-- extensions
-- themes
-- skills
-- prompt templates
-- package-like installs from supported sources
 
 ---
 
-## Configuration paths
+## Worktrees
 
-### User-level
+LSD supports isolated git worktrees for parallel streams of work:
 
-LSD stores global state under:
-
-```text
-~/.lsd/
+```bash
+lsd -w                        # auto-named worktree
+lsd -w my-feature             # named worktree
+lsd worktree list             # list with status
+lsd worktree merge my-feature # squash-merge into main
+lsd worktree clean            # remove merged/empty worktrees
+lsd worktree remove NAME      # remove specific worktree
 ```
 
-Typical contents include:
+Lifecycle:
+1. `lsd -w` — creates worktree, starts session inside it
+2. Work normally — all changes stay on the worktree branch
+3. Exit — dirty work is auto-committed
+4. `lsd -w` — resume where you left off
+5. `lsd worktree merge` — squash-merge into main when done
+
+---
+
+## Headless mode
+
+Run LSD without the TUI for CI, scripts, or automation:
+
+```bash
+lsd headless                                    # run auto mode
+lsd headless next                               # run one unit
+lsd headless status                             # show queue status
+lsd headless --json auto                        # JSONL event stream
+lsd headless --output-format json auto          # structured JSON result
+lsd headless --timeout 60000 auto              # with 1-minute timeout
+lsd headless --bare auto                        # skip lsd.md/CLAUDE.md/settings
+lsd headless --resume abc123 auto              # resume a prior session
+lsd headless --supervised auto                 # orchestrator mode
+lsd headless --answers answers.json auto       # pre-supply answers/secrets
+lsd headless new-milestone --context spec.md   # create milestone from file
+lsd headless new-milestone --context spec.md --auto  # create + execute
+```
+
+Exit codes: `0` success, `1` error/timeout, `10` blocked, `11` cancelled.
+
+---
+
+## Browser automation
+
+LSD includes full browser automation via Playwright:
+
+- local app verification and screenshots
+- form filling and interaction
+- DOM inspection and accessibility tree
+- assertions and debug bundles
+- network request inspection
+- device emulation
+
+---
+
+## Web research
+
+- Google-backed search (`google_search`)
+- Brave / Tavily web search
+- Page extraction via Jina
+- Context7 library docs lookup (`/context7`)
+
+---
+
+## Extensions, themes, and skills
+
+LSD supports a package-like extension system:
+
+```bash
+lsd install <source>   # install extension/theme/skill
+lsd remove <source>    # remove
+lsd list               # list installed packages
+```
+
+Sources: `npm:@scope/pkg`, `git:github.com/user/repo`, `https://...`, local paths.
+
+Bundled extensions include: memory, remote-questions, browser-tools, subagent, codex-rotate, usage, voice, bg-shell, async-jobs, context7, universal-config, search-the-web, cache-timer, mac-tools, aws-auth.
+
+---
+
+## Configuration reference
+
+### PREFERENCES.md
+
+Stored in `~/.lsd/PREFERENCES.md` (global) or `.lsd/PREFERENCES.md` (project). YAML frontmatter:
+
+```yaml
+---
+search_provider: tavily         # tavily | brave | ollama | native | auto
+remote_questions:
+  channel: telegram             # telegram | discord | slack
+  channel_id: "-1001234567890"
+  timeout_minutes: 5
+  poll_interval_seconds: 5
+experimental:
+  rtk: true                     # RTK shell-command compression
+  codex_rotate: true            # Codex multi-account rotation
+subagent:
+  budget_model: claude-haiku-4  # model used for memory/subagent background work
+cmux:
+  enabled: false
+  notifications: false
+---
+```
+
+### settings.json
+
+Located at `~/.lsd/agent/settings.json`. Editable via `/settings` in the TUI. Includes model preferences, UI toggles (cache timer, pin last prompt, accent color), and `budgetSubagentModel`.
+
+### auth.json
+
+Located at `~/.lsd/agent/auth.json`. Stores provider API keys and OAuth tokens. Modified by `/login` and `/codex add`.
+
+### Configuration paths
 
 ```text
 ~/.lsd/
   agent/
-    auth.json
-    settings.json
-    extensions/
-    agents/
-  sessions/
+    auth.json         API keys + OAuth tokens
+    settings.json     UI + model preferences
+    extensions/       Installed extensions
+    agents/           Custom agent definitions
+  sessions/           Saved sessions (all projects)
+  projects/
+    <project>/
+      memory/         Persistent memory files
+  PREFERENCES.md      Global preferences
 ```
-
-### Project-level
-
-Per-project state lives in:
 
 ```text
-.lsd/
-```
-
-Depending on your workflow, this may contain plan files, state files, generated artifacts, and project-local config.
-
----
-
-## Common commands
-
-### Main CLI
-
-```bash
-lsd                      # start interactive session
-lsd -c                   # resume last session
-lsd --print "..."        # one-shot mode
-lsd --list-models        # list available models
-lsd --mode mcp           # run as MCP server
-```
-
-### Setup + maintenance
-
-```bash
-lsd config               # re-run setup wizard
-lsd update               # update LSD
-lsd sessions             # browse saved sessions
-```
-
-### Worktrees
-
-```bash
-lsd -w                   # create/resume worktree session
-lsd worktree list
-lsd worktree merge NAME
-lsd worktree clean
-lsd worktree remove NAME
-```
-
-### Headless
-
-```bash
-lsd headless
-lsd headless next
-lsd headless status
-lsd headless --json auto
+.lsd/               Per-project state
+  PREFERENCES.md    Project-level preference overrides
+  mcp.json          Project MCP servers
 ```
 
 ---
 
-## Slash-command compatibility
+## Full CLI reference
 
-Inside the session, you may still see legacy commands such as:
+```bash
+lsd                          # interactive session
+lsd -c                       # resume last session
+lsd --continue               # resume last session (long form)
+lsd --print "..."            # one-shot mode
+lsd -w [name]                # worktree session
+lsd --model <id>             # override model
+lsd --sandbox <mode>         # sandbox mode: none | workspace-write | auto
+lsd --no-sandbox             # disable sandbox
+lsd --no-session             # disable session persistence
+lsd --extension <path>       # load extra extension
+lsd --tools a,b,c            # restrict available tools
+lsd --list-models [search]   # list available models
+lsd --version                # print version
+lsd --help                   # print help
+lsd --mode <text|json|rpc|mcp>  # output mode
 
-- `/gsd auto`
-- `/gsd status`
-- `/gsd config`
-- `/gsd doctor`
-- `/gsd queue`
+lsd config                   # re-run setup wizard
+lsd update                   # update to latest version
+lsd sessions                 # browse saved sessions
+lsd install <source>         # install package/extension
+lsd remove <source>          # remove installed package
+lsd list                     # list installed packages
+lsd worktree list            # list worktrees
+lsd worktree merge [name]    # merge worktree into main
+lsd worktree clean           # remove merged/empty worktrees
+lsd worktree remove <name>   # remove specific worktree
+lsd headless [cmd] [flags]   # headless mode (see above)
+```
 
-These remain usable, but the product branding is LSD.
+---
 
-If you are rewriting docs or onboarding material, prefer:
+## Naming note
 
-- **LSD** for the product name
-- **`lsd`** for the command
-- **`.lsd/`** for project state
-- **`~/.lsd/`** for global state
+LSD evolved from GSD 2. Some internal commands and compatibility surfaces still use `/gsd` — these remain usable. For new work, prefer:
+
+- `lsd` — binary
+- `.lsd/` — project state
+- `~/.lsd/` — global state
+- `/lsd remote` — remote questions
 
 ---
 
 ## Documentation
 
-See the local docs in [`docs/`](./docs/) for deeper details.
-
-Recommended starting points:
+See [`docs/`](./docs/) for deeper details:
 
 - [Getting Started](./docs/getting-started.md)
 - [Commands Reference](./docs/commands.md)
@@ -541,34 +581,15 @@ Recommended starting points:
 - [Skills](./docs/skills.md)
 - [Custom Models](./docs/custom-models.md)
 
-> Note: parts of the docs may still contain older GSD wording. The README reflects the intended LSD-facing product language.
-
 ---
 
 ## Development
 
-Build the repo:
-
 ```bash
-npm run build
-```
-
-Link the local CLI globally:
-
-```bash
-npm link
-```
-
-Run the dev CLI:
-
-```bash
-npm run gsd
-```
-
-Run tests:
-
-```bash
-npm test
+npm run build    # build
+npm link         # link local CLI globally
+npm run gsd      # run dev CLI
+npm test         # run tests
 ```
 
 ---
