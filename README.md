@@ -1,5 +1,3 @@
-<div align="center">
-
 # LSD
 
 ![LSD Screenshot](./lsd.png)
@@ -14,11 +12,10 @@ It is a **fork of GSD 2**, but positioned differently:
 - connect your session with telegram and code from there
 - and many more like: background subagents, skills, global and project lsd.md for instructions, usage tracking
 - using token saving tools like LSP and RTK
+
 ```bash
 npm install -g lsd-pi@latest
 ```
-
-</div>
 
 ---
 
