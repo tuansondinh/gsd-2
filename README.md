@@ -2,21 +2,18 @@
 
 # LSD
 
-**Lucent Software Developer** — a standalone coding-agent CLI built on the Pi SDK.
+![LSD Screenshot](./lsd.png)
 
-[![npm version](https://img.shields.io/npm/v/lsd-pi?style=for-the-badge&logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/lsd-pi)
-[![npm downloads](https://img.shields.io/npm/dm/lsd-pi?style=for-the-badge&logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/lsd-pi)
-[![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
-
-LSD is a local-first agent shell for software work: coding, shell execution, browser automation, web research, MCP integrations, worktrees, sessions, and autonomous task execution.
+**Looks Sort of Done** — a standalone coding-agent CLI built on the Pi SDK. Use all your providers and all your loved features from other Claude Code, Codex and Gemini in one place. 
 
 It is a **fork of GSD 2**, but positioned differently:
 
 - the heavy **GSD workflow/orchestration layer** was stripped away
-- LSD focuses on the **agent shell, tools, sessions, worktrees, and execution surface**
-- LSD keeps useful compatibility where practical, but it is **not presented as GSD**
-- LSD adds and emphasizes **permission modes**, where **auto mode** is treated as a special permission/execution style rather than the center of the whole product
-
+- built on top features from your beloved Ai Cli tools: Interactive terminal UI like Gemini, Memory system and permission modes like Claude Code, Sandbox system like Codex
+- special permission mode: Auto Mode (inspired by claude). Uses a classifier model to classify certain tool calls.
+- connect your session with telegram and code from there
+- and many more like: background subagents, skills, global and project lsd.md for instructions, usage tracking
+- using token saving tools like LSP and RTK
 ```bash
 npm install -g lsd-pi@latest
 ```
