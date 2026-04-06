@@ -288,6 +288,7 @@ function buildPlanModeSystemPrompt(): string {
   const details: string[] = [
     "You are currently in plan mode.",
     "Investigate, clarify scope, and produce a persisted execution plan before making source changes.",
+    "If requirements are ambiguous or constraints are missing, ask concise clarifying questions before drafting or saving a plan.",
     "Do not modify source files or run side-effect commands while plan mode is active.",
     "Persist plan artifacts under .lsd/plan/.",
   ];
@@ -326,9 +327,8 @@ function buildApprovalDialogInstructions(): string {
 function buildApprovalSteeringMessage(planPath: string): string {
   const details = [
     `Plan artifact saved at ${planPath}.`,
-    "The plan preview has already been shown to the user.",
-    "Do not repeat the plan contents in a normal assistant response.",
-    "Proceed directly to the approval questions.",
+    "Do not restate the plan in a normal assistant response.",
+    "Ask for approval now via ask_user_questions.",
     buildApprovalDialogInstructions(),
   ];
 

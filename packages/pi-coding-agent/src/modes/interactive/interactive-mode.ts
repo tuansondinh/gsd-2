@@ -268,7 +268,6 @@ export class InteractiveMode {
 	private pendingBashComponents: InteractiveBashComponent[] = [];
 	private focusedEmbeddedTerminal?: EmbeddedTerminalComponent;
 	private lastEmbeddedTerminalSize?: { cols: number; rows: number };
-	private readonly planBadgeBgToken = (["selectedBg", "userMessageBg", "customMessageBg", "toolPendingBg", "toolSuccessBg", "toolErrorBg"] as const)[crypto.randomInt(6)];
 
 	// Auto-compaction state
 	private autoCompactionLoader: Loader | undefined = undefined;
@@ -2260,11 +2259,13 @@ export class InteractiveMode {
 
 	private getPlanModeEditorBadge(): string {
 		const planState = this.getLatestPlanModeState();
-		if (!planState?.active || !planState.latestPlanPath) return "";
+		if (!planState?.active) return "";
 
-		const planName = path.basename(planState.latestPlanPath).replace(/\.md$/i, "");
+		const planName = planState.latestPlanPath
+			? path.basename(planState.latestPlanPath).replace(/\.md$/i, "")
+			: "draft";
 		const badgeText = ` plan ${planName} · /plan to show plan `;
-		return theme.bg(this.planBadgeBgToken, theme.fg("text", theme.bold(badgeText)));
+		return theme.fg("accent", theme.bold(badgeText));
 	}
 
 	/** Extract text content from a user message */

@@ -6,6 +6,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.8] - 2026-04-06
+
+### Changed
+- **plan-mode**: refine approval steering to avoid internal control phrasing in normal assistant responses while preserving the exact two-question approval flow
+- **plan-mode**: strengthen system instructions to ask concise clarifying questions before drafting/saving a plan when requirements are ambiguous
+- **interactive**: make the plan badge more reliable by showing it whenever plan mode is active (including pre-save draft state) and using stable accent styling for visibility
+- **tests**: update plan mode state-machine assertions to reflect the revised approval steering text
+
 ## [1.1.7] - 2026-04-05
 
 ### Added
@@ -2217,7 +2225,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 - License updated to MIT
 
-[Unreleased]: https://github.com/gsd-build/gsd-2/compare/v2.58.0...HEAD
+[Unreleased]: https://github.com/gsd-build/gsd-2/compare/v1.1.8...HEAD
+[1.1.8]: https://github.com/gsd-build/gsd-2/compare/v2.58.0...v1.1.8
 [2.58.0]: https://github.com/gsd-build/gsd-2/compare/v2.57.0...v2.58.0
 [2.57.0]: https://github.com/gsd-build/gsd-2/compare/v2.56.0...v2.57.0
 [2.56.0]: https://github.com/gsd-build/gsd-2/compare/v2.55.0...v2.56.0

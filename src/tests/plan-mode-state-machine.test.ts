@@ -162,8 +162,8 @@ test('plan mode presents the saved plan and approval options before approval', a
   assert.match(pi.customMessages[0]?.content ?? '', /run \/execute to approve/i)
 
   const lastMessage = pi.sentMessages.at(-1) ?? ''
-  assert.match(lastMessage, /plan preview has already been shown to the user/i)
-  assert.match(lastMessage, /do not repeat the plan contents/i)
+  assert.match(lastMessage, /do not restate the plan in a normal assistant response/i)
+  assert.match(lastMessage, /ask for approval now via ask_user_questions/i)
   assert.match(lastMessage, /Approve plan \(Recommended\)/)
   assert.match(lastMessage, /Let other agent review/)
   assert.match(lastMessage, /Revise plan/)
