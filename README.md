@@ -141,16 +141,7 @@ lsd headless --bare auto
 ---
 
 ## Interactive TUI
-
-The default `lsd` experience is a full terminal UI with:
-
-- scrollable message history and tool execution rendering
-- slash commands
-- model switching (`/model`)
-- session management
-- background process management
-- settings panel (`/settings`)
-- an embedded interactive terminal inside the LSD CLI
+LSD comes with an embedded interactive terminal inspired by the gemini cli
 - user interaction with that terminal directly from the TUI
 - agent interaction with terminal programs and commands that require prompts, input, or other interactive flows without getting blocked
 
