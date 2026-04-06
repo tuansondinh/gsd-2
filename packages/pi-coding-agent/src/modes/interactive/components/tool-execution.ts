@@ -582,16 +582,34 @@ export class ToolExecutionComponent extends Container {
 		this.contentBox.addChild(body);
 
 		const timeoutSuffix = timeout ? theme.fg("muted", ` (timeout ${timeout}s)`) : "";
-		const commandDisplay =
-			command === null
-				? theme.fg("error", "[invalid arg]")
-				: command
-					? theme.fg("toolOutput", command)
-					: theme.fg("toolOutput", "...");
 		const sandboxBadge = this.result?.details?.sandboxed ? `  ${theme.fg("success", "[sandboxed]")}` : "";
 		const toolLabel = theme.fg("toolTitle", theme.bold("bash"));
 		const shellPrompt = theme.fg("muted", "$ ");
+
+		// Always show only the first meaningful non-comment line in the header.
+		// The full command is shown below the header when expanded.
+		let commandDisplay: string;
+		let commandLines: string[] = [];
+		let isMultiLine = false;
+		if (command === null) {
+			commandDisplay = theme.fg("error", "[invalid arg]");
+		} else if (!command) {
+			commandDisplay = theme.fg("toolOutput", "...");
+		} else {
+			commandLines = command.split("\n");
+			isMultiLine = commandLines.length > 1;
+			const firstMeaningful = commandLines.find((l) => l.trim() && !l.trim().startsWith("#")) ?? commandLines[0];
+			const suffix = isMultiLine ? theme.fg("muted", " …") : "";
+			commandDisplay = theme.fg("toolOutput", firstMeaningful ?? "") + suffix;
+		}
+
 		body.addChild(new Text(`${statusIndicator} ${toolLabel} ${shellPrompt}${commandDisplay}${timeoutSuffix}${sandboxBadge}`, 0, 0));
+
+		// When expanded, show the full command below the header (only for multi-line commands)
+		if (this.expanded && isMultiLine) {
+			const fullCommand = commandLines.map((line) => theme.fg("toolOutput", line)).join("\n");
+			body.addChild(new Text(`\n${fullCommand}`, 0, 0));
+		}
 
 		if (this.result) {
 			const output = this.getTextOutput().trim();

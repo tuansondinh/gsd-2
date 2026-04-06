@@ -1030,7 +1030,7 @@ async function runRemoteQuestionsStep(
     { value: 'discord', label: 'Discord', hint: 'receive questions in a Discord channel' },
     { value: 'slack', label: 'Slack', hint: 'receive questions in a Slack channel' },
     { value: 'telegram', label: 'Telegram', hint: 'receive questions via Telegram bot' },
-    { value: 'skip', label: 'Skip for now', hint: 'use /gsd remote inside GSD later' },
+    { value: 'skip', label: 'Skip for now', hint: 'configure later with /gsd remote in LSD' },
   )
 
   const choice = await p.select({
@@ -1203,12 +1203,12 @@ async function runDiscordChannelStep(p: ClackModule, pc: PicoModule, token: stri
     const data = await res.json()
     guilds = Array.isArray(data) ? data : []
   } catch {
-    p.log.warn('Could not fetch Discord servers — configure channel later with /gsd remote discord')
+    p.log.warn('Could not fetch Discord servers — configure channel later with /gsd remote discord in LSD')
     return null
   }
 
   if (guilds.length === 0) {
-    p.log.warn('Bot is not in any Discord servers — configure channel later with /gsd remote discord')
+    p.log.warn('Bot is not in any Discord servers — configure channel later with /gsd remote discord in LSD')
     return null
   }
 
@@ -1236,12 +1236,12 @@ async function runDiscordChannelStep(p: ClackModule, pc: PicoModule, token: stri
     const data = await res.json()
     channels = Array.isArray(data) ? data.filter((ch: any) => ch.type === 0 || ch.type === 5) : []
   } catch {
-    p.log.warn('Could not fetch channels — configure later with /gsd remote discord')
+    p.log.warn('Could not fetch channels — configure later with /gsd remote discord in LSD')
     return null
   }
 
   if (channels.length === 0) {
-    p.log.warn('No text channels found — configure later with /gsd remote discord')
+    p.log.warn('No text channels found — configure later with /gsd remote discord in LSD')
     return null
   }
 

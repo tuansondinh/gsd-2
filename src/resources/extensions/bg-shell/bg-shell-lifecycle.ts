@@ -1,6 +1,6 @@
 /**
  * bg_shell lifecycle hook registration — session events, compaction awareness,
- * context injection, process discovery, footer widget, and periodic maintenance.
+ * context injection, footer widget, and periodic maintenance.
  */
 
 import type {
@@ -18,24 +18,14 @@ import {
 	pendingAlerts,
 	cleanupAll,
 	cleanupSessionProcesses,
-	persistManifest,
-	loadManifest,
 	pruneDeadProcesses,
 } from "./process-manager.js";
-import { formatUptime, getBgShellLiveCwd, resolveBgShellPersistenceCwd } from "./utilities.js";
+import { formatUptime, getBgShellLiveCwd } from "./utilities.js";
 import { formatTokenCount } from "../shared/format-utils.js";
 
 import type { BgShellSharedState } from "./index.js";
 
 export function registerBgShellLifecycle(pi: ExtensionAPI, state: BgShellSharedState): void {
-
-	function syncLatestCtxCwd(): void {
-		if (!state.latestCtx) return;
-		const syncedCwd = resolveBgShellPersistenceCwd(state.latestCtx.cwd);
-		if (syncedCwd !== state.latestCtx.cwd) {
-			state.latestCtx = { ...state.latestCtx, cwd: syncedCwd };
-		}
-	}
 
 	// Clean up on session shutdown
 	pi.on("session_shutdown", async () => {
@@ -86,8 +76,6 @@ export function registerBgShellLifecycle(pi: ExtensionAPI, state: BgShellSharedS
 		state.latestCtx = ctx;
 		if (event.reason === "new" && event.previousSessionFile) {
 			await cleanupSessionProcesses(event.previousSessionFile);
-			syncLatestCtxCwd();
-			if (state.latestCtx) persistManifest(state.latestCtx.cwd);
 		}
 		buildProcessStateAlert("Session was switched.");
 	});
@@ -124,37 +112,6 @@ export function registerBgShellLifecycle(pi: ExtensionAPI, state: BgShellSharedS
 				display: false,
 			},
 		};
-	});
-
-	// ── Session Start: Discover Surviving Processes ────────────────────
-
-	pi.on("session_start", async (_event, ctx) => {
-		state.latestCtx = ctx;
-
-		// Check for surviving processes from previous session
-		const manifest = loadManifest(ctx.cwd);
-		if (manifest.length > 0) {
-			// Check which PIDs are still alive
-			const surviving: typeof manifest = [];
-			for (const entry of manifest) {
-				if (entry.pid) {
-					try {
-						process.kill(entry.pid, 0); // Check if process exists
-						surviving.push(entry);
-					} catch { /* process is dead */ }
-				}
-			}
-
-			if (surviving.length > 0) {
-				const summary = surviving.map(s =>
-					`  - ${s.id}: ${s.label} (pid ${s.pid}, type: ${s.processType}${s.group ? `, group: ${s.group}` : ""})`
-				).join("\n");
-
-				pendingAlerts.push(
-					`${surviving.length} background process(es) from previous session still running:\n${summary}\n  Note: These processes are outside bg_shell's control. Kill them manually if needed.`
-				);
-			}
-		}
 	});
 
 	// ── Live Footer ──────────────────────────────────────────────────────
@@ -376,11 +333,6 @@ export function registerBgShellLifecycle(pi: ExtensionAPI, state: BgShellSharedS
 	const maintenanceInterval = setInterval(() => {
 		pruneDeadProcesses();
 		refreshWidget();
-		// Persist manifest periodically
-		if (state.latestCtx) {
-			syncLatestCtxCwd();
-			persistManifest(state.latestCtx.cwd);
-		}
 	}, 2000);
 
 	// Refresh widget after agent actions and session events
@@ -401,10 +353,6 @@ export function registerBgShellLifecycle(pi: ExtensionAPI, state: BgShellSharedS
 	// Clean up on shutdown
 	pi.on("session_shutdown", async () => {
 		clearInterval(maintenanceInterval);
-		if (state.latestCtx) {
-			syncLatestCtxCwd();
-			persistManifest(state.latestCtx.cwd);
-		}
 		cleanupAll();
 	});
 }

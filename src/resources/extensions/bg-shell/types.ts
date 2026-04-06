@@ -157,21 +157,6 @@ export interface GetOutputOptions {
 	incremental?: boolean;
 }
 
-export interface ProcessManifest {
-	id: string;
-	label: string;
-	command: string;
-	cwd: string;
-	ownerSessionFile: string | null;
-	persistAcrossSessions: boolean;
-	startedAt: number;
-	processType: ProcessType;
-	group: string | null;
-	readyPattern: string | null;
-	readyPort: number | null;
-	pid: number | undefined;
-}
-
 // ── Constants ──────────────────────────────────────────────────────────────
 
 export const MAX_BUFFER_LINES = 5000;

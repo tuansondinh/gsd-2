@@ -16,11 +16,16 @@ function expandTilde(p: string): string {
 
 /** Default config values when no file is present or fields are missing. */
 function defaults(): DaemonConfig {
+  const home = homedir();
+  const lsdDir = resolve(home, '.lsd');
+  const gsdDir = resolve(home, '.gsd');
+  const baseDir = existsSync(lsdDir) ? lsdDir : existsSync(gsdDir) ? gsdDir : lsdDir;
+
   return {
     discord: undefined,
     projects: { scan_roots: [] },
     log: {
-      file: resolve(homedir(), '.gsd', 'daemon.log'),
+      file: resolve(baseDir, 'daemon.log'),
       level: 'info',
       max_size_mb: 50,
     },
@@ -29,13 +34,18 @@ function defaults(): DaemonConfig {
 
 /**
  * Resolve the config file path.
- * Priority: explicit CLI arg → GSD_DAEMON_CONFIG env → ~/.gsd/daemon.yaml
+ * Priority: explicit CLI arg → LSD_DAEMON_CONFIG → GSD_DAEMON_CONFIG → ~/.lsd/daemon.yaml with ~/.gsd fallback
  */
 export function resolveConfigPath(cliPath?: string): string {
   if (cliPath) return expandTilde(cliPath);
-  const envPath = process.env['GSD_DAEMON_CONFIG'];
+  const envPath = process.env['LSD_DAEMON_CONFIG'] || process.env['GSD_DAEMON_CONFIG'];
   if (envPath) return expandTilde(envPath);
-  return resolve(homedir(), '.gsd', 'daemon.yaml');
+
+  const lsdPath = resolve(homedir(), '.lsd', 'daemon.yaml');
+  if (existsSync(lsdPath)) return lsdPath;
+  const gsdPath = resolve(homedir(), '.gsd', 'daemon.yaml');
+  if (existsSync(gsdPath)) return gsdPath;
+  return lsdPath;
 }
 
 /**

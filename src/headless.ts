@@ -1,7 +1,7 @@
 /**
- * Headless Orchestrator — `gsd headless`
+ * Headless Orchestrator — `lsd headless`
  *
- * Runs any /gsd subcommand without a TUI by spawning a child process in
+ * Runs any LSD planning/auto subcommand without a TUI by spawning a child process in
  * RPC mode, auto-responding to extension UI requests, and streaming
  * progress to stderr.
  *
@@ -56,6 +56,7 @@ import {
   loadContext,
   bootstrapGsdProject,
 } from './headless-context.js'
+import { resolveProjectStateRoot } from './shared-paths.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -318,33 +319,33 @@ async function runHeadlessOnce(options: HeadlessOptions, restartCount: number): 
     }
   }
 
-  // For new-milestone, validate context and bootstrap .gsd/ before spawning RPC child
+  // For new-milestone, validate context and bootstrap LSD project state before spawning RPC child
   if (isNewMilestone) {
     if (!contextContent) {
       process.stderr.write('[headless] Error: new-milestone requires --context <file> or --context-text <text>\n')
       process.exit(1)
     }
 
-    // Bootstrap .gsd/ if needed
-    const gsdDir = join(process.cwd(), '.gsd')
-    if (!existsSync(gsdDir)) {
+    // Bootstrap project state if needed
+    const stateDir = resolveProjectStateRoot(process.cwd())
+    if (!existsSync(stateDir)) {
       if (!options.json) {
-        process.stderr.write('[headless] Bootstrapping .gsd/ project structure...\n')
+        process.stderr.write('[headless] Bootstrapping LSD project structure...\n')
       }
       bootstrapGsdProject(process.cwd())
     }
 
     // Write context to temp file for the RPC child to read
-    const runtimeDir = join(gsdDir, 'runtime')
+    const runtimeDir = join(stateDir, 'runtime')
     mkdirSync(runtimeDir, { recursive: true })
     writeFileSync(join(runtimeDir, 'headless-context.md'), contextContent, 'utf-8')
   }
 
-  // Validate .gsd/ directory — skip for new-milestone (just bootstrapped) and bare mode
-  const gsdDir = join(process.cwd(), '.gsd')
-  if (!isNewMilestone && !options.bare && !existsSync(gsdDir)) {
-    process.stderr.write('[headless] Error: No .gsd/ directory found in current directory.\n')
-    process.stderr.write("[headless] Run 'gsd' interactively first to initialize a project.\n")
+  // Validate project state directory — skip for new-milestone (just bootstrapped) and bare mode
+  const stateDir = resolveProjectStateRoot(process.cwd())
+  if (!isNewMilestone && !options.bare && !existsSync(stateDir)) {
+    process.stderr.write('[headless] Error: No .lsd/ or legacy .gsd/ directory found in current directory.\n')
+    process.stderr.write("[headless] Run 'lsd' interactively first to initialize a project.\n")
     process.exit(1)
   }
 
@@ -354,9 +355,9 @@ async function runHeadlessOnce(options: HeadlessOptions, restartCount: number): 
   }
 
   // Resolve CLI path for the child process
-  const cliPath = process.env.GSD_BIN_PATH || process.env.LSD_BIN_PATH || process.argv[1]
+  const cliPath = process.env.LSD_BIN_PATH || process.env.GSD_BIN_PATH || process.argv[1]
   if (!cliPath) {
-    process.stderr.write('[headless] Error: Cannot determine CLI path. Set GSD_BIN_PATH/LSD_BIN_PATH or run via gsd.\n')
+    process.stderr.write('[headless] Error: Cannot determine CLI path. Set LSD_BIN_PATH/GSD_BIN_PATH or run via lsd.\n')
     process.exit(1)
   }
 
@@ -854,9 +855,9 @@ async function runHeadlessOnce(options: HeadlessOptions, restartCount: number): 
       process.stderr.write('[headless] Running bare+context mode...\n')
     }
   } else {
-    promptMessage = `/gsd ${options.command}${options.commandArgs.length > 0 ? ' ' + options.commandArgs.join(' ') : ''}`
+    promptMessage = `/lsd ${options.command}${options.commandArgs.length > 0 ? ' ' + options.commandArgs.join(' ') : ''}`
     if (!options.json) {
-      process.stderr.write(`[headless] Running /gsd ${options.command}${options.commandArgs.length > 0 ? ' ' + options.commandArgs.join(' ') : ''}...\n`)
+      process.stderr.write(`[headless] Running /lsd ${options.command}${options.commandArgs.length > 0 ? ' ' + options.commandArgs.join(' ') : ''}...\n`)
     }
   }
 
@@ -873,7 +874,7 @@ async function runHeadlessOnce(options: HeadlessOptions, restartCount: number): 
     await completionPromise
   }
 
-  // Auto-mode chaining: if --auto and milestone creation succeeded, send /gsd auto
+  // Auto-mode chaining: if --auto and milestone creation succeeded, send /lsd auto
   if (isNewMilestone && options.auto && milestoneReady && !blocked && exitCode === EXIT_SUCCESS) {
     if (!options.json) {
       process.stderr.write('[headless] Milestone ready — chaining into auto-mode...\n')

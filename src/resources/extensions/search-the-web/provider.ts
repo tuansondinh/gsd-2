@@ -16,8 +16,8 @@ import { join } from 'path'
 // Compute authFilePath locally instead of importing from app-paths.ts,
 // because extensions are copied to ~/.gsd/agent/extensions/ at runtime
 // where the relative import '../../../app-paths.ts' doesn't resolve.
-const gsdHome = process.env.LSD_HOME || join(homedir(), '.gsd')
-const authFilePath = join(gsdHome, 'agent', 'auth.json')
+const lsdHome = process.env.LSD_HOME || process.env.GSD_HOME || join(homedir(), '.lsd')
+const authFilePath = join(lsdHome, 'agent', 'auth.json')
 
 export type SearchProvider = 'tavily' | 'brave' | 'ollama'
 export type SearchProviderPreference = SearchProvider | 'auto'

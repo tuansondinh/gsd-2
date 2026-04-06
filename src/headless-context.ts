@@ -2,11 +2,12 @@
  * Headless Context Loading — stdin reading, file context, and project bootstrapping
  *
  * Handles loading context from files or stdin for headless new-milestone,
- * and bootstraps the .gsd/ directory structure when needed.
+ * and bootstraps the LSD project state directory when needed.
  */
 
 import { readFileSync, mkdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { resolveProjectStateRoot } from './shared-paths.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,11 +53,12 @@ export async function loadContext(options: ContextOptions): Promise<string> {
 // ---------------------------------------------------------------------------
 
 /**
- * Bootstrap .gsd/ directory structure for headless new-milestone.
+ * Bootstrap LSD project state for headless new-milestone.
+ * Creates `.lsd/` by default; legacy `.gsd/` projects are discovered elsewhere.
  * Mirrors the bootstrap logic from guided-flow.ts showSmartEntry().
  */
 export function bootstrapGsdProject(basePath: string): void {
-  const gsdDir = join(basePath, '.gsd')
-  mkdirSync(join(gsdDir, 'milestones'), { recursive: true })
-  mkdirSync(join(gsdDir, 'runtime'), { recursive: true })
+  const stateDir = resolveProjectStateRoot(basePath)
+  mkdirSync(join(stateDir, 'milestones'), { recursive: true })
+  mkdirSync(join(stateDir, 'runtime'), { recursive: true })
 }

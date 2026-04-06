@@ -1,19 +1,16 @@
 /**
  * Process lifecycle management: start, stop, restart, signal, state tracking,
- * process registry, and persistence.
+ * process registry.
  */
 
 import { spawn, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
 import { getShellConfig, sanitizeCommand } from "@gsd/pi-coding-agent";
 import { rewriteCommandWithRtk } from "../shared/rtk.js";
 import type {
 	BgProcess,
 	BgProcessInfo,
 	ProcessEvent,
-	ProcessManifest,
 	ProcessType,
 	StartOptions,
 } from "./types.js";
@@ -355,16 +352,19 @@ export function getGroupStatus(group: string): {
 
 // ── Cleanup ────────────────────────────────────────────────────────────────
 
-export function pruneDeadProcesses(): void {
+export function pruneDeadProcesses(): number {
 	const now = Date.now();
+	let pruned = 0;
 	for (const [id, bg] of processes) {
 		if (!bg.alive) {
 			const ttl = bg.processType === "shell" ? DEAD_PROCESS_TTL * 6 : DEAD_PROCESS_TTL;
 			if (now - bg.startedAt > ttl) {
 				processes.delete(id);
+				pruned++;
 			}
 		}
 	}
+	return pruned;
 }
 
 export function cleanupAll(): void {
@@ -420,44 +420,4 @@ export async function cleanupSessionProcesses(
 		if (bg.alive) killProcess(bg.id, "SIGKILL");
 	}
 	return matches.map((bg) => bg.id);
-}
-
-// ── Persistence ────────────────────────────────────────────────────────────
-
-export function getManifestPath(cwd: string): string {
-	const dir = join(cwd, ".bg-shell");
-	if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-	return join(dir, "manifest.json");
-}
-
-export function persistManifest(cwd: string): void {
-	try {
-		const manifest: ProcessManifest[] = Array.from(processes.values())
-			.filter(p => p.alive)
-			.map(p => ({
-				id: p.id,
-				label: p.label,
-				command: p.command,
-				cwd: p.cwd,
-				ownerSessionFile: p.ownerSessionFile,
-				persistAcrossSessions: p.persistAcrossSessions,
-				startedAt: p.startedAt,
-				processType: p.processType,
-				group: p.group,
-				readyPattern: p.readyPattern,
-				readyPort: p.readyPort,
-				pid: p.proc.pid,
-			}));
-		writeFileSync(getManifestPath(cwd), JSON.stringify(manifest, null, 2));
-	} catch { /* best effort */ }
-}
-
-export function loadManifest(cwd: string): ProcessManifest[] {
-	try {
-		const path = getManifestPath(cwd);
-		if (existsSync(path)) {
-			return JSON.parse(readFileSync(path, "utf-8"));
-		}
-	} catch { /* best effort */ }
-	return [];
 }

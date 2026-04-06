@@ -58,12 +58,6 @@ const COLLAPSED_ITEM_COUNT = 10;
 const DEFAULT_AWAIT_SUBAGENT_TIMEOUT_SECONDS = 120;
 const liveSubagentProcesses = new Set<ChildProcess>();
 
-type ForegroundSubagentControl = {
-    agentName: string;
-    task: string;
-    requestBackground: () => { ok: true; jobId: string } | { ok: false; reason: string };
-};
-
 const AwaitSubagentParams = Type.Object({
     jobs: Type.Optional(
         Type.Array(Type.String(), {
@@ -512,9 +506,7 @@ async function runSingleAgent(
     parentModel: { provider: string; id: string } | undefined,
     signal: AbortSignal | undefined,
     onUpdate: OnUpdateCallback | undefined,
-    makeDetails: (results: SingleResult[]) => SubagentDetails,
-    backgroundManager?: BackgroundJobManager,
-    setForegroundControl?: (control: ForegroundSubagentControl | null) => void,
+    makeDetails: (results: SingleResult[]) => SubagentDetails
 ): Promise<SingleResult> {
     const agent = agents.find((a) => a.name === agentName);
 
@@ -572,7 +564,6 @@ async function runSingleAgent(
         }
         const args = buildSubagentProcessArgs(agent, task, tmpPromptPath, inferredModel);
         let wasAborted = false;
-        let foregroundReleased = false;
 
         const exitCode = await new Promise<number>((resolve) => {
             const bundledPaths = getBundledExtensionPathsFromEnv();
@@ -588,7 +579,9 @@ async function runSingleAgent(
                 [cliPath, ...extensionArgs, ...args],
                 { cwd: cwd ?? defaultCwd, shell: false, stdio: ["pipe", "pipe", "pipe"] },
             );
-            proc.stdin.end();
+            // Keep stdin open so approval/classifier responses can be proxied back
+            // into the child process. Closing it here can leave the subagent stuck
+            // after its first turn when it requests permission for a tool call.
             liveSubagentProcesses.add(proc);
             let buffer = "";
             let completionSeen = false;
@@ -607,53 +600,7 @@ async function runSingleAgent(
                 resolve(code);
             };
 
-            const clearForegroundControl = () => {
-                setForegroundControl?.(null);
-            };
 
-            const releaseToBackground = (): { ok: true; jobId: string } | { ok: false; reason: string } => {
-                if (foregroundReleased) {
-                    return currentResult.backgroundJobId
-                        ? { ok: true, jobId: currentResult.backgroundJobId }
-                        : { ok: false, reason: "This subagent is already running in the background." };
-                }
-                if (!backgroundManager) {
-                    return { ok: false, reason: "Background subagent manager not initialized." };
-                }
-                try {
-                    const summaryFromCurrentResult = () => {
-                        const finalOutput = getFinalOutput(currentResult.messages);
-                        const summary = finalOutput.length > 300 ? `${finalOutput.slice(0, 300)}…` : finalOutput || "(no output)";
-                        return {
-                            summary,
-                            stderr: currentResult.stderr,
-                            exitCode: currentResult.exitCode,
-                            model: currentResult.model,
-                        };
-                    };
-                    const jobId = backgroundManager.adoptRunning(
-                        agentName,
-                        task,
-                        cwd ?? defaultCwd,
-                        procAbortController,
-                        backgroundResultPromise.then(() => summaryFromCurrentResult()),
-                    );
-                    foregroundReleased = true;
-                    currentResult.stopReason = "backgrounded";
-                    currentResult.backgroundJobId = jobId;
-                    clearForegroundControl();
-                    finishForeground(0);
-                    return { ok: true, jobId };
-                } catch (error) {
-                    return { ok: false, reason: error instanceof Error ? error.message : String(error) };
-                }
-            };
-
-            setForegroundControl?.({
-                agentName,
-                task,
-                requestBackground: releaseToBackground,
-            });
 
             proc.stdout.on("data", (data) => {
                 buffer += data.toString();
@@ -677,7 +624,6 @@ async function runSingleAgent(
 
             proc.on("close", (code) => {
                 liveSubagentProcesses.delete(proc);
-                clearForegroundControl();
                 if (buffer.trim()) {
                     const completedOnFlush = processSubagentEventLine(buffer, currentResult, emitUpdate, proc);
                     completionSeen = completionSeen || completedOnFlush;
@@ -690,20 +636,16 @@ async function runSingleAgent(
                     exitCode: finalExitCode,
                     model: currentResult.model,
                 });
-                if (!foregroundReleased) {
-                    finishForeground(finalExitCode);
-                }
+                finishForeground(finalExitCode);
             });
 
             proc.on("error", (error) => {
                 liveSubagentProcesses.delete(proc);
-                clearForegroundControl();
                 rejectBackgroundResult?.(error);
                 finishForeground(1);
             });
 
             const killProc = () => {
-                if (foregroundReleased) return;
                 wasAborted = true;
                 procAbortController.abort();
                 proc.kill("SIGTERM");
@@ -730,7 +672,7 @@ async function runSingleAgent(
         });
 
         currentResult.exitCode = exitCode;
-        if (wasAborted && currentResult.stopReason !== "backgrounded") throw new Error("Subagent was aborted");
+        if (wasAborted) throw new Error("Subagent was aborted");
         return currentResult;
     } finally {
         if (tmpPromptPath)
@@ -817,16 +759,13 @@ const SubagentParams = Type.Object({
 
 export default function(pi: ExtensionAPI) {
     let bgManager: BackgroundJobManager | null = null;
-    let activeForegroundSubagent: ForegroundSubagentControl | null = null;
-    let currentSessionCtx: any = null;
 
     function getBgManager(): BackgroundJobManager {
         if (!bgManager) throw new Error("BackgroundJobManager not initialized.");
         return bgManager;
     }
 
-    pi.on("session_start", async (_event, ctx) => {
-        currentSessionCtx = ctx;
+    pi.on("session_start", async () => {
         bgManager = new BackgroundJobManager({
             onJobComplete: (job) => {
                 if (job.awaited) return;
@@ -838,46 +777,26 @@ export default function(pi: ExtensionAPI) {
                     : `Error: ${job.stderr ?? "unknown error"}`;
                 const modelInfo = job.model ? ` · ${job.model}` : "";
 
-                // Use the captured session context to ensure the message is delivered
-                if (currentSessionCtx) {
-                    currentSessionCtx.sendMessage(
-                        {
-                            customType: "background_subagent_result",
-                            content: [
-                                `**Background subagent ${statusEmoji}: ${job.id}** (${job.agentName}, ${elapsed}s${modelInfo})`,
-                                `> ${taskPreview}`,
-                                "",
-                                output,
-                            ].join("\n"),
-                            display: true,
-                        },
-                        { deliverAs: "followUp" },
-                    );
-                }
+                // Use pi.sendMessage to deliver the background result message
+                pi.sendMessage(
+                    {
+                        customType: "background_subagent_result",
+                        content: [
+                            `**Background subagent ${statusEmoji}: ${job.id}** (${job.agentName}, ${elapsed}s${modelInfo})`,
+                            `> ${taskPreview}`,
+                            "",
+                            output,
+                        ].join("\n"),
+                        display: true,
+                    },
+                    { deliverAs: "followUp" },
+                );
             },
         });
     });
 
-    pi.registerShortcut("ctrl+b", {
-        description: "Move the active foreground subagent to the background",
-        handler: async (ctx) => {
-            const control = activeForegroundSubagent;
-            if (!control) {
-                ctx.ui.notify("No foreground subagent is currently running.", "info");
-                return;
-            }
-            const result = control.requestBackground();
-            if (result.ok) {
-                ctx.ui.notify(`Moved ${control.agentName} to background as ${result.jobId}.`, "info");
-            } else {
-                ctx.ui.notify(`Could not move subagent to background: ${result.reason}`, "warning");
-            }
-        },
-    });
 
     pi.on("session_before_switch", async () => {
-        activeForegroundSubagent = null;
-        currentSessionCtx = null;
         if (bgManager) {
             for (const job of bgManager.getRunningJobs()) {
                 bgManager.cancel(job.id);
@@ -886,8 +805,6 @@ export default function(pi: ExtensionAPI) {
     });
 
     pi.on("session_shutdown", async () => {
-        activeForegroundSubagent = null;
-        currentSessionCtx = null;
         await stopLiveSubagents();
         if (bgManager) {
             bgManager.shutdown();
@@ -1365,12 +1282,6 @@ export default function(pi: ExtensionAPI) {
                 try {
                     const effectiveCwd = params.cwd ?? ctx.cwd;
 
-                    if (onUpdate && ctx.hasUI) {
-                        onUpdate({
-                            content: [{ type: "text", text: `Subagent **${params.agent}** running… (press **Ctrl+B** to move to background)` }],
-                            details: makeDetails("single")([]),
-                        });
-                    }
 
                     if (useIsolation) {
                         const taskId = crypto.randomUUID();
@@ -1389,20 +1300,6 @@ export default function(pi: ExtensionAPI) {
                         signal,
                         onUpdate,
                         makeDetails("single"),
-                        useIsolation ? undefined : (bgManager ?? undefined),
-                        useIsolation
-                            ? undefined
-                            : (control) => {
-                                activeForegroundSubagent = control;
-                                if (ctx.hasUI) {
-                                    ctx.ui.setStatus(
-                                        "subagent",
-                                        control
-                                            ? `subagent ${control.agentName} running — Ctrl+B background`
-                                            : undefined,
-                                    );
-                                }
-                            },
                     );
 
                     // Capture and merge delta if isolated
@@ -1424,12 +1321,6 @@ export default function(pi: ExtensionAPI) {
                         };
                     }
 
-                    if (result.stopReason === "backgrounded" && result.backgroundJobId) {
-                        return {
-                            content: [{ type: "text", text: `Moved subagent to background. Job ID: **${result.backgroundJobId}**\nAgent: ${params.agent}\nUse \`await_subagent\` to wait, \`/subagents wait ${result.backgroundJobId}\` to block in the TUI, or \`/subagents cancel ${result.backgroundJobId}\` to stop it.` }],
-                            details: makeDetails("single")([result]),
-                        };
-                    }
 
                     let outputText = getFinalOutput(result.messages) || "(no output)";
                     if (mergeResult && !mergeResult.success) {
@@ -1494,7 +1385,6 @@ export default function(pi: ExtensionAPI) {
                 theme.fg("accent", agentName) +
                 theme.fg("muted", ` [${scope}]`);
             text += `\n  ${theme.fg("dim", preview)}`;
-            text += `\n  ${theme.fg("muted", "(Ctrl+B to background)")}`;
             return new Text(text, 0, 0);
         },
 
@@ -1770,3 +1660,4 @@ export default function(pi: ExtensionAPI) {
         },
     });
 }
+

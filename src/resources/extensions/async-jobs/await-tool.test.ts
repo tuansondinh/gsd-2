@@ -8,160 +8,188 @@ import { AsyncJobManager } from "./job-manager.ts";
 import { createAwaitTool } from "./await-tool.ts";
 
 function getTextFromResult(result: { content: Array<{ type: string; text?: string }> }): string {
-	return result.content.map((c) => c.text ?? "").join("\n");
+    return result.content.map((c) => c.text ?? "").join("\n");
 }
 
 const noopSignal = new AbortController().signal;
 
 test("await_job returns immediately when no running jobs exist", async () => {
-	const manager = new AsyncJobManager();
-	const tool = createAwaitTool(() => manager);
+    const manager = new AsyncJobManager();
+    const tool = createAwaitTool(() => manager);
 
-	const result = await tool.execute("tc1", {}, noopSignal, () => {}, undefined as never);
-	const text = getTextFromResult(result);
-	assert.match(text, /No running background jobs/);
+    const result = await tool.execute("tc1", {}, noopSignal, () => { }, undefined as never);
+    const text = getTextFromResult(result);
+    assert.match(text, /No running background jobs/);
 });
 
 test("await_job returns immediately when all watched jobs are already completed", async () => {
-	const manager = new AsyncJobManager();
-	const tool = createAwaitTool(() => manager);
+    const manager = new AsyncJobManager();
+    const tool = createAwaitTool(() => manager);
 
-	// Register a job that completes instantly
-	const jobId = manager.register("bash", "fast-job", async () => "done");
-	// Wait for the job to settle
-	const job = manager.getJob(jobId)!;
-	await job.promise;
+    // Register a job that completes instantly
+    const jobId = manager.register("bash", "fast-job", async () => "done");
+    // Wait for the job to settle
+    const job = manager.getJob(jobId)!;
+    await job.promise;
 
-	const result = await tool.execute("tc2", { jobs: [jobId] }, noopSignal, () => {}, undefined as never);
-	const text = getTextFromResult(result);
-	assert.match(text, /fast-job/);
-	assert.match(text, /completed/);
+    const result = await tool.execute("tc2", { jobs: [jobId] }, noopSignal, () => { }, undefined as never);
+    const text = getTextFromResult(result);
+    assert.match(text, /fast-job/);
+    assert.match(text, /completed/);
 });
 
 test("await_job returns on timeout when jobs are still running", async () => {
-	const manager = new AsyncJobManager();
-	const tool = createAwaitTool(() => manager);
+    const manager = new AsyncJobManager();
+    const tool = createAwaitTool(() => manager);
 
-	// Register a job that takes a long time
-	const jobId = manager.register("bash", "slow-job", async (_signal) => {
-		return new Promise<string>((resolve) => {
-			const timer = setTimeout(() => resolve("finally done"), 60_000);
-			if (typeof timer === "object" && "unref" in timer) timer.unref();
-		});
-	});
+    // Register a job that takes a long time
+    const jobId = manager.register("bash", "slow-job", async (_signal) => {
+        return new Promise<string>((resolve) => {
+            const timer = setTimeout(() => resolve("finally done"), 60_000);
+            if (typeof timer === "object" && "unref" in timer) timer.unref();
+        });
+    });
 
-	const start = Date.now();
-	const result = await tool.execute("tc3", { jobs: [jobId], timeout: 1 }, noopSignal, () => {}, undefined as never);
-	const elapsed = Date.now() - start;
-	const text = getTextFromResult(result);
+    const start = Date.now();
+    const result = await tool.execute("tc3", { jobs: [jobId], timeout: 1 }, noopSignal, () => { }, undefined as never);
+    const elapsed = Date.now() - start;
+    const text = getTextFromResult(result);
 
-	// Should have timed out within ~1-2 seconds, not 60
-	assert.ok(elapsed < 5_000, `Expected timeout in ~1s but took ${elapsed}ms`);
-	assert.match(text, /Timed out/);
-	assert.match(text, /Still running/);
-	assert.match(text, /slow-job/);
+    // Should have timed out within ~1-2 seconds, not 60
+    assert.ok(elapsed < 5_000, `Expected timeout in ~1s but took ${elapsed}ms`);
+    assert.match(text, /Timed out/);
+    assert.match(text, /Still running/);
+    assert.match(text, /slow-job/);
 
-	// Cleanup
-	manager.cancel(jobId);
-	manager.shutdown();
+    // Cleanup
+    manager.cancel(jobId);
+    manager.shutdown();
 });
 
 test("await_job completes before timeout when job finishes quickly", async () => {
-	const manager = new AsyncJobManager();
-	const tool = createAwaitTool(() => manager);
+    const manager = new AsyncJobManager();
+    const tool = createAwaitTool(() => manager);
 
-	// Register a job that completes in 100ms
-	const jobId = manager.register("bash", "quick-job", async () => {
-		return new Promise<string>((resolve) => setTimeout(() => resolve("quick result"), 100));
-	});
+    // Register a job that completes in 100ms
+    const jobId = manager.register("bash", "quick-job", async () => {
+        return new Promise<string>((resolve) => setTimeout(() => resolve("quick result"), 100));
+    });
 
-	const start = Date.now();
-	const result = await tool.execute("tc4", { jobs: [jobId], timeout: 30 }, noopSignal, () => {}, undefined as never);
-	const elapsed = Date.now() - start;
-	const text = getTextFromResult(result);
+    const start = Date.now();
+    const result = await tool.execute("tc4", { jobs: [jobId], timeout: 30 }, noopSignal, () => { }, undefined as never);
+    const elapsed = Date.now() - start;
+    const text = getTextFromResult(result);
 
-	// Should complete in ~100ms, well before the 30s timeout
-	assert.ok(elapsed < 5_000, `Expected quick completion but took ${elapsed}ms`);
-	assert.ok(!text.includes("Timed out"), "Should not have timed out");
-	assert.match(text, /quick-job/);
-	assert.match(text, /completed/);
+    // Should complete in ~100ms, well before the 30s timeout
+    assert.ok(elapsed < 5_000, `Expected quick completion but took ${elapsed}ms`);
+    assert.ok(!text.includes("Timed out"), "Should not have timed out");
+    assert.match(text, /quick-job/);
+    assert.match(text, /completed/);
 
-	manager.shutdown();
+    manager.shutdown();
 });
 
 test("await_job uses default timeout of 120s when not specified", async () => {
-	const manager = new AsyncJobManager();
-	const tool = createAwaitTool(() => manager);
+    const manager = new AsyncJobManager();
+    const tool = createAwaitTool(() => manager);
 
-	// Register a job that completes immediately
-	const jobId = manager.register("bash", "instant-job", async () => "instant");
-	const job = manager.getJob(jobId)!;
-	await job.promise;
+    // Register a job that completes immediately
+    const jobId = manager.register("bash", "instant-job", async () => "instant");
+    const job = manager.getJob(jobId)!;
+    await job.promise;
 
-	// Call without timeout param — should work fine for already-done jobs
-	const result = await tool.execute("tc5", { jobs: [jobId] }, noopSignal, () => {}, undefined as never);
-	const text = getTextFromResult(result);
-	assert.match(text, /instant-job/);
-	assert.match(text, /completed/);
+    // Call without timeout param — should work fine for already-done jobs
+    const result = await tool.execute("tc5", { jobs: [jobId] }, noopSignal, () => { }, undefined as never);
+    const text = getTextFromResult(result);
+    assert.match(text, /instant-job/);
+    assert.match(text, /completed/);
 
-	manager.shutdown();
+    manager.shutdown();
 });
 
 test("await_job returns not-found message for invalid job IDs", async () => {
-	const manager = new AsyncJobManager();
-	const tool = createAwaitTool(() => manager);
+    const manager = new AsyncJobManager();
+    const tool = createAwaitTool(() => manager);
 
-	const result = await tool.execute("tc6", { jobs: ["bg_nonexistent"] }, noopSignal, () => {}, undefined as never);
-	const text = getTextFromResult(result);
-	assert.match(text, /No jobs found/);
-	assert.match(text, /bg_nonexistent/);
+    const result = await tool.execute("tc6", { jobs: ["bg_nonexistent"] }, noopSignal, () => { }, undefined as never);
+    const text = getTextFromResult(result);
+    assert.match(text, /No jobs found/);
+    assert.match(text, /bg_nonexistent/);
 
-	manager.shutdown();
+    manager.shutdown();
+});
+
+test("await_job returns promptly when tool signal is aborted (Escape cancel)", async () => {
+    const manager = new AsyncJobManager();
+    const tool = createAwaitTool(() => manager);
+
+    const jobId = manager.register("bash", "escape-cancel-job", async (_signal) => {
+        return new Promise<string>((resolve) => {
+            const timer = setTimeout(() => resolve("finally done"), 60_000);
+            if (typeof timer === "object" && "unref" in timer) timer.unref();
+        });
+    });
+
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 100);
+
+    const start = Date.now();
+    const result = await tool.execute("tc_abort", { jobs: [jobId], timeout: 30 }, controller.signal, () => { }, undefined as never);
+    const elapsed = Date.now() - start;
+    const text = getTextFromResult(result);
+
+    assert.ok(elapsed < 5_000, `Expected abort in ~100ms but took ${elapsed}ms`);
+    assert.match(text, /\*\*Cancelled\*\* waiting for background jobs/);
+    assert.match(text, /Still running/);
+    assert.match(text, /escape-cancel-job/);
+
+    manager.cancel(jobId);
+    manager.shutdown();
 });
 
 test("await_job marks jobs as awaited to suppress follow-up delivery (#2248)", async () => {
-	const followUps: string[] = [];
-	const manager = new AsyncJobManager({
-		onJobComplete: (job) => {
-			if (!job.awaited) followUps.push(job.id);
-		},
-	});
-	const tool = createAwaitTool(() => manager);
+    const followUps: string[] = [];
+    const manager = new AsyncJobManager({
+        onJobComplete: (job) => {
+            if (!job.awaited) followUps.push(job.id);
+        },
+    });
+    const tool = createAwaitTool(() => manager);
 
-	// Register a job that completes in 50ms
-	const jobId = manager.register("bash", "awaited-job", async () => {
-		return new Promise<string>((resolve) => setTimeout(() => resolve("result"), 50));
-	});
+    // Register a job that completes in 50ms
+    const jobId = manager.register("bash", "awaited-job", async () => {
+        return new Promise<string>((resolve) => setTimeout(() => resolve("result"), 50));
+    });
 
-	// await_job consumes the result — should mark as awaited before promise resolves
-	await tool.execute("tc7", { jobs: [jobId] }, noopSignal, () => {}, undefined as never);
+    // await_job consumes the result — should mark as awaited before promise resolves
+    await tool.execute("tc7", { jobs: [jobId] }, noopSignal, () => { }, undefined as never);
 
-	// Give the onJobComplete callback a tick to fire
-	await new Promise((r) => setTimeout(r, 50));
+    // Give the onJobComplete callback a tick to fire
+    await new Promise((r) => setTimeout(r, 50));
 
-	assert.equal(followUps.length, 0, "onJobComplete should not deliver follow-up for awaited jobs");
+    assert.equal(followUps.length, 0, "onJobComplete should not deliver follow-up for awaited jobs");
 
-	manager.shutdown();
+    manager.shutdown();
 });
 
 test("unawaited jobs still get follow-up delivery (#2248)", async () => {
-	const followUps: string[] = [];
-	const manager = new AsyncJobManager({
-		onJobComplete: (job) => {
-			if (!job.awaited) followUps.push(job.id);
-		},
-	});
+    const followUps: string[] = [];
+    const manager = new AsyncJobManager({
+        onJobComplete: (job) => {
+            if (!job.awaited) followUps.push(job.id);
+        },
+    });
 
-	// Register a fire-and-forget job
-	const jobId = manager.register("bash", "fire-and-forget", async () => "done");
-	const job = manager.getJob(jobId)!;
-	await job.promise;
+    // Register a fire-and-forget job
+    const jobId = manager.register("bash", "fire-and-forget", async () => "done");
+    const job = manager.getJob(jobId)!;
+    await job.promise;
 
-	// Give the callback a tick
-	await new Promise((r) => setTimeout(r, 50));
+    // Give the callback a tick
+    await new Promise((r) => setTimeout(r, 50));
 
-	assert.equal(followUps.length, 1, "onJobComplete should deliver follow-up for unawaited jobs");
-	assert.equal(followUps[0], jobId);
+    assert.equal(followUps.length, 1, "onJobComplete should deliver follow-up for unawaited jobs");
+    assert.equal(followUps[0], jobId);
 
-	manager.shutdown();
+    manager.shutdown();
 });

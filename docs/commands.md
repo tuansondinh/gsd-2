@@ -1,81 +1,83 @@
 # Commands Reference
 
+> Preferred command surface: use `/lsd ...` in docs and examples. Legacy `/gsd ...` aliases may still work for compatibility, but they are not the primary workflow.
+
 ## Session Commands
 
 | Command | Description |
 |---------|-------------|
-| `/gsd` | Step mode — execute one unit at a time, pause between each |
-| `/gsd next` | Explicit step mode (same as `/gsd`) |
-| `/gsd auto` | Autonomous mode — research, plan, execute, commit, repeat |
-| `/gsd quick` | Execute a quick task with LSD guarantees (atomic commits, state tracking) without full planning overhead |
-| `/gsd stop` | Stop auto mode gracefully |
-| `/gsd pause` | Pause auto-mode (preserves state, `/gsd auto` to resume) |
-| `/gsd steer` | Hard-steer plan documents during execution |
-| `/gsd discuss` | Discuss architecture and decisions (works alongside auto mode) |
-| `/gsd status` | Progress dashboard |
-| `/gsd widget` | Cycle dashboard widget: full / small / min / off |
-| `/gsd queue` | Queue and reorder future milestones (safe during auto mode) |
-| `/gsd capture` | Fire-and-forget thought capture (works during auto mode) |
-| `/gsd triage` | Manually trigger triage of pending captures |
-| `/gsd dispatch` | Dispatch a specific phase directly (research, plan, execute, complete, reassess, uat, replan) |
-| `/gsd history` | View execution history (supports `--cost`, `--phase`, `--model` filters) |
-| `/gsd forensics` | Full-access LSD debugger — structured anomaly detection, unit traces, and LLM-guided root-cause analysis for auto-mode failures |
-| `/gsd cleanup` | Clean up LSD state files and stale worktrees |
-| `/gsd visualize` | Open workflow visualizer (progress, deps, metrics, timeline) |
-| `/gsd export --html` | Generate self-contained HTML report for current or completed milestone |
-| `/gsd export --html --all` | Generate retrospective reports for all milestones at once |
-| `/gsd update` | Update LSD to the latest version in-session |
-| `/gsd knowledge` | Add persistent project knowledge (rule, pattern, or lesson) |
+| `/lsd` | Step mode — execute one unit at a time, pause between each |
+| `/lsd next` | Explicit step mode (same as `/lsd`) |
+| `/lsd auto` | Autonomous mode — research, plan, execute, commit, repeat |
+| `/lsd quick` | Execute a quick task with LSD guarantees (atomic commits, state tracking) without full planning overhead |
+| `/lsd stop` | Stop auto mode gracefully |
+| `/lsd pause` | Pause auto-mode (preserves state, `/lsd auto` to resume) |
+| `/lsd steer` | Hard-steer plan documents during execution |
+| `/lsd discuss` | Discuss architecture and decisions (works alongside auto mode) |
+| `/lsd status` | Progress dashboard |
+| `/lsd widget` | Cycle dashboard widget: full / small / min / off |
+| `/lsd queue` | Queue and reorder future milestones (safe during auto mode) |
+| `/lsd capture` | Fire-and-forget thought capture (works during auto mode) |
+| `/lsd triage` | Manually trigger triage of pending captures |
+| `/lsd dispatch` | Dispatch a specific phase directly (research, plan, execute, complete, reassess, uat, replan) |
+| `/lsd history` | View execution history (supports `--cost`, `--phase`, `--model` filters) |
+| `/lsd forensics` | Full-access LSD debugger — structured anomaly detection, unit traces, and LLM-guided root-cause analysis for auto-mode failures |
+| `/lsd cleanup` | Clean up LSD state files and stale worktrees |
+| `/lsd visualize` | Open workflow visualizer (progress, deps, metrics, timeline) |
+| `/lsd export --html` | Generate self-contained HTML report for current or completed milestone |
+| `/lsd export --html --all` | Generate retrospective reports for all milestones at once |
+| `/lsd update` | Update LSD to the latest version in-session |
+| `/lsd knowledge` | Add persistent project knowledge (rule, pattern, or lesson) |
 | `/fast` | Toggle service tier for supported models (prioritized API routing) |
-| `/gsd rate` | Rate last unit's model tier (over/ok/under) — improves adaptive routing |
-| `/gsd changelog` | Show categorized release notes |
-| `/gsd logs` | Browse activity logs, debug logs, and metrics |
-| `/gsd remote` | Control remote auto-mode |
-| `/gsd help` | Categorized command reference with descriptions for all GSD subcommands |
+| `/lsd rate` | Rate last unit's model tier (over/ok/under) — improves adaptive routing |
+| `/lsd changelog` | Show categorized release notes |
+| `/lsd logs` | Browse activity logs, debug logs, and metrics |
+| `/lsd remote` | Control remote auto-mode |
+| `/lsd help` | Categorized command reference with descriptions for all LSD subcommands |
 
 ## Configuration & Diagnostics
 
 | Command | Description |
 |---------|-------------|
-| `/gsd prefs` | Model selection, timeouts, budget ceiling |
-| `/gsd mode` | Switch workflow mode (solo/team) with coordinated defaults |
-| `/gsd config` | Re-run the provider setup wizard (LLM provider + tool keys) |
-| `/gsd keys` | API key manager — list, add, remove, test, rotate, doctor |
-| `/gsd doctor` | Runtime health checks with auto-fix |
-| `/gsd inspect` | Show SQLite DB diagnostics |
-| `/gsd init` | Project init wizard — detect, configure, bootstrap `.lsd/` |
-| `/gsd setup` | Global setup status and configuration |
-| `/gsd skill-health` | Skill lifecycle dashboard — usage stats, success rates, token trends, staleness warnings |
-| `/gsd skill-health <name>` | Detailed view for a single skill |
-| `/gsd skill-health --declining` | Show only skills flagged for declining performance |
-| `/gsd skill-health --stale N` | Show skills unused for N+ days |
-| `/gsd hooks` | Show configured post-unit and pre-dispatch hooks |
-| `/gsd run-hook` | Manually trigger a specific hook |
-| `/gsd migrate` | Migrate a `.planning` (v1) or `.gsd/` directory to `.lsd/` format |
+| `/lsd prefs` | Model selection, timeouts, budget ceiling |
+| `/lsd mode` | Switch workflow mode (solo/team) with coordinated defaults |
+| `/lsd config` | Re-run the provider setup wizard (LLM provider + tool keys) |
+| `/lsd keys` | API key manager — list, add, remove, test, rotate, doctor |
+| `/lsd doctor` | Runtime health checks with auto-fix |
+| `/lsd inspect` | Show SQLite DB diagnostics |
+| `/lsd init` | Project init wizard — detect, configure, bootstrap `.lsd/` |
+| `/lsd setup` | Global setup status and configuration |
+| `/lsd skill-health` | Skill lifecycle dashboard — usage stats, success rates, token trends, staleness warnings |
+| `/lsd skill-health <name>` | Detailed view for a single skill |
+| `/lsd skill-health --declining` | Show only skills flagged for declining performance |
+| `/lsd skill-health --stale N` | Show skills unused for N+ days |
+| `/lsd hooks` | Show configured post-unit and pre-dispatch hooks |
+| `/lsd run-hook` | Manually trigger a specific hook |
+| `/lsd migrate` | Migrate a `.planning` (v1) or `.gsd/` directory to `.lsd/` format |
 
 ## Milestone Management
 
 | Command | Description |
 |---------|-------------|
-| `/gsd new-milestone` | Create a new milestone |
-| `/gsd skip` | Prevent a unit from auto-mode dispatch |
-| `/gsd undo` | Revert last completed unit |
-| `/gsd undo-task` | Reset a specific task's completion state (DB + markdown) |
-| `/gsd reset-slice` | Reset a slice and all its tasks (DB + markdown) |
-| `/gsd park` | Park a milestone — skip without deleting |
-| `/gsd unpark` | Reactivate a parked milestone |
-| Discard milestone | Available via `/gsd` wizard → "Milestone actions" → "Discard" |
+| `/lsd new-milestone` | Create a new milestone |
+| `/lsd skip` | Prevent a unit from auto-mode dispatch |
+| `/lsd undo` | Revert last completed unit |
+| `/lsd undo-task` | Reset a specific task's completion state (DB + markdown) |
+| `/lsd reset-slice` | Reset a slice and all its tasks (DB + markdown) |
+| `/lsd park` | Park a milestone — skip without deleting |
+| `/lsd unpark` | Reactivate a parked milestone |
+| Discard milestone | Available via `/lsd` wizard → "Milestone actions" → "Discard" |
 
 ## Parallel Orchestration
 
 | Command | Description |
 |---------|-------------|
-| `/gsd parallel start` | Analyze eligibility, confirm, and start workers |
-| `/gsd parallel status` | Show all workers with state, progress, and cost |
-| `/gsd parallel stop [MID]` | Stop all workers or a specific milestone's worker |
-| `/gsd parallel pause [MID]` | Pause all workers or a specific one |
-| `/gsd parallel resume [MID]` | Resume paused workers |
-| `/gsd parallel merge [MID]` | Merge completed milestones back to main |
+| `/lsd parallel start` | Analyze eligibility, confirm, and start workers |
+| `/lsd parallel status` | Show all workers with state, progress, and cost |
+| `/lsd parallel stop [MID]` | Stop all workers or a specific milestone's worker |
+| `/lsd parallel pause [MID]` | Pause all workers or a specific one |
+| `/lsd parallel resume [MID]` | Resume paused workers |
+| `/lsd parallel merge [MID]` | Merge completed milestones back to main |
 
 See [Parallel Orchestration](./parallel-orchestration.md) for full documentation.
 
@@ -83,30 +85,30 @@ See [Parallel Orchestration](./parallel-orchestration.md) for full documentation
 
 | Command | Description |
 |---------|-------------|
-| `/gsd start` | Start a workflow template (bugfix, spike, feature, hotfix, refactor, security-audit, dep-upgrade, full-project) |
-| `/gsd start resume` | Resume an in-progress workflow |
-| `/gsd templates` | List available workflow templates |
-| `/gsd templates info <name>` | Show detailed template info |
+| `/lsd start` | Start a workflow template (bugfix, spike, feature, hotfix, refactor, security-audit, dep-upgrade, full-project) |
+| `/lsd start resume` | Resume an in-progress workflow |
+| `/lsd templates` | List available workflow templates |
+| `/lsd templates info <name>` | Show detailed template info |
 
 ## Custom Workflows
 
 | Command | Description |
 |---------|-------------|
-| `/gsd workflow new` | Create a new workflow definition (via skill) |
-| `/gsd workflow run <name>` | Create a run and start auto-mode |
-| `/gsd workflow list` | List workflow runs |
-| `/gsd workflow validate <name>` | Validate a workflow definition YAML |
-| `/gsd workflow pause` | Pause custom workflow auto-mode |
-| `/gsd workflow resume` | Resume paused custom workflow auto-mode |
+| `/lsd workflow new` | Create a new workflow definition (via skill) |
+| `/lsd workflow run <name>` | Create a run and start auto-mode |
+| `/lsd workflow list` | List workflow runs |
+| `/lsd workflow validate <name>` | Validate a workflow definition YAML |
+| `/lsd workflow pause` | Pause custom workflow auto-mode |
+| `/lsd workflow resume` | Resume paused custom workflow auto-mode |
 
 ## Extensions
 
 | Command | Description |
 |---------|-------------|
-| `/gsd extensions list` | List all extensions and their status |
-| `/gsd extensions enable <id>` | Enable a disabled extension |
-| `/gsd extensions disable <id>` | Disable an extension |
-| `/gsd extensions info <id>` | Show extension details |
+| `/lsd extensions list` | List all extensions and their status |
+| `/lsd extensions enable <id>` | Enable a disabled extension |
+| `/lsd extensions disable <id>` | Disable an extension |
+| `/lsd extensions info <id>` | Show extension details |
 
 ## Git & Worktrees
 
@@ -217,7 +219,7 @@ echo "Build a CLI tool" | lsd headless new-milestone --context -
 
 **Exit codes:** `0` = complete, `1` = error or timeout, `2` = blocked.
 
-Any `/gsd` subcommand works as a positional argument — `lsd headless status`, `lsd headless doctor`, `lsd headless dispatch execute`, etc.
+Any `/lsd` subcommand works as a positional argument — `lsd headless status`, `lsd headless doctor`, `lsd headless dispatch execute`, etc.
 
 ## MCP Server Mode
 
@@ -229,14 +231,14 @@ lsd --mode mcp
 
 ## Export
 
-`/gsd export` generates reports of milestone work.
+`/lsd export` generates reports of milestone work.
 
 ```bash
 # Generate HTML report for the active milestone
-/gsd export --html
+/lsd export --html
 
 # Generate retrospective reports for ALL milestones at once
-/gsd export --html --all
+/lsd export --html --all
 ```
 
 Reports are saved to `.lsd/reports/` with a browseable `index.html`.

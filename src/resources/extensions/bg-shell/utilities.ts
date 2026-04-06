@@ -76,17 +76,3 @@ export function getBgShellLiveCwd(
 		return "/";
 	}
 }
-
-export function resolveBgShellPersistenceCwd(
-	cachedCwd: string,
-	liveCwd: string | undefined = undefined,
-	pathExists: (path: string) => boolean = existsSync,
-): string {
-	const resolvedLiveCwd = liveCwd ?? getBgShellLiveCwd(cachedCwd, pathExists);
-	const cachedIsAutoWorktree = /(?:^|[\\/])\.gsd[\\/]worktrees[\\/]/.test(cachedCwd);
-	if (!cachedIsAutoWorktree) return cachedCwd;
-	if (cachedCwd === resolvedLiveCwd && pathExists(cachedCwd)) return cachedCwd;
-	if (!pathExists(cachedCwd)) return resolvedLiveCwd;
-	if (resolvedLiveCwd !== cachedCwd) return resolvedLiveCwd;
-	return cachedCwd;
-}

@@ -12,7 +12,7 @@
  */
 
 import { z } from 'zod';
-import { readFileSync, writeFileSync, chmodSync } from 'node:fs';
+import { readFileSync, writeFileSync, chmodSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import type Anthropic from '@anthropic-ai/sdk';
@@ -44,7 +44,7 @@ const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
 const CLIENT_ID = atob('OWQxYzI1MGEtZTYxYi00NGQ5LTg4ZWQtNTk0NGQxOTYyZjVl');
 
 /**
- * Read the Anthropic OAuth access token from GSD's auth.json.
+ * Read the Anthropic OAuth access token from LSD's auth.json.
  * If expired, refresh it and write the new credentials back.
  * Falls back to ANTHROPIC_API_KEY env var if no OAuth credential exists.
  */
@@ -54,20 +54,23 @@ async function resolveAnthropicApiKey(logger?: Logger): Promise<string> {
     return process.env.ANTHROPIC_API_KEY;
   }
 
-  const authPath = join(homedir(), '.gsd', 'agent', 'auth.json');
+  const authPath = (() => {
+    const lsdPath = join(homedir(), '.lsd', 'agent', 'auth.json');
+    return existsSync(lsdPath) ? lsdPath : join(homedir(), '.gsd', 'agent', 'auth.json');
+  })();
   let authData: Record<string, unknown>;
   try {
     authData = JSON.parse(readFileSync(authPath, 'utf-8'));
   } catch {
     throw new Error(
-      'No Anthropic auth found. Run `gsd login` to authenticate, or set ANTHROPIC_API_KEY.',
+      'No Anthropic auth found. Run `lsd login` to authenticate, or set ANTHROPIC_API_KEY.',
     );
   }
 
   const cred = authData.anthropic as OAuthCredentials | undefined;
   if (!cred || cred.type !== 'oauth' || !cred.access) {
     throw new Error(
-      'No Anthropic OAuth credential in auth.json. Run `gsd login` to authenticate.',
+      'No Anthropic OAuth credential in auth.json. Run `lsd login` to authenticate.',
     );
   }
 

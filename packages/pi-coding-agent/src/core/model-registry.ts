@@ -545,6 +545,16 @@ export class ModelRegistry {
 		if (config?.isReady) return config.isReady();
 		const authMode = this.getProviderAuthMode(provider);
 		if (authMode === "externalCli" || authMode === "none") return true;
+
+		// Check if provider has custom models from models.json with local baseUrl
+		// Local endpoints (Ollama, LM Studio) don't need auth storage
+		if (this.customProviderApiKeys.has(provider)) {
+			const providerModels = this.models.filter((m) => m.provider === provider);
+			if (providerModels.some(isLocalModel)) {
+				return true;
+			}
+		}
+
 		return this.authStorage.hasAuth(provider);
 	}
 

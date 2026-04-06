@@ -38,32 +38,33 @@ function errorContent(message: string): { isError: true; content: Array<{ type: 
 // ---------------------------------------------------------------------------
 
 async function readProjectState(projectDir: string, _query: string): Promise<Record<string, unknown>> {
-  const gsdDir = join(resolve(projectDir), '.gsd');
-  const result: Record<string, unknown> = { projectDir: resolve(projectDir) };
+  const root = resolve(projectDir);
+  const stateDir = await fileExists(join(root, '.lsd')) ? join(root, '.lsd') : join(root, '.gsd');
+  const result: Record<string, unknown> = { projectDir: root };
 
   // STATE.md — current execution state
   try {
-    result.state = await readFile(join(gsdDir, 'STATE.md'), 'utf-8');
+    result.state = await readFile(join(stateDir, 'STATE.md'), 'utf-8');
   } catch {
     result.state = null;
   }
 
   // PROJECT.md — project description
   try {
-    result.project = await readFile(join(gsdDir, 'PROJECT.md'), 'utf-8');
+    result.project = await readFile(join(stateDir, 'PROJECT.md'), 'utf-8');
   } catch {
     result.project = null;
   }
 
   // REQUIREMENTS.md — requirement contract
   try {
-    result.requirements = await readFile(join(gsdDir, 'REQUIREMENTS.md'), 'utf-8');
+    result.requirements = await readFile(join(stateDir, 'REQUIREMENTS.md'), 'utf-8');
   } catch {
     result.requirements = null;
   }
 
   // List milestones with basic metadata
-  const milestonesDir = join(gsdDir, 'milestones');
+  const milestonesDir = join(stateDir, 'milestones');
   try {
     const entries = await readdir(milestonesDir, { withFileTypes: true });
     const milestones: Array<{ id: string; hasRoadmap: boolean; hasSummary: boolean }> = [];

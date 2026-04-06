@@ -154,6 +154,8 @@ The default `lsd` experience is a full terminal UI with:
 - user interaction with that terminal directly from the TUI
 - agent interaction with terminal programs and commands that require prompts, input, or other interactive flows without getting blocked
 
+![Interactive TUI Terminal](./docs/images/interactive-tui-terminal.png)
+
 ### TUI slash commands
 
 Use `/help` inside LSD to see the live command list for your current session, including built-ins, extension commands, prompt templates, and skill commands.

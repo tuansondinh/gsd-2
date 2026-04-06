@@ -18,6 +18,13 @@ test('subagent launch resolves CLI path via env, argv, cwd fallbacks, and PATH',
   assert.ok(src.includes('execFileSync("which", [binName]'), 'checks PATH fallback via which')
 })
 
+test('subagent launch keeps stdin open for approval proxy responses', () => {
+  const src = readFileSync(join(projectRoot, 'src', 'resources', 'extensions', 'subagent', 'index.ts'), 'utf-8')
+
+  assert.ok(src.includes('stdio: ["pipe", "pipe", "pipe"]'), 'launches child with piped stdin/stdout/stderr')
+  assert.ok(!src.includes('proc.stdin.end()'), 'does not close child stdin before approval responses can be written')
+})
+
 test('loader exports both legacy and rebranded bin path env vars', () => {
   const src = readFileSync(join(projectRoot, 'src', 'loader.ts'), 'utf-8')
 

@@ -16,7 +16,6 @@ import {
 	restartProcess,
 	getInfo,
 	getGroupStatus,
-	persistManifest,
 } from "./process-manager.js";
 import {
 	generateDigest,
@@ -161,9 +160,6 @@ export function registerBgShellTool(pi: ExtensionAPI, state: BgShellSharedState)
 
 					// Give the process a moment to potentially fail immediately
 					await new Promise(r => setTimeout(r, 500));
-
-					// Persist manifest
-					persistManifest(ctx.cwd);
 
 					const info = getInfo(bg);
 					let text = `Started background process ${bg.id}\n`;
@@ -626,9 +622,6 @@ export function registerBgShellTool(pi: ExtensionAPI, state: BgShellSharedState)
 					const info = getInfo(bg);
 					if (!bg.alive) processes.delete(params.id);
 
-					// Update manifest
-					persistManifest(ctx.cwd);
-
 					return {
 						content: [{ type: "text" as const, text: killed ? `Killed process ${bg.id} (${bg.label})` : `Failed to kill process ${bg.id}` }],
 						details: { action: "kill", process: info },
@@ -654,7 +647,6 @@ export function registerBgShellTool(pi: ExtensionAPI, state: BgShellSharedState)
 
 					// Give it a moment
 					await new Promise(r => setTimeout(r, 500));
-					persistManifest(ctx.cwd);
 
 					const info = getInfo(newBg);
 					let text = `Restarted process (restart #${newBg.restartCount})\n`;

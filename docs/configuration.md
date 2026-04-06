@@ -1,17 +1,19 @@
 # Configuration
 
-LSD preferences live in `~/.lsd/PREFERENCES.md` (global) or `.lsd/PREFERENCES.md` (project-local). Manage interactively with `/gsd prefs`.
+LSD preferences live in `~/.lsd/PREFERENCES.md` (global) or `.lsd/PREFERENCES.md` (project-local). Manage interactively with `/lsd prefs`.
 
-## `/gsd prefs` Commands
+> Preferred command surface: use `/lsd ...`. Legacy `/gsd ...` aliases may still exist for compatibility.
+
+## `/lsd prefs` Commands
 
 | Command | Description |
 |---------|-------------|
-| `/gsd prefs` | Open the global preferences wizard (default) |
-| `/gsd prefs global` | Interactive wizard for global preferences (`~/.lsd/PREFERENCES.md`) |
-| `/gsd prefs project` | Interactive wizard for project preferences (`.lsd/PREFERENCES.md`) |
-| `/gsd prefs status` | Show current preference files, merged values, and skill resolution status |
-| `/gsd prefs wizard` | Alias for `/gsd prefs global` |
-| `/gsd prefs setup` | Alias for `/gsd prefs wizard` — creates preferences file if missing |
+| `/lsd prefs` | Open the global preferences wizard (default) |
+| `/lsd prefs global` | Interactive wizard for global preferences (`~/.lsd/PREFERENCES.md`) |
+| `/lsd prefs project` | Interactive wizard for project preferences (`.lsd/PREFERENCES.md`) |
+| `/lsd prefs status` | Show current preference files, merged values, and skill resolution status |
+| `/lsd prefs wizard` | Alias for `/lsd prefs global` |
+| `/lsd prefs setup` | Alias for `/lsd prefs wizard` — creates preferences file if missing |
 
 ## Preferences File Format
 

@@ -2,7 +2,7 @@
  * Worktree CLI — standalone subcommand and -w flag handling.
  *
  * Maintains lightweight git-worktree support without relying on the removed
- * bundled gsd extension runtime.
+ * bundled legacy planning extension runtime.
  */
 
 import { execFileSync } from 'node:child_process'
@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import chalk from 'chalk'
 import { accentHex } from './cli-theme.js'
 import { generateWorktreeName } from './worktree-name-gen.js'
+import { resolveProjectStateRoot } from './shared-paths.js'
 
 interface WorktreeInfo {
   name: string
@@ -58,7 +59,7 @@ function gitSafe(basePath: string, args: string[]): string {
 }
 
 function worktreeRoot(basePath: string): string {
-  return join(basePath, '.gsd', 'worktrees')
+  return join(resolveProjectStateRoot(basePath), 'worktrees')
 }
 
 function worktreeBranchName(name: string): string {
@@ -261,7 +262,7 @@ async function handleList(basePath: string): Promise<void> {
   const worktrees = listWorktrees(basePath)
 
   if (worktrees.length === 0) {
-    process.stderr.write(chalk.dim('No worktrees. Create one with: gsd -w <name>\n'))
+    process.stderr.write(chalk.dim('No worktrees. Create one with: lsd -w <name>\n'))
     return
   }
 
@@ -280,8 +281,8 @@ async function handleMerge(basePath: string, args: string[]): Promise<void> {
       await doMerge(basePath, worktrees[0].name)
       return
     }
-    process.stderr.write(chalk.red('Usage: gsd worktree merge <name>\n'))
-    process.stderr.write(chalk.dim('Run gsd worktree list to see worktrees.\n'))
+    process.stderr.write(chalk.red('Usage: lsd worktree merge <name>\n'))
+    process.stderr.write(chalk.dim('Run lsd worktree list to see worktrees.\n'))
     process.exit(1)
   }
   await doMerge(basePath, name)
@@ -311,7 +312,7 @@ async function doMerge(basePath: string, name: string): Promise<void> {
   }
 
   const commitType = inferCommitType(name)
-  const commitMessage = `${commitType}: merge worktree ${name}\n\nGSD-Worktree: ${name}`
+  const commitMessage = `${commitType}: merge worktree ${name}\n\nLSD-Worktree: ${name}`
 
   process.stderr.write(`\nMerging ${chalk.bold.cyan(name)} → ${chalk.magenta(nativeDetectMainBranch(basePath))}\n`)
   process.stderr.write(chalk.dim(`  ${status.filesChanged} files, ${chalk.green(`+${status.linesAdded}`)} ${chalk.red(`-${status.linesRemoved}`)}\n\n`))
@@ -324,7 +325,7 @@ async function doMerge(basePath: string, name: string): Promise<void> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     process.stderr.write(chalk.red(`✗ Merge failed: ${msg}\n`))
-    process.stderr.write(chalk.dim('  Resolve conflicts manually, then run gsd worktree merge again.\n'))
+    process.stderr.write(chalk.dim('  Resolve conflicts manually, then run lsd worktree merge again.\n'))
     process.exit(1)
   }
 }
@@ -358,7 +359,7 @@ async function handleClean(basePath: string): Promise<void> {
 async function handleRemove(basePath: string, args: string[]): Promise<void> {
   const name = args[0]
   if (!name) {
-    process.stderr.write(chalk.red('Usage: gsd worktree remove <name>\n'))
+    process.stderr.write(chalk.red('Usage: lsd worktree remove <name>\n'))
     process.exit(1)
   }
 
@@ -372,7 +373,7 @@ async function handleRemove(basePath: string, args: string[]): Promise<void> {
   const status = getWorktreeStatus(basePath, name, wt.path)
   if (status.filesChanged > 0 || status.uncommitted) {
     process.stderr.write(chalk.yellow(`⚠ Worktree "${name}" has unmerged changes (${status.filesChanged} files).\n`))
-    process.stderr.write(chalk.yellow('  Use --force to remove anyway, or merge first: gsd worktree merge ' + name + '\n'))
+    process.stderr.write(chalk.yellow('  Use --force to remove anyway, or merge first: lsd worktree merge ' + name + '\n'))
     if (!process.argv.includes('--force')) {
       process.exit(1)
     }
@@ -399,11 +400,11 @@ async function handleStatusBanner(basePath: string): Promise<void> {
 
   const names = withChanges.map(w => chalk.hex(accentHex())(w.name)).join(', ')
   process.stderr.write(
-    chalk.dim('[gsd] ') +
+    chalk.dim('[lsd] ') +
     chalk.yellow(`${withChanges.length} worktree${withChanges.length === 1 ? '' : 's'} with unmerged changes: `) +
     names + '\n' +
-    chalk.dim('[gsd] ') +
-    chalk.dim('Resume: gsd -w <name>  |  Merge: gsd worktree merge <name>  |  List: gsd worktree list\n\n'),
+    chalk.dim('[lsd] ') +
+    chalk.dim('Resume: lsd -w <name>  |  Merge: lsd worktree merge <name>  |  List: lsd worktree list\n\n'),
   )
 }
 
@@ -438,7 +439,7 @@ async function handleWorktreeFlag(worktreeFlag: boolean | string): Promise<void>
         const status = getWorktreeStatus(basePath, wt.name, wt.path)
         process.stderr.write(formatStatus(status) + '\n\n')
       }
-      process.stderr.write(chalk.dim('Specify which one: gsd -w <name>\n'))
+      process.stderr.write(chalk.dim('Specify which one: lsd -w <name>\n'))
       process.exit(0)
     }
 
@@ -467,7 +468,7 @@ async function createAndEnter(basePath: string, name: string): Promise<void> {
     const info = createWorktree(basePath, name)
     const hookError = runWorktreePostCreateHook(basePath, info.path)
     if (hookError) {
-      process.stderr.write(chalk.yellow(`[gsd] ${hookError}\n`))
+      process.stderr.write(chalk.yellow(`[lsd] ${hookError}\n`))
     }
 
     process.chdir(info.path)
@@ -478,7 +479,7 @@ async function createAndEnter(basePath: string, name: string): Promise<void> {
     process.stderr.write(chalk.dim(`  branch ${info.branch}\n\n`))
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    process.stderr.write(chalk.red(`[gsd] Failed to create worktree: ${msg}\n`))
+    process.stderr.write(chalk.red(`[lsd] Failed to create worktree: ${msg}\n`))
     process.exit(1)
   }
 }

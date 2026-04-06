@@ -3,7 +3,7 @@
  * marker files/directories. Reads one level deep (immediate children only).
  */
 
-import { readdir, stat, access } from 'node:fs/promises';
+import { readdir, stat } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 import type { ProjectInfo, ProjectMarker } from './types.js';
 
@@ -14,6 +14,7 @@ import type { ProjectInfo, ProjectMarker } from './types.js';
 const MARKER_MAP: ReadonlyMap<string, ProjectMarker> = new Map([
   ['.git', 'git'],
   ['package.json', 'node'],
+  ['.lsd', 'gsd'],
   ['.gsd', 'gsd'],
   ['Cargo.toml', 'rust'],
   ['pyproject.toml', 'python'],

@@ -1,6 +1,8 @@
 # Auto Mode
 
-Auto mode is LSD's autonomous execution engine. Type `/gsd auto`, walk away, come back to built software with a clean git history.
+Auto mode is LSD's autonomous execution engine. Type `/lsd auto`, walk away, come back to built software with a clean git history.
+
+> Preferred command surface: use `/lsd ...`. Legacy `/gsd ...` aliases may still exist for compatibility.
 
 ## How It Works
 
@@ -57,7 +59,7 @@ When your project has independent milestones, you can run them simultaneously. E
 
 ### Crash Recovery
 
-A lock file tracks the current unit. If the session dies, the next `/gsd auto` reads the surviving session file, synthesizes a recovery briefing, and resumes with full context.
+A lock file tracks the current unit. If the session dies, the next `/lsd auto` reads the surviving session file, synthesizes a recovery briefing, and resumes with full context.
 
 **Headless auto-restart:** When running `lsd headless auto`, crashes trigger automatic restart with exponential backoff (5s → 10s → 30s cap, default 3 attempts). Configure with `--max-restarts N`. Combined with crash recovery, this enables true overnight "run until done" execution.
 
@@ -130,14 +132,14 @@ After a milestone completes, LSD auto-generates a self-contained HTML report in 
 auto_report: true    # enabled by default
 ```
 
-Generate manually with `/gsd export --html`, or for all milestones with `/gsd export --html --all`.
+Generate manually with `/lsd export --html`, or for all milestones with `/lsd export --html --all`.
 
 ## Controlling Auto Mode
 
 ### Start
 
 ```
-/gsd auto
+/lsd auto
 ```
 
 ### Pause
@@ -147,7 +149,7 @@ Press **Escape**. The conversation is preserved. You can interact with the agent
 ### Resume
 
 ```
-/gsd auto
+/lsd auto
 ```
 
 Auto mode reads disk state and picks up where it left off.
@@ -155,7 +157,7 @@ Auto mode reads disk state and picks up where it left off.
 ### Stop
 
 ```
-/gsd stop
+/lsd stop
 ```
 
 Stops auto mode gracefully. Can be run from a different terminal.
@@ -163,7 +165,7 @@ Stops auto mode gracefully. Can be run from a different terminal.
 ### Steer
 
 ```
-/gsd steer
+/lsd steer
 ```
 
 Hard-steer plan documents during execution without stopping the pipeline. Changes are picked up at the next phase boundary.
@@ -171,7 +173,7 @@ Hard-steer plan documents during execution without stopping the pipeline. Change
 ### Capture
 
 ```
-/gsd capture "add rate limiting to API endpoints"
+/lsd capture "add rate limiting to API endpoints"
 ```
 
 Fire-and-forget thought capture. Captures are triaged automatically between tasks.
@@ -179,14 +181,14 @@ Fire-and-forget thought capture. Captures are triaged automatically between task
 ### Visualize
 
 ```
-/gsd visualize
+/lsd visualize
 ```
 
 Open the workflow visualizer — interactive tabs for progress, dependencies, metrics, and timeline.
 
 ## Dashboard
 
-`Ctrl+Alt+G` or `/gsd status` shows real-time progress:
+`Ctrl+Alt+G` or `/lsd status` shows real-time progress:
 
 - Current milestone, slice, and task
 - Auto mode elapsed time and phase
@@ -219,16 +221,16 @@ The recommended workflow for large builds: auto mode in one terminal, steering f
 
 ```bash
 lsd
-/gsd auto
+/lsd auto
 ```
 
 **Terminal 2 — steer while it works:**
 
 ```bash
 lsd
-/gsd discuss    # talk through architecture decisions
-/gsd status     # check progress
-/gsd queue      # queue the next milestone
+/lsd discuss    # talk through architecture decisions
+/lsd status     # check progress
+/lsd queue      # queue the next milestone
 ```
 
 Both terminals read and write the same `.lsd/` files. Decisions in terminal 2 are picked up at the next phase boundary automatically.

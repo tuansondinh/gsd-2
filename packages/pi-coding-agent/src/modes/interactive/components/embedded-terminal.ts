@@ -175,8 +175,9 @@ export class EmbeddedTerminalComponent implements Focusable {
         body.push(this.buildHeaderText(innerWidth));
         body.push("");
 
-        if (this.renderedLines.length > 0) {
-            body.push(...this.renderedLines);
+        const visibleTerminalLines = this.getVisibleTerminalLines();
+        if (visibleTerminalLines.length > 0) {
+            body.push(...visibleTerminalLines);
         } else if (this.status === "running") {
             body.push(theme.fg("dim", "Terminal waiting for output…"));
         }
@@ -184,6 +185,14 @@ export class EmbeddedTerminalComponent implements Focusable {
         body.push("");
         body.push(this.buildStatusText(innerWidth));
         return body;
+    }
+
+    private getVisibleTerminalLines(): string[] {
+        const lines = [...this.renderedLines];
+        while (lines.length > 0 && lines[lines.length - 1] === "") {
+            lines.pop();
+        }
+        return lines;
     }
 
     private buildHeaderText(innerWidth: number): string {
