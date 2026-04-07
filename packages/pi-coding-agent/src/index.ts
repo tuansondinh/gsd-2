@@ -342,6 +342,8 @@ export {
 	type FileChangeApprovalRequest,
 	type PermissionMode,
 	getPermissionMode,
+	getFileChangeApprovalHandler,
+	getClassifierHandler,
 	registerStdioApprovalHandler,
 	registerStdioClassifierHandler,
 	resolveApprovalResponse,

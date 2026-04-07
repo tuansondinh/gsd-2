@@ -1,4 +1,8 @@
 import type { ChildProcess } from "node:child_process";
+import {
+	getFileChangeApprovalHandler,
+	getClassifierHandler,
+} from "@gsd/pi-coding-agent";
 
 export type SubagentPermissionRequest =
 	| {
@@ -25,44 +29,60 @@ export function isSubagentPermissionRequest(event: any): event is SubagentPermis
 	);
 }
 
+/**
+ * Handles permission requests from subagent processes.
+ *
+ * This function forwards approval requests from subagents to the parent session's
+ * approval handlers, bypassing the permission mode check. This is important because
+ * the subagent has already determined it needs approval (it sent the request),
+ * so the parent should always prompt the user regardless of the parent's permission mode.
+ */
 export async function handleSubagentPermissionRequest(
 	event: SubagentPermissionRequest,
 	proc: Pick<ChildProcess, "stdin">,
-	handlers: {
-		requestFileChangeApproval: (request: {
-			action: "write" | "edit" | "delete" | "move";
-			path: string;
-			message: string;
-		}) => Promise<void>;
-		requestClassifierDecision: (request: {
-			toolName: string;
-			toolCallId: string;
-			args: any;
-		}) => Promise<boolean>;
-	},
 ): Promise<boolean> {
 	if (event.type === "approval_request") {
+		const handler = getFileChangeApprovalHandler();
 		let approved = true;
-		try {
-			await handlers.requestFileChangeApproval({
-				action: event.action,
-				path: event.path,
-				message: event.message,
-			});
-		} catch {
+
+		if (!handler) {
+			// No handler configured - deny by default for safety
 			approved = false;
+		} else {
+			try {
+				// Call the handler directly, bypassing permission mode check
+				const handlerApproved = await handler({
+					action: event.action,
+					path: event.path,
+					message: event.message,
+				});
+				approved = handlerApproved;
+			} catch {
+				approved = false;
+			}
 		}
+
 		if (proc.stdin && !proc.stdin.destroyed) {
 			proc.stdin.write(JSON.stringify({ type: "approval_response", id: event.id, approved }) + "\n");
 		}
 		return true;
 	}
 
-	const approved = await handlers.requestClassifierDecision({
-		toolName: event.toolName,
-		toolCallId: event.toolCallId,
-		args: event.args,
-	});
+	const classifierHandler = getClassifierHandler();
+	let approved = false;
+
+	if (classifierHandler) {
+		try {
+			approved = await classifierHandler({
+				toolName: event.toolName,
+				toolCallId: event.toolCallId,
+				args: event.args,
+			});
+		} catch {
+			approved = false;
+		}
+	}
+
 	if (proc.stdin && !proc.stdin.destroyed) {
 		proc.stdin.write(JSON.stringify({ type: "classifier_response", id: event.id, approved }) + "\n");
 	}

@@ -24,8 +24,6 @@ import {
     type ExtensionAPI,
     getAgentDir,
     getMarkdownTheme,
-    requestClassifierDecision,
-    requestFileChangeApproval,
 } from "@gsd/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@gsd/pi-tui";
 import { Type } from "@sinclair/typebox";
@@ -446,10 +444,7 @@ function processSubagentEventLine(
     }
 
     if (proc && isSubagentPermissionRequest(event)) {
-        void handleSubagentPermissionRequest(event, proc, {
-            requestFileChangeApproval,
-            requestClassifierDecision,
-        });
+        void handleSubagentPermissionRequest(event, proc);
         return false;
     }
 

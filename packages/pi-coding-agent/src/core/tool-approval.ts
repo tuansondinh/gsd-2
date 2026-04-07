@@ -67,8 +67,16 @@ export function setFileChangeApprovalHandler(handler: FileChangeApprovalHandler 
 	fileChangeApprovalHandler = handler;
 }
 
+export function getFileChangeApprovalHandler(): FileChangeApprovalHandler | null {
+	return fileChangeApprovalHandler;
+}
+
 export function setClassifierHandler(handler: ClassifierHandler | null): void {
 	classifierHandler = handler;
+}
+
+export function getClassifierHandler(): ClassifierHandler | null {
+	return classifierHandler;
 }
 
 export function setNetworkApprovalHandler(handler: NetworkApprovalHandler | null): void {
