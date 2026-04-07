@@ -381,7 +381,7 @@ export class AgentSession {
 
 	private _shouldIncludeAllExtensionTools(): boolean {
 		// Tool profiles now provide curated active sets. Do not auto-activate every
-		extension tool at startup, or the saved profile gets effectively ignored.
+		// extension tool at startup, or the saved profile gets effectively ignored.
 		return false;
 	}
 
