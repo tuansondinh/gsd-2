@@ -59,6 +59,25 @@ function str(value: unknown): string | null {
 	return null; // Invalid type
 }
 
+/**
+ * Returns true if the bash output indicates a privilege escalation failure
+ * that the agent process cannot resolve (sudo blocked, EPERM on root-owned files, etc.).
+ */
+function isBashPrivilegeError(output: string, command: string): boolean {
+	// Already handled by OS sandbox-policy path
+	if (/sandbox blocked this operation/i.test(output)) return false;
+	// sudo explicitly rejected by OS
+	if (/sudo.*operation not permitted/i.test(output)) return true;
+	if (/command exited with code 126/i.test(output) && /sudo/i.test(output)) return true;
+	// npm / other tools hitting root-owned cache files
+	if (/cache folder contains root-owned files/i.test(output)) return true;
+	// Generic EPERM when command involves sudo
+	if (/EPERM|operation not permitted/i.test(output) && /sudo/i.test(command)) return true;
+	// Permission denied when command involves sudo
+	if (/permission denied/i.test(output) && /sudo/i.test(command)) return true;
+	return false;
+}
+
 export interface ToolExecutionOptions {
 	showImages?: boolean; // default: true (only used if terminal supports images)
 	renderMode?: "minimal" | "normal";
@@ -672,6 +691,17 @@ export class ToolExecutionComponent extends Container {
 					}
 				}
 				body.addChild(new Text(`\n${theme.fg("warning", `[${warnings.join(". ")}]`)}`, 0, 0));
+			}
+
+			// Privilege escalation error — agent cannot sudo, show manual step callout
+			if (this.result.isError && command !== null && isBashPrivilegeError(output, command)) {
+				body.addChild(
+					new Text(
+						`\n${theme.fg("warning", "⚠ This command requires elevated privileges the agent cannot use.")}\n${theme.fg("muted", `Run it manually in your terminal:\n  ${command}`)}`,
+						0,
+						0,
+					),
+				);
 			}
 		}
 	}

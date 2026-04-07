@@ -17,6 +17,25 @@ import { truncateToVisualLines } from "./visual-truncate.js";
 // Preview line limit when not expanded (matches tool execution behavior)
 const PREVIEW_LINES = 20;
 
+/**
+ * Returns true if the command failure looks like a privilege/sudo escalation
+ * error that the agent cannot resolve — distinct from an OS sandbox policy block.
+ */
+function isPrivilegeError(output: string, command: string): boolean {
+	// Already handled by sandbox-policy path
+	if (/sandbox blocked this operation/i.test(output)) return false;
+	// sudo explicitly rejected
+	if (/sudo.*operation not permitted/i.test(output)) return true;
+	if (/command exited with code 126/i.test(output) && /sudo/i.test(output)) return true;
+	// Agent process itself hit EPERM (e.g. npm cache owned by root)
+	if (/EPERM|operation not permitted/i.test(output) && /sudo/i.test(command)) return true;
+	// npm cache root-owned files pattern
+	if (/cache folder contains root-owned files/i.test(output)) return true;
+	// Generic privilege denial patterns
+	if (/permission denied/i.test(output) && /sudo/i.test(command)) return true;
+	return false;
+}
+
 type ToolOutputMode = "minimal" | "normal";
 
 export class BashExecutionComponent extends Container {
@@ -216,6 +235,13 @@ export class BashExecutionComponent extends Container {
 							"warning",
 							"Sandbox blocked this operation. Run /sandbox to inspect the active policy and allowed paths.",
 						),
+					);
+				} else if (!this.sandboxed && isPrivilegeError(fullOutput, this.command)) {
+					statusParts.push(
+						theme.fg("warning", "⚠ This command requires elevated privileges the agent cannot use."),
+					);
+					statusParts.push(
+						theme.fg("muted", `Run it manually in your terminal:\n  ${this.command}`),
 					);
 				}
 			}
