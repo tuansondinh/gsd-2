@@ -380,7 +380,9 @@ export class AgentSession {
 	}
 
 	private _shouldIncludeAllExtensionTools(): boolean {
-		return !this.settingsManager.getToolSearch();
+		// Tool profiles now provide curated active sets. Do not auto-activate every
+		extension tool at startup, or the saved profile gets effectively ignored.
+		return false;
 	}
 
 	private async _waitForAutomatedFollowUps(): Promise<void> {

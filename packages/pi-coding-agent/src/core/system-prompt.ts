@@ -19,7 +19,12 @@ const toolDescriptions: Record<string, string> = {
 };
 
 export interface BuildSystemPromptOptions {
-	/** Custom system prompt (replaces default). */
+	/**
+	 * Custom system prompt that replaces the default role header, tool list,
+	 * and guidelines entirely. You are responsible for providing your own
+	 * tool-usage guidance. Project context, skills, extension promptGuidelines,
+	 * date/cwd, and appendSystemPrompt are still applied on top.
+	 */
 	customPrompt?: string;
 	/** Tools to include in prompt. Default: [read, bash, edit, write] */
 	selectedTools?: string[];
@@ -90,10 +95,6 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions = {}): strin
 			prompt += formatSkillsForPrompt(skills);
 		}
 
-		// Add date/time and working directory last
-		prompt += `\nCurrent date and time: ${dateTime}`;
-		prompt += `\nCurrent working directory: ${resolvedCwd}`;
-
 		// Append promptGuidelines from extension-registered tools.
 		// Without this, tools registered via pi.registerTool() with promptGuidelines
 		// have their definitions reach the API but the model has no guidance on when
@@ -104,6 +105,10 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions = {}): strin
 				prompt += guideline + "\n";
 			}
 		}
+
+		// Add date/time and working directory last
+		prompt += `\nCurrent date and time: ${dateTime}`;
+		prompt += `\nCurrent working directory: ${resolvedCwd}`;
 
 		return prompt;
 	}
