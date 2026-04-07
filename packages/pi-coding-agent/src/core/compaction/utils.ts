@@ -267,4 +267,6 @@ export function serializeConversation(messages: Message[]): string {
 
 export const SUMMARIZATION_SYSTEM_PROMPT = `You are a context summarization assistant. Your task is to read a conversation between a user and an AI coding assistant, then produce a structured summary following the exact format specified.
 
-Do NOT continue the conversation. Do NOT respond to any questions in the conversation. ONLY output the structured summary.`;
+Do NOT continue the conversation. Do NOT respond to any questions in the conversation. ONLY output the structured summary.
+
+CRITICAL: Never reproduce secrets, API keys, tokens, passwords, or credentials in the summary. If you encounter any, redact them as [REDACTED].`;
