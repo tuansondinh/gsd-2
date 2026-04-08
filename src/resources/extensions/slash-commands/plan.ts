@@ -364,7 +364,17 @@ function buildExecutionKickoffMessage(options: { permissionMode: RestorablePermi
   ];
   if (task) details.push(`Original task: ${task}`);
   if (state.latestPlanPath) details.push(`Primary plan artifact: ${state.latestPlanPath}`);
-  details.push("After subagent completion, summarize the result and any remaining follow-ups.");
+  details.push(
+    "Important: if the plan is large and you estimate it would exceed a single subagent's context window (~200k tokens), " +
+    "split execution across multiple sequential subagents instead of one. " +
+    "Use the subagent tool's chain mode: pass a \"chain\" array where each entry covers one self-contained phase or group of steps from the plan. " +
+    "Each chain entry should include the agent name, a focused task description for that phase, and may reference {previous} to receive the prior phase's output as handoff context. " +
+    "Only split when genuinely needed — prefer a single subagent for plans that fit comfortably.",
+  );
+  details.push(
+    "After all subagents complete: (1) do a quick review of the implementation — check that the plan steps were actually carried out, spot obvious issues or missed pieces, and verify the code compiles/passes lint if applicable. " +
+    "(2) Then summarize what was done, what (if anything) needs follow-up, and flag any concerns found during review.",
+  );
   return details.join(" ");
 }
 
