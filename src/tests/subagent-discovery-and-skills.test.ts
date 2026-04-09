@@ -212,7 +212,7 @@ test("discoverAgents parses agent frontmatter, keeps $budget_model, and drops ma
 		"name: valid-agent",
 		"description: Valid agent",
 		"model: $budget_model",
-		"tools: read, bash, , lsp",
+		"tools: read, bash, , lsp, bash, read",
 	], "Valid body\n");
 	writeAgentFile(userAgentsDir, "missing-name.md", ["description: Missing name"]);
 	writeAgentFile(userAgentsDir, "missing-description.md", ["name: missing-description"]);
@@ -331,6 +331,32 @@ test("subagent process args include resolved model, tools, and prompt path", () 
 		"read,lsp",
 		"--append-system-prompt",
 		"/tmp/prompt.md",
+		"Task: investigate auth flow",
+	]);
+});
+
+test("subagent process args dedupe duplicate tool names", () => {
+	const args = buildSubagentProcessArgs(
+		{
+			name: "scout",
+			description: "Scout",
+			tools: ["read", "lsp", "read", "grep", "lsp"],
+			systemPrompt: "body",
+			source: "user",
+			filePath: "/tmp/scout.md",
+		},
+		"investigate auth flow",
+		null,
+		undefined,
+	);
+
+	assert.deepEqual(args, [
+		"--mode",
+		"json",
+		"-p",
+		"--no-session",
+		"--tools",
+		"read,lsp,grep",
 		"Task: investigate auth flow",
 	]);
 });

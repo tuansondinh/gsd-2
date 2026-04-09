@@ -872,15 +872,20 @@ export class AgentSession {
 		const requestedToolNames = [...new Set([...toolNames, ...this._getBuiltinToolNames()])];
 		const tools: AgentTool[] = [];
 		const validToolNames: string[] = [];
+		const seenToolNames = new Set<string>();
 		for (const name of requestedToolNames) {
 			const tool = this._toolRegistry.get(name);
-			if (tool) {
-				tools.push(tool);
-				validToolNames.push(name);
+			if (!tool) {
+				continue;
 			}
+			if (seenToolNames.has(tool.name)) {
+				continue;
+			}
+			seenToolNames.add(tool.name);
+			tools.push(tool);
+			validToolNames.push(name);
 		}
 		this.agent.setTools(tools);
-
 
 		// Rebuild base system prompt with new tool set
 		this._baseSystemPrompt = this._rebuildSystemPrompt(validToolNames);

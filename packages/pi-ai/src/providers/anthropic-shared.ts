@@ -400,7 +400,18 @@ export function convertMessages(
 export function convertTools(tools: Tool[], isOAuthToken: boolean): Anthropic.Messages.Tool[] {
 	if (!tools) return [];
 
-	return tools.map((tool) => {
+	const uniqueTools: Tool[] = [];
+	const seenToolNames = new Set<string>();
+	for (const tool of tools) {
+		const mappedName = isOAuthToken ? toClaudeCodeName(tool.name) : tool.name;
+		if (seenToolNames.has(mappedName)) {
+			continue;
+		}
+		seenToolNames.add(mappedName);
+		uniqueTools.push(tool);
+	}
+
+	return uniqueTools.map((tool) => {
 		const jsonSchema = tool.parameters as any;
 
 		return {

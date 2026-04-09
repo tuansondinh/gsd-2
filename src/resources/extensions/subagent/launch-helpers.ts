@@ -23,7 +23,8 @@ export function buildSubagentProcessArgs(
 ): string[] {
 	const args: string[] = ["--mode", "json", "-p", "--no-session"];
 	if (model) args.push("--model", model);
-	if (agent.tools && agent.tools.length > 0) args.push("--tools", agent.tools.join(","));
+	const uniqueTools = agent.tools?.filter((tool, index, all) => all.indexOf(tool) === index);
+	if (uniqueTools && uniqueTools.length > 0) args.push("--tools", uniqueTools.join(","));
 	if (tmpPromptPath) args.push("--append-system-prompt", tmpPromptPath);
 	args.push(`Task: ${task}`);
 	return args;

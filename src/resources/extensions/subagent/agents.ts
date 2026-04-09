@@ -71,7 +71,8 @@ function loadAgentsFromDir(dir: string, source: "bundled" | "user" | "project"):
 		const tools = frontmatter.tools
 			?.split(",")
 			.map((t: string) => t.trim())
-			.filter(Boolean);
+			.filter(Boolean)
+			.filter((tool: string, index: number, all: string[]) => all.indexOf(tool) === index);
 
 		agents.push({
 			name: frontmatter.name,
