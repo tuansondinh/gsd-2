@@ -6,6 +6,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-04-09
+
+### Enhanced
+- **subagent discovery**: improved agent discovery and launch helpers for more reliable subagent routing
+- **agent session**: enhanced session management for better subagent context handling
+- **anthropic provider**: refined shared provider configuration for improved Anthropic API integration
+
 ## [1.2.3] - 2026-04-09
 
 ### Fixed
