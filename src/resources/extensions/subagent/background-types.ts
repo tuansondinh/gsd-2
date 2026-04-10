@@ -31,6 +31,10 @@ export interface BackgroundSubagentJob {
 	stderr?: string;
 	/** Model used by the subagent (if known) */
 	model?: string;
+	/** Session file created by the subagent run (if sessions are enabled) */
+	sessionFile?: string;
+	/** Parent session file this subagent was launched from (if known) */
+	parentSessionFile?: string;
 	/**
 	 * Set by await_job-style consumers when they've already consumed the result.
 	 * Suppresses the follow-up delivery.

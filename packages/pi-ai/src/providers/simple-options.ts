@@ -28,7 +28,6 @@ export function adjustMaxTokensForThinking(
 	customBudgets?: ThinkingBudgets,
 ): { maxTokens: number; thinkingBudget: number } {
 	const defaultBudgets: ThinkingBudgets = {
-		minimal: 1024,
 		low: 2048,
 		medium: 8192,
 		high: 16384,

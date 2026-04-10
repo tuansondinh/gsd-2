@@ -144,9 +144,15 @@ function shouldPreferAdaptiveThinkingByDefault(
     model: Model<any> | undefined,
     settingsManager: SettingsManager,
 ): boolean {
-    return !!model &&
-        model.provider === "anthropic" &&
-        model.reasoning === true &&
+    if (!model || model.reasoning !== true) {
+        return false;
+    }
+
+    if (settingsManager.getClientAdaptiveByDefault()) {
+        return true;
+    }
+
+    return model.provider === "anthropic" &&
         settingsManager.getAnthropicAdaptiveByDefault() &&
         supportsAdaptiveThinking(model.id);
 }
@@ -326,6 +332,16 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 
     const extensionRunnerRef: { current?: ExtensionRunner } = {};
 
+    // Resolve the adaptive classifier model for LLM-based adaptive thinking classification.
+    const adaptiveClassifierModelRef = settingsManager.getAdaptiveClassifierModel();
+    let adaptiveClassifierModel: Model<any> | undefined;
+    if (adaptiveClassifierModelRef) {
+        const parts = adaptiveClassifierModelRef.split("/");
+        if (parts.length === 2) {
+            adaptiveClassifierModel = modelRegistry.find(parts[0]!, parts[1]!) ?? undefined;
+        }
+    }
+
     agent = new Agent({
         initialState: {
             systemPrompt: "",
@@ -353,6 +369,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
         thinkingBudgets: settingsManager.getThinkingBudgets(),
         maxRetryDelayMs: settingsManager.getRetrySettings().maxDelayMs,
         externalToolExecution: (m) => modelRegistry.getProviderAuthMode(m.provider) === "externalCli",
+        adaptiveClassifierModel,
         getApiKey: async (provider) => {
             // Use the provider argument from the in-flight request;
             // agent.state.model may already be switched mid-turn.

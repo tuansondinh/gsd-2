@@ -13,6 +13,7 @@ import type { AgentConfig } from "./agents.js";
 export interface BackgroundLaunchContext {
 	defaultCwd: string;
 	model?: { provider: string; id: string };
+	parentSessionFile?: string;
 }
 
 /**
@@ -38,6 +39,8 @@ export function runSubagentInBackground(
 		finalOutput: string;
 		stderr: string;
 		model?: string;
+		sessionFile?: string;
+		parentSessionFile?: string;
 	}>,
 ): string {
 	const effectiveCwd = cwd ?? ctx.defaultCwd;
@@ -61,7 +64,12 @@ export function runSubagentInBackground(
 				stderr: result.stderr,
 				exitCode: result.exitCode,
 				model: result.model,
+				sessionFile: result.sessionFile,
+				parentSessionFile: result.parentSessionFile,
 			};
+		},
+		{
+			parentSessionFile: ctx.parentSessionFile,
 		},
 	);
 

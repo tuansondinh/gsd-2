@@ -51,6 +51,14 @@ const OptionSchema = Type.Object({
 	description: Type.String({ description: "One short sentence explaining impact/tradeoff if selected" }),
 });
 
+const ShowWhenSchema = Type.Object({
+	questionId: Type.String({ description: "Earlier question id this question depends on" }),
+	selectedAnyOf: Type.Array(Type.String(), {
+		description: "Show this question only when the earlier question selection includes one of these labels",
+		minItems: 1,
+	}),
+});
+
 const QuestionSchema = Type.Object({
 	id: Type.String({ description: "Stable identifier for mapping answers (snake_case)" }),
 	header: Type.String({ description: "Short header label shown in the UI (12 or fewer chars)" }),
@@ -65,6 +73,7 @@ const QuestionSchema = Type.Object({
 				"If true, the user can select multiple options using SPACE to toggle and ENTER to confirm. No 'None of the above' option is added. Default: false.",
 		}),
 	),
+	showWhen: Type.Optional(ShowWhenSchema),
 });
 
 const AskUserQuestionsParams = Type.Object({
@@ -88,6 +97,40 @@ function errorResult(
 }
 
 /** Convert the shared RoundResult into the JSON the LLM expects. */
+function selectedLabels(answer: { answers: string[] } | undefined): string[] {
+	if (!answer) return [];
+	return answer.answers.filter((item) => typeof item === "string" && !item.startsWith("user_note:"));
+}
+
+function shouldAskQuestion(
+	question: Question,
+	answers: Record<string, { answers: string[] }>,
+): boolean {
+	if (!question.showWhen) return true;
+	const controlling = answers[question.showWhen.questionId];
+	if (!controlling) return false;
+	const selected = selectedLabels(controlling);
+	return selected.some((label) => question.showWhen?.selectedAnyOf.includes(label));
+}
+
+function selectedRoundLabels(answer: { selected: string | string[]; notes: string } | undefined): string[] {
+	if (!answer) return [];
+	return (Array.isArray(answer.selected) ? answer.selected : [answer.selected]).filter(
+		(item): item is string => typeof item === "string" && item.length > 0,
+	);
+}
+
+function shouldRenderRoundQuestion(
+	question: Question,
+	answers: RoundResult["answers"],
+): boolean {
+	if (!question.showWhen) return true;
+	const controlling = answers[question.showWhen.questionId];
+	if (!controlling) return false;
+	const selected = selectedRoundLabels(controlling);
+	return selected.some((label) => question.showWhen?.selectedAnyOf.includes(label));
+}
+
 function formatForLLM(result: RoundResult): string {
 	const answers: Record<string, { answers: string[] }> = {};
 	for (const [id, answer] of Object.entries(result.answers)) {
@@ -118,6 +161,7 @@ export default function AskUserQuestions(pi: ExtensionAPI) {
 			"Keep questions to 1 when possible; never exceed 3.",
 			"For single-select: each question must have 2-3 options. Put the recommended option first with '(Recommended)' suffix. Do not include an 'Other' or 'None of the above' option - the client adds one automatically.",
 			"For multi-select: set allowMultiple: true. The user can pick any number of options. No 'None of the above' is added.",
+			"For conditional follow-ups, use showWhen.questionId and showWhen.selectedAnyOf on a later question so it only appears after the matching earlier answer.",
 		],
 		parameters: AskUserQuestionsParams,
 
@@ -136,6 +180,45 @@ export default function AskUserQuestions(pi: ExtensionAPI) {
 				}
 			}
 
+			for (let i = 0; i < params.questions.length; i++) {
+				const q = params.questions[i];
+				if (!q.showWhen) continue;
+				const controllerIndex = params.questions.findIndex((candidate) => candidate.id === q.showWhen?.questionId);
+				if (controllerIndex < 0 || controllerIndex >= i) {
+					return errorResult(
+						`Error: question "${q.id}" has invalid showWhen.questionId "${q.showWhen.questionId}" (must reference an earlier question id)`,
+						params.questions,
+					);
+				}
+				if (!q.showWhen.selectedAnyOf || q.showWhen.selectedAnyOf.length === 0) {
+					return errorResult(
+						`Error: question "${q.id}" showWhen.selectedAnyOf must include at least one option label`,
+						params.questions,
+					);
+				}
+				const controller = params.questions[controllerIndex];
+				const validLabels = [
+					...controller.options.map((option) => option.label),
+					...(!controller.allowMultiple ? [OTHER_OPTION_LABEL] : []),
+				];
+				const invalidLabels = q.showWhen.selectedAnyOf.filter((label) => !validLabels.includes(label));
+				if (invalidLabels.length > 0) {
+					return errorResult(
+						`Error: question "${q.id}" showWhen.selectedAnyOf contains unknown option labels: ${invalidLabels.join(", ")}`,
+						params.questions,
+					);
+				}
+			}
+
+			// Subagents have no human to respond — fail fast and tell the model to decide autonomously.
+			if (process.argv.includes('--subagent-name')) {
+				return errorResult(
+					"Error: ask_user_questions cannot be used inside a subagent. " +
+					"There is no human available. Make a reasonable autonomous decision and proceed.",
+					params.questions,
+				);
+			}
+
 			if (!ctx.hasUI) {
 				return errorResult("Error: UI not available (non-interactive mode)", params.questions);
 			}
@@ -149,6 +232,9 @@ export default function AskUserQuestions(pi: ExtensionAPI) {
 			if (!result) {
 				const answers: Record<string, { answers: string[] }> = {};
 				for (const q of params.questions) {
+					if (!shouldAskQuestion(q, answers)) {
+						continue;
+					}
 					const options = q.options.map((o) => o.label);
 					if (!q.allowMultiple) {
 						options.push(OTHER_OPTION_LABEL);
@@ -262,6 +348,7 @@ export default function AskUserQuestions(pi: ExtensionAPI) {
 				lines.push(theme.fg("dim", details.channel));
 				if (details.response) {
 					for (const q of questions) {
+						if (!shouldAskQuestion(q, details.response.answers)) continue;
 						const answer = details.response.answers[q.id];
 						if (!answer) {
 							lines.push(`${theme.fg("accent", q.header)}: ${theme.fg("dim", "(no answer)")}`);
@@ -284,6 +371,7 @@ export default function AskUserQuestions(pi: ExtensionAPI) {
 
 			const lines: string[] = [];
 			for (const q of details.questions) {
+				if (!shouldRenderRoundQuestion(q, details.response.answers)) continue;
 				const answer = (details.response as RoundResult).answers[q.id];
 				if (!answer) {
 					lines.push(`${theme.fg("accent", q.header)}: ${theme.fg("dim", "(no answer)")}`);

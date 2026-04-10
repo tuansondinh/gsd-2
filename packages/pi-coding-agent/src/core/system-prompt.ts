@@ -156,7 +156,10 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions = {}): strin
 
 	if (hasLsp) {
 		addGuideline(
-			"Code navigation in typed codebases: use lsp for symbols (definition, references, implementation, hover, diagnostics, rename, format). Use grep/find/ls for text patterns, filenames, and non-code files.",
+			"Code navigation in typed codebases: use lsp first for symbols (definition, references, implementation, type info, hover, callers, diagnostics, rename, format). Do not use grep/find as a substitute for symbol navigation when LSP is available. Use grep/find/ls for raw text patterns, filenames, and non-code files. If LSP is unavailable or failing, say so briefly and then fall back to grep/read.",
+		);
+		addGuideline(
+			"Before choosing a code navigation tool, classify intent: symbol lookup (definition/reference/implementation/type/caller/rename) → lsp; raw text or filename search → grep/find.",
 		);
 	} else {
 		addGuideline("Use grep/find/ls for code search and file exploration (faster than bash, respects .gitignore)");
@@ -219,6 +222,9 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions = {}): strin
 	}
 
 	const guidelines = guidelinesList.map((g) => `- ${g}`).join("\n");
+	const lspDecisionTable = hasLsp
+		? `\n\nTool selection — code navigation quick map:\n\n| Intent | Use | Avoid |\n| --- | --- | --- |\n| Find where a symbol is defined | \`lsp definition\` | \`grep\` |\n| Find all usages of a symbol | \`lsp references\` | \`grep\` |\n| Find implementations of an interface/type | \`lsp implementation\` | \`grep\` |\n| Get type info/docs for a symbol | \`lsp hover\` | raw text search |\n| Find callers of a function | \`lsp incoming_calls\` | \`grep\` |\n| Search literal text patterns (TODO, logs, strings) | \`grep\` | \`lsp\` |\n| Search filenames/paths | \`find\` / \`ls\` | \`lsp\` |\n| Rename a symbol across codebase | \`lsp rename\` | find-and-replace |\n| Check type errors after edits | \`lsp diagnostics\` | ad-hoc grep |\n| Format a file | \`lsp format\` | external formatter guesswork |`
+		: "";
 
 	const piDocsBlock = existsSync(readmePath)
 		? `\n\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):
@@ -236,7 +242,7 @@ ${toolsList}
 In addition to the tools above, you may have access to other custom tools depending on the project.
 
 Guidelines:
-${guidelines}${piDocsBlock}`;
+${guidelines}${lspDecisionTable}${piDocsBlock}`;
 
 	if (appendSection) {
 		prompt += appendSection;

@@ -16,8 +16,7 @@ import { DynamicBorder } from "./dynamic-border.js";
 
 export const THINKING_DESCRIPTIONS: Record<ThinkingLevel, string> = {
 	off: "No reasoning",
-	adaptive: "Claude decides when and how much to think (Claude 4.6+ only)",
-	minimal: "Very brief reasoning (~1k tokens)",
+	adaptive: "Automatically adapt per turn (client or provider resolved)",
 	low: "Light reasoning (~2k tokens)",
 	medium: "Moderate reasoning (~8k tokens)",
 	high: "Deep reasoning (~16k tokens)",
@@ -29,6 +28,7 @@ export interface SettingsConfig {
 	autoCompactThresholdPercent: number;
 	defaultModel: string;
 	classifierModel: string;
+	adaptiveClassifierModel: string;
 	budgetSubagentModel: string;
 	planModeReasoningModel: string;
 	planModeReviewModel: string;
@@ -48,6 +48,7 @@ export interface SettingsConfig {
 	transport: Transport;
 	thinkingLevel: ThinkingLevel;
 	anthropicAdaptiveByDefault: boolean;
+	clientAdaptiveByDefault: boolean;
 	availableThinkingLevels: ThinkingLevel[];
 	currentTheme: string;
 	availableThemes: string[];
@@ -74,6 +75,7 @@ export interface SettingsConfig {
 	sandboxNetworkMode?: "allow" | "ask" | "deny";
 	defaultModelSubmenu?: (currentValue: string, done: (selectedValue?: string) => void) => Component;
 	classifierModelSubmenu?: (currentValue: string, done: (selectedValue?: string) => void) => Component;
+	adaptiveClassifierModelSubmenu?: (currentValue: string, done: (selectedValue?: string) => void) => Component;
 	budgetSubagentModelSubmenu?: (currentValue: string, done: (selectedValue?: string) => void) => Component;
 	planModeReasoningModelSubmenu?: (currentValue: string, done: (selectedValue?: string) => void) => Component;
 	planModeReviewModelSubmenu?: (currentValue: string, done: (selectedValue?: string) => void) => Component;
@@ -85,6 +87,7 @@ export interface SettingsCallbacks {
 	onAutoCompactThresholdPercentChange: (percent: number) => void;
 	onDefaultModelChange: (modelRef: string) => void;
 	onClassifierModelChange: (modelRef: string) => void;
+	onAdaptiveClassifierModelChange: (modelRef: string) => void;
 	onBudgetSubagentModelChange: (modelRef: string) => void;
 	onPlanModeReasoningModelChange: (modelRef: string) => void;
 	onPlanModeReviewModelChange: (modelRef: string) => void;
@@ -109,6 +112,7 @@ export interface SettingsCallbacks {
 	onTransportChange: (transport: Transport) => void;
 	onThinkingLevelChange: (level: ThinkingLevel) => void;
 	onAnthropicAdaptiveByDefaultChange: (enabled: boolean) => void;
+	onClientAdaptiveByDefaultChange: (enabled: boolean) => void;
 	onThemeChange: (theme: string) => void;
 	onThemePreview?: (theme: string) => void;
 	onThemeAccentChange: (accent: string) => void;
@@ -230,6 +234,13 @@ export class SettingsSelectorComponent extends Container {
 				description: "Model used for Auto permission mode approvals",
 				currentValue: config.classifierModel,
 				submenu: config.classifierModelSubmenu,
+			},
+			{
+				id: "adaptive-classifier-model",
+				label: "Adaptive classifier model",
+				description: "LLM used to pick reasoning level when adaptive mode is on (default: heuristic)",
+				currentValue: config.adaptiveClassifierModel,
+				submenu: config.adaptiveClassifierModelSubmenu,
 			},
 			{
 				id: "budget-subagent-model",
@@ -379,6 +390,13 @@ export class SettingsSelectorComponent extends Container {
 				label: "Anthropic adaptive",
 				description: "Default to adaptive thinking for supported Anthropic models",
 				currentValue: config.anthropicAdaptiveByDefault ? "true" : "false",
+				values: ["true", "false"],
+			},
+			{
+				id: "client-adaptive-default",
+				label: "Adaptive by default",
+				description: "Default to adaptive thinking for all reasoning-capable models",
+				currentValue: config.clientAdaptiveByDefault ? "true" : "false",
 				values: ["true", "false"],
 			},
 			{
@@ -646,6 +664,9 @@ export class SettingsSelectorComponent extends Container {
 					case "classifier-model":
 						callbacks.onClassifierModelChange(newValue);
 						break;
+					case "adaptive-classifier-model":
+						callbacks.onAdaptiveClassifierModelChange(newValue);
+						break;
 					case "budget-subagent-model":
 						callbacks.onBudgetSubagentModelChange(newValue);
 						break;
@@ -711,6 +732,9 @@ export class SettingsSelectorComponent extends Container {
 						break;
 					case "anthropic-adaptive-default":
 						callbacks.onAnthropicAdaptiveByDefaultChange(newValue === "true");
+						break;
+					case "client-adaptive-default":
+						callbacks.onClientAdaptiveByDefaultChange(newValue === "true");
 						break;
 					case "hide-thinking":
 						callbacks.onHideThinkingBlockChange(newValue === "true");

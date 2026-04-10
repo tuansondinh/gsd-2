@@ -20,12 +20,23 @@ export function buildSubagentProcessArgs(
 	task: string,
 	tmpPromptPath: string | null,
 	model: string | undefined,
+	options?: { noSession?: boolean; parentSessionFile?: string; mode?: "json" | "rpc" },
 ): string[] {
-	const args: string[] = ["--mode", "json", "-p", "--no-session"];
-	if (model) args.push("--model", model);
+	const mode = options?.mode ?? "json";
+	const args: string[] = ["--mode", mode];
+	if (mode === "json") args.push("-p");
+	if (options?.noSession ?? true) args.push("--no-session");
+	if (options?.parentSessionFile) args.push("--parent-session", options.parentSessionFile);
+	args.push("--subagent-name", agent.name);
+	args.push("--subagent-task", task);
 	const uniqueTools = agent.tools?.filter((tool, index, all) => all.indexOf(tool) === index);
+	if (uniqueTools && uniqueTools.length > 0) args.push("--subagent-tools", uniqueTools.join(","));
+	if (model) args.push("--model", model);
 	if (uniqueTools && uniqueTools.length > 0) args.push("--tools", uniqueTools.join(","));
-	if (tmpPromptPath) args.push("--append-system-prompt", tmpPromptPath);
-	args.push(`Task: ${task}`);
+	if (tmpPromptPath) {
+		args.push("--append-system-prompt", tmpPromptPath);
+		args.push("--subagent-system-prompt-file", tmpPromptPath);
+	}
+	if (mode === "json") args.push(`Task: ${task}`);
 	return args;
 }

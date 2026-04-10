@@ -73,6 +73,52 @@ describe("custom UI fallback paths", () => {
 		assert.equal(result.answers.q1?.notes, "My custom answer");
 	});
 
+	it("showInterviewRound skips conditional question when condition is not met", async () => {
+		const selectCalls: Array<{ title: string; options: string[] }> = [];
+		const ctx = {
+			hasUI: true,
+			ui: {
+				custom: async () => undefined,
+				select: async (title: string, options: string[]) => {
+					selectCalls.push({ title, options });
+					if (title.startsWith("Q1:")) return "Review";
+					return options[0];
+				},
+				input: async () => "",
+			},
+		};
+
+		const result = await showInterviewRound(
+			[
+				{
+					id: "q1",
+					header: "Q1",
+					question: "Approve?",
+					options: [
+						{ label: "Approve", description: "approve" },
+						{ label: "Review", description: "review" },
+					],
+				},
+				{
+					id: "q2",
+					header: "Q2",
+					question: "Mode?",
+					options: [
+						{ label: "Auto", description: "auto" },
+						{ label: "Bypass", description: "bypass" },
+					],
+					showWhen: { questionId: "q1", selectedAnyOf: ["Approve"] },
+				},
+			],
+			{},
+			ctx as any,
+		);
+
+		assert.equal(selectCalls.length, 1, "conditional question should be skipped in fallback mode");
+		assert.equal(result.answers.q1?.selected, "Review");
+		assert.equal(result.answers.q2, undefined);
+	});
+
 	it("collectOneSecret respects null from secure UI and does not fall back to plaintext input", async () => {
 		let inputCalls = 0;
 		const notifications: Array<{ message: string; type?: string }> = [];

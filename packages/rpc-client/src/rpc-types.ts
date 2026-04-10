@@ -14,7 +14,7 @@
 // ============================================================================
 
 /** Thinking budget level (inlined from agent-core) */
-export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+export type ThinkingLevel = "off" | "low" | "medium" | "high" | "xhigh";
 
 /** Image attachment (inlined from pi-ai) */
 export interface ImageContent {

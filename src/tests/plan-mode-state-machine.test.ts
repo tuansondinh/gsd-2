@@ -171,7 +171,7 @@ test('plan mode presents the saved plan and approval options before approval', a
 
   const lastMessage = pi.sentMessages.at(-1) ?? ''
   assert.match(lastMessage, /do not restate the plan in a normal assistant response/i)
-  assert.match(lastMessage, /ask for approval now via ask_user_questions/i)
+  assert.match(lastMessage, /ask for plan approval now via.*ask_user_questions/i)
   assert.match(lastMessage, /Approve plan \(Recommended\)/)
   assert.match(lastMessage, /Let other agent review/)
   assert.match(lastMessage, /Revise plan/)
@@ -330,6 +330,11 @@ test('plan mode pending → approved switches to configured reasoning model and 
   assert.match(pi.sentMessages.at(-1) ?? '', /Plan approved\. Exit plan mode and start implementation immediately\./)
   assert.match(pi.sentMessages.at(-1) ?? '', /Original task: Ship phase 4/)
   assert.match(pi.sentMessages.at(-1) ?? '', /\.lsd\/plan\/PLAN-3\.md/)
+  assert.equal(
+    pi.sentMessages.some((m) => m.includes('Now ask which execution mode to use via ask_user_questions')),
+    false,
+    'execution mode question should not be steered as a second ask_user_questions call',
+  )
 })
 
 test('plan mode review option delegates to another agent with configured review model', async (t) => {
@@ -369,7 +374,7 @@ test('plan mode review option delegates to another agent with configured review 
   await pi.handlers.tool_result(
     {
       toolName: 'ask_user_questions',
-      details: makeAskUserDetails('Let other agent review', 'Auto mode'),
+      details: makeAskUserDetails('Let other agent review'),
     },
     makeCtx({ model: preplanModel }),
   )
@@ -418,7 +423,7 @@ test('plan mode pending → revising → pending → approved keeps preplan mode
   await pi.handlers.tool_result(
     {
       toolName: 'ask_user_questions',
-      details: makeAskUserDetails('Revise plan', 'Auto mode'),
+      details: makeAskUserDetails('Revise plan'),
     },
     makeCtx({ model: preplanModel }),
   )
@@ -484,7 +489,7 @@ test('plan mode pending → cancelled restores preplan model and original permis
   await pi.handlers.tool_result(
     {
       toolName: 'ask_user_questions',
-      details: makeAskUserDetails(['None of the above'], 'Auto mode', false, 'Cancel'),
+      details: makeAskUserDetails(['None of the above'], undefined, false, 'Cancel'),
     },
     makeCtx({ model: { provider: 'anthropic', id: 'claude-sonnet-4-6' } }),
   )

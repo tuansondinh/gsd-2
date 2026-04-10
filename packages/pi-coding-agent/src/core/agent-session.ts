@@ -122,6 +122,7 @@ export function parseSkillBlock(text: string): ParsedSkillBlock | null {
 export type SessionStateChangeReason =
 	| "set_model"
 	| "set_thinking_level"
+	| "adaptive_classified"
 	| "set_steering_mode"
 	| "set_follow_up_mode"
 	| "set_auto_compaction"
@@ -231,17 +232,8 @@ export interface SessionStats {
 // Constants
 // ============================================================================
 
-/** Standard thinking levels */
-const THINKING_LEVELS: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high"];
-
-/** Thinking levels including xhigh (for supported models) */
-const THINKING_LEVELS_WITH_XHIGH: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh"];
-
-/** Thinking levels for models supporting adaptive thinking (Claude Opus/Sonnet 4.6+) */
-const THINKING_LEVELS_WITH_ADAPTIVE: ThinkingLevel[] = ["off", "adaptive", "minimal", "low", "medium", "high"];
-
-/** Thinking levels for models supporting both adaptive and xhigh */
-const THINKING_LEVELS_WITH_ADAPTIVE_AND_XHIGH: ThinkingLevel[] = ["off", "adaptive", "minimal", "low", "medium", "high", "xhigh"];
+/** Canonical thinking levels; availability is filtered per model capability */
+const THINKING_LEVELS_ALL: ThinkingLevel[] = ["off", "adaptive", "low", "medium", "high", "xhigh"];
 
 // ============================================================================
 // AgentSession Class
@@ -479,6 +471,9 @@ export class AgentSession {
 
 		// Notify all listeners
 		this._emit(event);
+		if (event.type === "adaptive_classified") {
+			this._emitSessionStateChanged("adaptive_classified");
+		}
 
 		// Handle session persistence
 		if (event.type === "message_end") {
@@ -563,6 +558,7 @@ export class AgentSession {
 
 					// Auto-retry after downsizing
 					setTimeout(() => {
+						this._enforcePlanModeHighThinkingLevel();
 						this.agent.continue().catch(() => {});
 					}, 0);
 					return;
@@ -826,6 +822,11 @@ export class AgentSession {
 	/** Current thinking level */
 	get thinkingLevel(): ThinkingLevel {
 		return this.agent.state.thinkingLevel;
+	}
+
+	/** Last adaptive classifier decision for footer/debug visibility */
+	get lastAdaptiveDecision(): AgentState["lastAdaptiveDecision"] {
+		return this.agent.state.lastAdaptiveDecision;
 	}
 
 	/** Whether agent is currently streaming a response */
@@ -1164,6 +1165,16 @@ export class AgentSession {
 	// Prompting
 	// =========================================================================
 
+	private _enforcePlanModeHighThinkingLevel(): void {
+		if (getPermissionMode() !== "plan") return;
+		if (!this.supportsThinking()) return;
+		if (this.agent.state.thinkingLevel === "high") return;
+
+		this.agent.setThinkingLevel("high");
+		this.sessionManager.appendThinkingLevelChange("high");
+		this._emitSessionStateChanged("set_thinking_level");
+	}
+
 	/**
 	 * Send a prompt to the agent.
 	 * - Handles extension commands (registered via pi.registerCommand) immediately, even during streaming
@@ -1327,6 +1338,7 @@ export class AgentSession {
 			}
 		}
 
+		this._enforcePlanModeHighThinkingLevel();
 		await this.agent.prompt(messages);
 		await this._waitForAutomatedFollowUps();
 	}
@@ -2000,15 +2012,11 @@ export class AgentSession {
 	 */
 	getAvailableThinkingLevels(): ThinkingLevel[] {
 		if (!this.supportsThinking()) return ["off"];
-		const adaptive = this.supportsAdaptiveThinking();
-		const xhigh = this.supportsXhighThinking();
-		if (adaptive && xhigh) return THINKING_LEVELS_WITH_ADAPTIVE_AND_XHIGH;
-		if (adaptive) return THINKING_LEVELS_WITH_ADAPTIVE;
-		return xhigh ? THINKING_LEVELS_WITH_XHIGH : THINKING_LEVELS;
+		return THINKING_LEVELS_ALL.filter((level) => level !== "xhigh" || this.supportsXhighThinking());
 	}
 
 	/**
-	 * Check if current model supports adaptive thinking (Claude Opus/Sonnet 4.6+).
+	 * Check if current model supports provider-side adaptive thinking.
 	 */
 	supportsAdaptiveThinking(): boolean {
 		return this.model ? supportsAdaptiveThinking(this.model.id) : false;
@@ -2032,6 +2040,9 @@ export class AgentSession {
 		if (explicitLevel !== undefined) {
 			return explicitLevel;
 		}
+		if (targetModel.reasoning === true && this.settingsManager.getClientAdaptiveByDefault()) {
+			return "adaptive";
+		}
 		if (
 			targetModel.provider === "anthropic" &&
 			targetModel.reasoning === true &&
@@ -2047,7 +2058,7 @@ export class AgentSession {
 	}
 
 	private _clampThinkingLevel(level: ThinkingLevel, availableLevels: ThinkingLevel[]): ThinkingLevel {
-		const ordered = THINKING_LEVELS_WITH_ADAPTIVE_AND_XHIGH;
+		const ordered = THINKING_LEVELS_ALL;
 		const available = new Set(availableLevels);
 		const requestedIndex = ordered.indexOf(level);
 		if (requestedIndex === -1) {
@@ -2316,6 +2327,7 @@ export class AgentSession {
 							downsizeConversationImages(messages as Message[]);
 						}
 						this.agent.replaceMessages(messages.slice(0, -1));
+						this._enforcePlanModeHighThinkingLevel();
 						this.agent.continue().catch((err) => {
 							runner.emitError({
 								extensionPath: "<runtime>",

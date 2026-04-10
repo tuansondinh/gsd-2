@@ -48,6 +48,11 @@ interface CliFlags {
   print?: boolean
   continue?: boolean
   noSession?: boolean
+  parentSession?: string
+  subagentName?: string
+  subagentTask?: string
+  subagentTools?: string[]
+  subagentSystemPromptFile?: string
   worktree?: boolean | string
   model?: string
   sandbox?: 'none' | 'workspace-write' | 'auto'
@@ -91,6 +96,16 @@ function parseCliArgs(argv: string[]): CliFlags {
       flags.continue = true
     } else if (arg === '--no-session') {
       flags.noSession = true
+    } else if (arg === '--parent-session' && i + 1 < args.length) {
+      flags.parentSession = args[++i]
+    } else if (arg === '--subagent-name' && i + 1 < args.length) {
+      flags.subagentName = args[++i]
+    } else if (arg === '--subagent-task' && i + 1 < args.length) {
+      flags.subagentTask = args[++i]
+    } else if (arg === '--subagent-tools' && i + 1 < args.length) {
+      flags.subagentTools = args[++i].split(',').filter(Boolean)
+    } else if (arg === '--subagent-system-prompt-file' && i + 1 < args.length) {
+      flags.subagentSystemPromptFile = args[++i]
     } else if (arg === '--model' && i + 1 < args.length) {
       flags.model = args[++i]
     } else if (arg === '--sandbox' && i + 1 < args.length) {
@@ -407,9 +422,28 @@ if (!settingsManager.getCollapseChangelog()) {
 // ---------------------------------------------------------------------------
 if (isPrintMode) {
   await ensureRtkBootstrap()
+  const printCwd = process.cwd()
+  const printSessionsDir = getProjectSessionsDir(printCwd)
   const sessionManager = cliFlags.noSession
-    ? SessionManager.inMemory()
-    : SessionManager.create(process.cwd())
+    ? SessionManager.inMemory(printCwd)
+    : SessionManager.create(printCwd, printSessionsDir)
+  let subagentSystemPrompt: string | undefined
+  if (cliFlags.subagentSystemPromptFile) {
+    try {
+      subagentSystemPrompt = readFileSync(cliFlags.subagentSystemPromptFile, 'utf-8')
+    } catch {
+      subagentSystemPrompt = undefined
+    }
+  }
+  if (!cliFlags.noSession && (cliFlags.parentSession || cliFlags.subagentName || subagentSystemPrompt || cliFlags.subagentTools?.length)) {
+    sessionManager.newSession({
+      parentSession: cliFlags.parentSession,
+      subagentName: cliFlags.subagentName,
+      subagentTask: cliFlags.subagentTask,
+      subagentSystemPrompt,
+      subagentTools: cliFlags.subagentTools,
+    })
+  }
 
   // Read --append-system-prompt file content (subagent writes agent system prompts to temp files)
   let appendSystemPrompt: string | undefined

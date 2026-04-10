@@ -840,7 +840,6 @@ export const streamSimpleGoogleGeminiCli: StreamFunction<"google-gemini-cli", Si
 	}
 
 	const defaultBudgets: ThinkingBudgets = {
-		minimal: 1024,
 		low: 2048,
 		medium: 8192,
 		high: 16384,
@@ -954,7 +953,6 @@ type ClampedThinkingLevel = Exclude<ThinkingLevel, "xhigh" | "adaptive">;
 function getGeminiCliThinkingLevel(effort: ClampedThinkingLevel, modelId: string): GoogleThinkingLevel {
 	if (isGemini3ProModel(modelId)) {
 		switch (effort) {
-			case "minimal":
 			case "low":
 				return "LOW";
 			case "medium":
@@ -963,8 +961,6 @@ function getGeminiCliThinkingLevel(effort: ClampedThinkingLevel, modelId: string
 		}
 	}
 	switch (effort) {
-		case "minimal":
-			return "MINIMAL";
 		case "low":
 			return "LOW";
 		case "medium":

@@ -182,12 +182,9 @@ export function handleStreamError(
 
 /**
  * Clamp reasoning effort for models that don't support all levels.
- * gpt-5.x models don't support "minimal" -- map to "low".
  *
  * Used by both openai-responses.ts and azure-openai-responses.ts.
  */
 export function clampReasoningForModel(modelName: string, effort: string): string {
-	const name = modelName.includes("/") ? modelName.split("/").pop()! : modelName;
-	if (name.startsWith("gpt-5") && effort === "minimal") return "low";
 	return effort;
 }

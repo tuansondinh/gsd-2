@@ -45,6 +45,12 @@ export async function runPrintMode(session: AgentSession, options: PrintModeOpti
 		if (header) {
 			console.log(JSON.stringify(header));
 		}
+		console.log(JSON.stringify({
+			type: "subagent_session_info",
+			sessionFile: session.sessionManager.getSessionFile() ?? null,
+			sessionId: session.sessionManager.getSessionId(),
+			parentSessionFile: header?.parentSession ?? null,
+		}));
 	}
 	const permMode = getPermissionMode();
 	if (permMode === "accept-on-edit") registerStdioApprovalHandler();

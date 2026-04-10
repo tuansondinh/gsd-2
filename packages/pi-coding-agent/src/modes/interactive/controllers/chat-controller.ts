@@ -59,6 +59,7 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 					return;
 				case "set_model":
 				case "set_thinking_level":
+				case "adaptive_classified":
 					host.updateEditorBorderColor();
 					host.ui.requestRender();
 					return;

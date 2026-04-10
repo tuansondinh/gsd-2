@@ -40,7 +40,7 @@ export const BUILTIN_SLASH_COMMANDS: ReadonlyArray<BuiltinSlashCommand> = [
 	{ name: "compact", description: "Manually compact the session context" },
 	{ name: "resume", description: "Resume a different session" },
 	{ name: "reload", description: "Reload extensions, skills, prompts, and themes" },
-	{ name: "thinking", description: "Set thinking level (off/minimal/low/medium/high/xhigh)" },
+	{ name: "thinking", description: "Set thinking level (off/low/medium/high/xhigh)" },
 	{ name: "edit-mode", description: "Toggle edit mode (standard/hashline)" },
 	{ name: "terminal", description: "Run a shell command directly (e.g. /terminal ping -c3 1.1.1.1)" },
 	{ name: "quit", description: "Quit pi" },

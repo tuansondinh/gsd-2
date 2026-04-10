@@ -222,8 +222,16 @@ export class FooterComponent implements Component {
 		let rightSideWithoutProvider = modelName;
 		if (displayModel?.reasoning) {
 			const thinkingLevel = state.thinkingLevel || "off";
-			rightSideWithoutProvider =
-				thinkingLevel === "off" ? `${modelName} • thinking off` : `${modelName} • ${thinkingLevel}`;
+			if (thinkingLevel === "off") {
+				rightSideWithoutProvider = `${modelName} • thinking off`;
+			} else if (thinkingLevel === "adaptive") {
+				const resolved = state.lastAdaptiveDecision?.level;
+				rightSideWithoutProvider = resolved
+					? `${modelName} • adaptive→${resolved}`
+					: `${modelName} • adaptive`;
+			} else {
+				rightSideWithoutProvider = `${modelName} • ${thinkingLevel}`;
+			}
 		}
 
 		// Prepend the provider in parentheses if there are multiple providers and there's enough room

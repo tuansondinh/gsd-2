@@ -402,7 +402,6 @@ function mapThinkingLevelToEffort(
 		case "adaptive":
 			// No effort override — let Claude decide based on request complexity
 			return undefined;
-		case "minimal":
 		case "low":
 			return "low";
 		case "medium":
@@ -699,7 +698,6 @@ function buildAdditionalModelRequestFields(
 			: (() => {
 					const defaultBudgets: Record<ThinkingLevel, number> = {
 						adaptive: 16384, // Fallback for old models that don't support adaptive
-						minimal: 1024,
 						low: 2048,
 						medium: 8192,
 						high: 16384,

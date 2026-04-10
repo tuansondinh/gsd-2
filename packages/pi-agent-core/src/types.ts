@@ -208,9 +208,10 @@ export interface AgentLoopConfig extends SimpleStreamOptions {
 /**
  * Thinking/reasoning level for models that support it.
  * Note: "xhigh" is only supported by OpenAI gpt-5.1-codex-max, gpt-5.2, gpt-5.2-codex, gpt-5.3, and gpt-5.3-codex models.
- * Note: "adaptive" is only supported by Claude Opus 4.6 and Sonnet 4.6 — Claude dynamically decides when and how much to think.
+ * Note: "adaptive" is a session-level mode. Some providers handle it server-side,
+ * and others are resolved client-side to a concrete level per user turn.
  */
-export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "adaptive";
+export type ThinkingLevel = "off" | "low" | "medium" | "high" | "xhigh" | "adaptive";
 
 /**
  * Extensible interface for custom app messages.
@@ -256,6 +257,13 @@ export interface AgentState {
 	 * of `model` to avoid showing a stale value after a mid-turn model switch.
 	 */
 	activeInferenceModel?: Model<any>;
+	lastAdaptiveDecision?: {
+		level: Exclude<ThinkingLevel, "off" | "xhigh" | "adaptive">;
+		score: number;
+		reasons: string[];
+		at: number;
+		messageTimestamp: number;
+	};
 }
 
 export interface AgentToolResult<T> {
@@ -306,4 +314,5 @@ export type AgentEvent =
 	// Tool execution lifecycle
 	| { type: "tool_execution_start"; toolCallId: string; toolName: string; args: any }
 	| { type: "tool_execution_update"; toolCallId: string; toolName: string; args: any; partialResult: any }
-	| { type: "tool_execution_end"; toolCallId: string; toolName: string; result: any; isError: boolean };
+	| { type: "tool_execution_end"; toolCallId: string; toolName: string; result: any; isError: boolean }
+	| { type: "adaptive_classified"; decision: NonNullable<AgentState["lastAdaptiveDecision"]> };

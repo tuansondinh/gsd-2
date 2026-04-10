@@ -447,7 +447,6 @@ function getGemini3ThinkingLevel(
 ): GoogleThinkingLevel {
 	if (isGemini3ProModel(model)) {
 		switch (effort) {
-			case "minimal":
 			case "low":
 				return "LOW";
 			case "medium":
@@ -456,8 +455,6 @@ function getGemini3ThinkingLevel(
 		}
 	}
 	switch (effort) {
-		case "minimal":
-			return "MINIMAL";
 		case "low":
 			return "LOW";
 		case "medium":
@@ -480,7 +477,6 @@ function getGoogleBudget(
 
 	if (model.id.includes("2.5-pro")) {
 		const budgets: Record<ClampedThinkingLevel, number> = {
-			minimal: 128,
 			low: 2048,
 			medium: 8192,
 			high: 32768,
@@ -490,7 +486,6 @@ function getGoogleBudget(
 
 	if (model.id.includes("2.5-flash")) {
 		const budgets: Record<ClampedThinkingLevel, number> = {
-			minimal: 128,
 			low: 2048,
 			medium: 8192,
 			high: 24576,

@@ -69,6 +69,7 @@ import {
 	type PermissionMode,
 } from "../../core/tool-approval.js";
 import type { TruncationResult } from "../../core/tools/truncate.js";
+import { writeToPtySession } from "../../core/tools/index.js";
 import { isPtyAvailable } from "../../core/pty-executor.js";
 import { getChangelogPath, getNewEntries, parseChangelog } from "../../utils/changelog.js";
 import { extensionForImageMimeType, readClipboardImage } from "../../utils/clipboard-image.js";
@@ -465,7 +466,6 @@ export class InteractiveMode {
 			thinkingCommand.getArgumentCompletions = (prefix: string): AutocompleteItem[] | null => {
 				const levels = [
 					{ value: "off", label: "off", description: "Disable extended thinking" },
-					{ value: "minimal", label: "minimal", description: "Minimal thinking budget" },
 					{ value: "low", label: "low", description: "Low thinking budget" },
 					{ value: "medium", label: "medium", description: "Medium thinking budget" },
 					{ value: "high", label: "high", description: "High thinking budget" },
@@ -3423,6 +3423,7 @@ export class InteractiveMode {
 					autoCompactThresholdPercent: this.settingsManager.getCompactionThresholdPercent(),
 					defaultModel: defaultModelRef,
 					classifierModel: this.settingsManager.getClassifierModel() ?? "default",
+					adaptiveClassifierModel: this.settingsManager.getAdaptiveClassifierModel() ?? "default",
 					budgetSubagentModel: this.settingsManager.getBudgetSubagentModel() ?? "default",
 					planModeReasoningModel: this.settingsManager.getPlanModeReasoningModel() ?? "default",
 					planModeReviewModel: this.settingsManager.getPlanModeReviewModel() ?? "default",
@@ -3442,6 +3443,7 @@ export class InteractiveMode {
 					transport: this.settingsManager.getTransport(),
 					thinkingLevel: this.session.thinkingLevel,
 					anthropicAdaptiveByDefault: this.settingsManager.getAnthropicAdaptiveByDefault(),
+					clientAdaptiveByDefault: this.settingsManager.getClientAdaptiveByDefault(),
 					availableThinkingLevels: this.session.getAvailableThinkingLevels(),
 					currentTheme: this.settingsManager.getTheme() || "dark",
 					currentThemeAccent: this.settingsManager.getThemeAccent() || "default",
@@ -3478,6 +3480,16 @@ export class InteractiveMode {
 							() => submenuDone(),
 						),
 					classifierModelSubmenu: (_currentValue, submenuDone) =>
+						new ModelSelectorComponent(
+							this.ui,
+							undefined,
+							this.settingsManager,
+							this.session.modelRegistry,
+							[],
+							(model) => submenuDone(`${model.provider}/${model.id}`),
+							() => submenuDone(),
+						),
+					adaptiveClassifierModelSubmenu: (_currentValue, submenuDone) =>
 						new ModelSelectorComponent(
 							this.ui,
 							undefined,
@@ -3551,6 +3563,16 @@ export class InteractiveMode {
 					onClassifierModelChange: (modelRef) => {
 						this.settingsManager.setClassifierModel(modelRef);
 						this.showStatus(`Classifier model: ${modelRef}`);
+					},
+					onAdaptiveClassifierModelChange: (modelRef) => {
+						this.settingsManager.setAdaptiveClassifierModel(modelRef === "default" ? undefined : modelRef);
+						// Live-update the agent so the change takes effect immediately
+						const parts = modelRef && modelRef !== "default" ? modelRef.split("/") : [];
+						const resolved = parts.length === 2
+							? this.session.modelRegistry.find(parts[0]!, parts[1]!) ?? undefined
+							: undefined;
+						this.session.agent.setAdaptiveClassifierModel(resolved);
+						this.showStatus(`Adaptive classifier model: ${modelRef === "default" ? "heuristic (default)" : modelRef}`);
 					},
 					onBudgetSubagentModelChange: (modelRef) => {
 						this.settingsManager.setBudgetSubagentModel(modelRef === "default" ? undefined : modelRef);
@@ -3657,6 +3679,10 @@ export class InteractiveMode {
 					onAnthropicAdaptiveByDefaultChange: (enabled) => {
 						this.settingsManager.setAnthropicAdaptiveByDefault(enabled);
 						this.showStatus(`Anthropic adaptive default: ${enabled ? "enabled" : "disabled"}`);
+					},
+					onClientAdaptiveByDefaultChange: (enabled) => {
+						this.settingsManager.setClientAdaptiveByDefault(enabled);
+						this.showStatus(`Adaptive default: ${enabled ? "enabled" : "disabled"}`);
 					},
 					onThemeChange: (themeName) => {
 						const result = setTheme(themeName, true, this.settingsManager.getThemeAccent());
@@ -4525,6 +4551,17 @@ export class InteractiveMode {
 			appKey(this.keybindings, "terminalFocus"),
 			false,
 		);
+		// Wire up a handle shim so the user can focus and type into the agent PTY
+		component.setHandle(
+			{
+				pid: 0,
+				write: (data: string) => writeToPtySession(sessionId, data),
+				resize: () => {},
+				kill: () => {},
+				isActive: () => true,
+			},
+			() => this.releaseEmbeddedTerminalFocus(),
+		);
 		component.setStatusOverride(theme.fg("muted", "Agent-controlled terminal session"));
 		component.setExpanded(true);
 		this.chatContainer.addChild(component);
@@ -4579,6 +4616,13 @@ export class InteractiveMode {
 		}
 		if (this.bashComponent instanceof EmbeddedTerminalComponent) {
 			this.focusEmbeddedTerminal(this.bashComponent);
+			return;
+		}
+		// Fall back to the most recently created agent PTY component
+		const agentComponents = [...this.agentPtyComponents.values()];
+		const last = agentComponents[agentComponents.length - 1];
+		if (last) {
+			this.focusEmbeddedTerminal(last);
 		}
 	}
 

@@ -81,7 +81,7 @@ export interface PtyToolDetails {
 }
 
 class PtySessionManager {
-	private sessions = new Map<string, ManagedPtySession>();
+	readonly sessions = new Map<string, ManagedPtySession>();
 
 	constructor(private cwd: string) {}
 
@@ -196,17 +196,34 @@ class PtySessionManager {
 
 	async wait(
 		sessionId: string,
-		options?: { text?: string; view?: "viewport" | "buffer"; timeoutMs?: number; stableMs?: number },
+		options?: { text?: string; view?: "viewport" | "buffer"; timeoutMs?: number; stableMs?: number; signal?: AbortSignal; onUpdate?: (result: { content: Array<{ type: string; text: string }>; details: any }) => void },
 	): Promise<{ session: ManagedPtySession; text: string }> {
 		const timeoutMs = Math.max(50, options?.timeoutMs ?? 30000);
 		const stableMs = Math.max(50, options?.stableMs ?? 800);
 		const view = options?.view ?? "viewport";
+		const signal = options?.signal;
+		const onUpdate = options?.onUpdate;
 		const start = Date.now();
 		let lastSnapshot = "";
 		let stableSince = Date.now();
+		let lastUpdateText = "";
 
 		while (Date.now() - start < timeoutMs) {
+			if (signal?.aborted) {
+				throw new Error(`pty_wait cancelled`);
+			}
 			const { text } = await this.read(sessionId, view);
+
+			// Push live screen text updates to UI
+			if (onUpdate && text !== lastUpdateText) {
+				lastUpdateText = text;
+				const session = this.get(sessionId);
+				onUpdate({
+					content: [{ type: "text", text: buildReadText(session, view, text) }],
+					details: { sessionId, pid: session.pty.handle.pid, completed: session.completed, cancelled: session.cancelled, exitCode: session.exitCode, view, screenText: text },
+				});
+			}
+
 			if (options?.text) {
 				if (text.includes(options.text)) {
 					return { session: this.get(sessionId), text };
@@ -222,7 +239,10 @@ class PtySessionManager {
 					return { session: this.get(sessionId), text };
 				}
 			}
-			await new Promise((resolve) => setTimeout(resolve, 100));
+			await new Promise<void>((resolve) => {
+				const t = setTimeout(resolve, 100);
+				signal?.addEventListener("abort", () => { clearTimeout(t); resolve(); }, { once: true });
+			});
 		}
 
 		await this.read(sessionId, view);
@@ -249,7 +269,17 @@ function buildReadText(session: ManagedPtySession, view: "viewport" | "buffer", 
 	return text ? `${header}\n${text}` : `${header}\n(no visible text)`;
 }
 
-export function createPtyTools(cwd: string): Record<string, AgentTool<any, PtyToolDetails>> {
+export interface PtyToolsResult {
+	pty_start: AgentTool<any, PtyToolDetails>;
+	pty_send: AgentTool<any, PtyToolDetails>;
+	pty_read: AgentTool<any, PtyToolDetails>;
+	pty_wait: AgentTool<any, PtyToolDetails>;
+	pty_resize: AgentTool<any, PtyToolDetails>;
+	pty_kill: AgentTool<any, PtyToolDetails>;
+	writeToSession: (sessionId: string, input: string) => void;
+}
+
+export function createPtyTools(cwd: string): PtyToolsResult {
 	const manager = new PtySessionManager(cwd);
 
 	const ptyStartTool: AgentTool<typeof ptyStartSchema, PtyToolDetails> = {
@@ -302,9 +332,9 @@ export function createPtyTools(cwd: string): Record<string, AgentTool<any, PtyTo
 		label: "pty_wait",
 		description: "Wait until text appears in a PTY session or until the PTY screen stops changing. Useful between pty_send calls.",
 		parameters: ptyWaitSchema,
-		execute: async (_toolCallId, { sessionId, text, view, timeoutMs, stableMs }) => {
+		execute: async (_toolCallId, { sessionId, text, view, timeoutMs, stableMs }, signal, onUpdate) => {
 			const effectiveView = view ?? "viewport";
-			const result = await manager.wait(sessionId, { text, view: effectiveView, timeoutMs, stableMs });
+			const result = await manager.wait(sessionId, { text, view: effectiveView, timeoutMs, stableMs, signal, onUpdate: onUpdate as ((result: { content: Array<{ type: string; text: string }>; details: any }) => void) | undefined });
 			return {
 				content: [{ type: "text", text: buildReadText(result.session, effectiveView, result.text) }],
 				details: { sessionId, pid: result.session.pty.handle.pid, completed: result.session.completed, cancelled: result.session.cancelled, exitCode: result.session.exitCode, view: effectiveView, screenText: result.text },
@@ -341,6 +371,14 @@ export function createPtyTools(cwd: string): Record<string, AgentTool<any, PtyTo
 		},
 	};
 
+	/** Write raw input to an active PTY session by ID. Used by the UI when the user focuses and types into an agent PTY terminal. */
+	function writeToSession(sessionId: string, input: string): void {
+		const session = manager.sessions.get(sessionId);
+		if (session && !session.completed && session.pty.handle.isActive()) {
+			session.pty.handle.write(input);
+		}
+	}
+
 	return {
 		pty_start: ptyStartTool,
 		pty_send: ptySendTool,
@@ -348,6 +386,7 @@ export function createPtyTools(cwd: string): Record<string, AgentTool<any, PtyTo
 		pty_wait: ptyWaitTool,
 		pty_resize: ptyResizeTool,
 		pty_kill: ptyKillTool,
+		writeToSession,
 	};
 }
 

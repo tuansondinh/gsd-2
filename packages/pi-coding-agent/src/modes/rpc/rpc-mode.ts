@@ -20,6 +20,16 @@ import type {
 } from "../../core/extensions/index.js";
 import { InteractiveMode } from "../interactive/interactive-mode.js";
 import { type Theme, theme } from "../interactive/theme/theme.js";
+import {
+	getPermissionMode,
+	registerStdioApprovalHandler,
+	registerStdioClassifierHandler,
+	registerStdioNetworkApprovalHandler,
+	resolveApprovalResponse,
+	resolveClassifierResponse,
+	resolveNetworkApprovalResponse,
+	type NetworkApprovalDecision,
+} from "../../core/tool-approval.js";
 import { createDefaultCommandContextActions } from "../shared/command-context-actions.js";
 import { attachJsonlLineReader, serializeJsonLine } from "./jsonl.js";
 import { RemoteTerminal } from "./remote-terminal.js";
@@ -50,6 +60,11 @@ export type {
  * Listens for JSON commands on stdin, outputs events and responses on stdout.
  */
 export async function runRpcMode(session: AgentSession): Promise<never> {
+	const permMode = getPermissionMode();
+	if (permMode === "accept-on-edit") registerStdioApprovalHandler();
+	if (permMode === "auto") registerStdioClassifierHandler();
+	registerStdioNetworkApprovalHandler();
+
 	const output = (obj: RpcResponse | RpcExtensionUIRequest | object) => {
 		process.stdout.write(serializeJsonLine(obj));
 	};
@@ -842,6 +857,20 @@ export async function runRpcMode(session: AgentSession): Promise<never> {
 					pendingExtensionRequests.delete(response.id);
 					pending.resolve(response);
 				}
+				return;
+			}
+
+			// Handle raw approval/classifier/network responses from RPC hosts.
+			if (parsed.type === "approval_response") {
+				resolveApprovalResponse(parsed.id, Boolean(parsed.approved));
+				return;
+			}
+			if (parsed.type === "classifier_response") {
+				resolveClassifierResponse(parsed.id, Boolean(parsed.approved));
+				return;
+			}
+			if (parsed.type === "network_approval_response" && typeof parsed.decision === "string") {
+				resolveNetworkApprovalResponse(parsed.id, parsed.decision as NetworkApprovalDecision);
 				return;
 			}
 

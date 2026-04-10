@@ -41,7 +41,6 @@ export interface ImageSettings {
 }
 
 export interface ThinkingBudgetsSettings {
-	minimal?: number;
 	low?: number;
 	medium?: number;
 	high?: number;
@@ -131,8 +130,10 @@ export interface Settings {
 	autoSwitchPlanModel?: boolean; // default: false — enable opusplan-style model switching (auto-switch to reasoning model on entry, new-session option on approval)
 	permissionMode?: "danger-full-access" | "accept-on-edit" | "auto" | "plan";
 	classifierModel?: string;
-	defaultThinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "adaptive";
+	adaptiveClassifierModel?: string;
+	defaultThinkingLevel?: "off" | "low" | "medium" | "high" | "xhigh" | "adaptive";
 	anthropicAdaptiveByDefault?: boolean; // default: false — prefer adaptive thinking when using supported Anthropic models
+	clientAdaptiveByDefault?: boolean; // default: true — prefer adaptive thinking for any reasoning-capable model
 	transport?: TransportSetting; // default: "sse"
 	steeringMode?: "all" | "one-at-a-time";
 	followUpMode?: "all" | "one-at-a-time";
@@ -752,6 +753,10 @@ export class SettingsManager {
 		return this.settings.classifierModel;
 	}
 
+	getAdaptiveClassifierModel(): string | undefined {
+		return this.settings.adaptiveClassifierModel;
+	}
+
 	setDefaultProvider(provider: string): void {
 		this.setScopedSetting("defaultProvider", provider);
 	}
@@ -839,6 +844,16 @@ export class SettingsManager {
 		this.setGlobalSetting("classifierModel", modelRef);
 	}
 
+	setAdaptiveClassifierModel(modelRef: string | undefined): void {
+		if (modelRef === undefined) {
+			delete this.globalSettings.adaptiveClassifierModel;
+			this.markModified("adaptiveClassifierModel");
+			this.save();
+			return;
+		}
+		this.setGlobalSetting("adaptiveClassifierModel", modelRef);
+	}
+
 	setDefaultModelAndProvider(provider: string, modelId: string): void {
 		if (this.hasProjectSettings()) {
 			this.projectSettings.defaultProvider = provider;
@@ -893,11 +908,11 @@ export class SettingsManager {
 		this.setGlobalSetting("themeAccent", accent);
 	}
 
-	getDefaultThinkingLevel(): "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "adaptive" | undefined {
+	getDefaultThinkingLevel(): "off" | "low" | "medium" | "high" | "xhigh" | "adaptive" | undefined {
 		return this.settings.defaultThinkingLevel;
 	}
 
-	setDefaultThinkingLevel(level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "adaptive"): void {
+	setDefaultThinkingLevel(level: "off" | "low" | "medium" | "high" | "xhigh" | "adaptive"): void {
 		this.setGlobalSetting("defaultThinkingLevel", level);
 	}
 
@@ -907,6 +922,14 @@ export class SettingsManager {
 
 	setAnthropicAdaptiveByDefault(enabled: boolean): void {
 		this.setGlobalSetting("anthropicAdaptiveByDefault", enabled);
+	}
+
+	getClientAdaptiveByDefault(): boolean {
+		return this.settings.clientAdaptiveByDefault ?? true;
+	}
+
+	setClientAdaptiveByDefault(enabled: boolean): void {
+		this.setGlobalSetting("clientAdaptiveByDefault", enabled);
 	}
 
 	getTransport(): TransportSetting {

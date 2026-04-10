@@ -25,6 +25,30 @@ test('subagent launch keeps stdin open for approval proxy responses', () => {
   assert.ok(!src.includes('proc.stdin.end()'), 'does not close child stdin before approval responses can be written')
 })
 
+test('subagent print-mode sessions use project session directory so /agent can switch to them', () => {
+  const src = readFileSync(join(projectRoot, 'src', 'cli.ts'), 'utf-8')
+
+  assert.ok(src.includes('const printSessionsDir = getProjectSessionsDir(printCwd)'), 'print mode derives project session directory')
+  assert.ok(src.includes('SessionManager.create(printCwd, printSessionsDir)'), 'print mode persists sessions into the project session dir')
+})
+
+test('subagent launch passes parent session metadata to attachable child sessions', () => {
+  const launchSrc = readFileSync(join(projectRoot, 'src', 'resources', 'extensions', 'subagent', 'launch-helpers.ts'), 'utf-8')
+  const cliSrc = readFileSync(join(projectRoot, 'src', 'cli.ts'), 'utf-8')
+
+  assert.ok(launchSrc.includes('args.push("--parent-session", options.parentSessionFile)'), 'launch args include --parent-session when provided')
+  assert.ok(launchSrc.includes('args.push("--subagent-name", agent.name)'), 'launch args include subagent name metadata')
+  assert.ok(launchSrc.includes('args.push("--subagent-task", task)'), 'launch args include subagent task metadata')
+  assert.ok(launchSrc.includes('args.push("--subagent-system-prompt-file", tmpPromptPath)'), 'launch args include persistent subagent prompt metadata')
+  assert.ok(launchSrc.includes('const mode = options?.mode ?? "json"'), 'launch helper supports selectable process mode')
+  assert.ok(launchSrc.includes('if (mode === "json") args.push("-p")'), 'print prompt flag is only used in json mode')
+  assert.ok(cliSrc.includes("} else if (arg === '--parent-session' && i + 1 < args.length) {"), 'cli parses --parent-session')
+  assert.ok(cliSrc.includes("} else if (arg === '--subagent-name' && i + 1 < args.length) {"), 'cli parses --subagent-name')
+  assert.ok(cliSrc.includes("} else if (arg === '--subagent-system-prompt-file' && i + 1 < args.length) {"), 'cli parses --subagent-system-prompt-file')
+  assert.ok(cliSrc.includes('subagentName: cliFlags.subagentName,'), 'print mode persists subagent name in child session header')
+  assert.ok(cliSrc.includes('subagentSystemPrompt,'), 'print mode persists subagent system prompt in child session header')
+})
+
 test('loader exports both legacy and rebranded bin path env vars', () => {
   const src = readFileSync(join(projectRoot, 'src', 'loader.ts'), 'utf-8')
 

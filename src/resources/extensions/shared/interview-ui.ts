@@ -43,6 +43,11 @@ export interface QuestionOption {
 	description: string;
 }
 
+export interface QuestionShowWhen {
+	questionId: string;
+	selectedAnyOf: string[];
+}
+
 export interface Question {
 	id: string;
 	header: string;
@@ -50,6 +55,8 @@ export interface Question {
 	options: QuestionOption[];
 	/** If true, user can toggle multiple options with SPACE, confirm with ENTER */
 	allowMultiple?: boolean;
+	/** Show this question only when a prior question matches one of selectedAnyOf labels */
+	showWhen?: QuestionShowWhen;
 }
 
 export interface RoundResult {
@@ -107,6 +114,19 @@ export interface WrapUpOptions {
 const OTHER_OPTION_LABEL = "None of the above";
 const OTHER_OPTION_DESCRIPTION = "Select to type your own answer.";
 
+function matchesShowWhen(
+	question: Question,
+	answers: Record<string, { selected: string | string[]; notes: string }>,
+): boolean {
+	if (!question.showWhen) return true;
+	const controlling = answers[question.showWhen.questionId];
+	if (!controlling) return false;
+	const selected = Array.isArray(controlling.selected)
+		? controlling.selected
+		: [controlling.selected];
+	return selected.some((value) => question.showWhen?.selectedAnyOf.includes(value));
+}
+
 async function runSequentialInterviewFallback(
 	questions: Question[],
 	ctx: ExtensionCommandContext,
@@ -114,6 +134,9 @@ async function runSequentialInterviewFallback(
 	const answers: Record<string, { selected: string | string[]; notes: string }> = {};
 
 	for (const q of questions) {
+		if (!matchesShowWhen(q, answers)) {
+			continue;
+		}
 		const options = q.options.map((o) => o.label);
 		if (!q.allowMultiple) {
 			options.push(OTHER_OPTION_LABEL);
@@ -252,7 +275,6 @@ export async function showInterviewRound(
 			notesVisible: false,
 		}));
 
-		const isMultiQuestion = questions.length > 1;
 		let currentIdx = 0;
 		let focusNotes = false;
 		let showingReview = false;
@@ -295,13 +317,64 @@ export async function showInterviewRound(
 			getEditor().setText(states[currentIdx].notes);
 		}
 
+		function selectedLabelsForIndex(idx: number): string[] {
+			if (isMultiSelect(idx)) {
+				return Array.from(states[idx].checkedIndices).sort((a, b) => a - b).map((optionIdx) => questions[idx].options[optionIdx]?.label).filter((v): v is string => !!v);
+			}
+			const committed = states[idx].committedIndex;
+			if (committed === null) return [];
+			if (committed < questions[idx].options.length) return [questions[idx].options[committed]?.label].filter((v): v is string => !!v);
+			if (committed === noneOrDoneIdx(idx)) return [OTHER_OPTION_LABEL];
+			return [];
+		}
+
+		function visibleQuestionIndices(): number[] {
+			const visible: number[] = [];
+			for (let i = 0; i < questions.length; i++) {
+				const q = questions[i];
+				if (!q.showWhen) {
+					visible.push(i);
+					continue;
+				}
+				const controllingIdx = questions.findIndex((candidate) => candidate.id === q.showWhen?.questionId);
+				if (controllingIdx < 0 || !visible.includes(controllingIdx)) continue;
+				const selected = selectedLabelsForIndex(controllingIdx);
+				if (selected.some((label) => q.showWhen?.selectedAnyOf.includes(label))) {
+					visible.push(i);
+				}
+			}
+			return visible;
+		}
+
 		function isQuestionAnswered(idx: number): boolean {
 			if (isMultiSelect(idx)) return states[idx].checkedIndices.size > 0;
 			return states[idx].committedIndex !== null;
 		}
 
 		function allAnswered(): boolean {
-			return questions.every((_, i) => isQuestionAnswered(i));
+			const visible = visibleQuestionIndices();
+			return visible.length > 0 && visible.every((i) => isQuestionAnswered(i));
+		}
+
+		function clearQuestionState(idx: number) {
+			states[idx].cursorIndex = 0;
+			states[idx].committedIndex = null;
+			states[idx].checkedIndices.clear();
+			states[idx].notes = "";
+			states[idx].notesVisible = false;
+		}
+
+		function reconcileVisibility() {
+			const visible = new Set(visibleQuestionIndices());
+			for (let i = 0; i < questions.length; i++) {
+				if (!visible.has(i)) clearQuestionState(i);
+			}
+			if (!visible.has(currentIdx)) {
+				const fallback = visibleQuestionIndices()[0] ?? 0;
+				currentIdx = fallback;
+				loadStateToEditor();
+				focusNotes = false;
+			}
 		}
 
 		function switchQuestion(newIdx: number) {
@@ -315,7 +388,9 @@ export async function showInterviewRound(
 
 		function buildResult(): RoundResult {
 			const answers: Record<string, { selected: string | string[]; notes: string }> = {};
+			const visible = new Set(visibleQuestionIndices());
 			for (let i = 0; i < questions.length; i++) {
+				if (!visible.has(i)) continue;
 				const q = questions[i];
 				const st = states[i];
 				const notes = st.notes.trim();
@@ -348,6 +423,8 @@ export async function showInterviewRound(
 				states[currentIdx].committedIndex = states[currentIdx].cursorIndex;
 			}
 
+			reconcileVisibility();
+
 			// Auto-open the notes field when "None of the above" is selected
 			// so the user can immediately provide a free-text explanation
 			// instead of being trapped in a re-asking loop (bug #2715).
@@ -360,10 +437,14 @@ export async function showInterviewRound(
 				return;
 			}
 
-			if (isMultiQuestion && currentIdx < questions.length - 1) {
-				let next = currentIdx + 1;
-				for (let i = 0; i < questions.length; i++) {
-					const candidate = (currentIdx + 1 + i) % questions.length;
+			const visible = visibleQuestionIndices();
+			const currentVisiblePos = visible.indexOf(currentIdx);
+			const isMultiQuestion = visible.length > 1;
+
+			if (isMultiQuestion && currentVisiblePos >= 0 && currentVisiblePos < visible.length - 1) {
+				let next = visible[currentVisiblePos + 1] ?? visible[0] ?? currentIdx;
+				for (let i = 0; i < visible.length; i++) {
+					const candidate = visible[(currentVisiblePos + 1 + i) % visible.length] ?? currentIdx;
 					if (!isQuestionAnswered(candidate)) { next = candidate; break; }
 				}
 				switchQuestion(next);
@@ -396,7 +477,8 @@ export async function showInterviewRound(
 			if (showingReview) {
 				if (matchesKey(data, Key.escape) || matchesKey(data, Key.left)) {
 					showingReview = false;
-					switchQuestion(questions.length - 1);
+					const visible = visibleQuestionIndices();
+					switchQuestion(visible[visible.length - 1] ?? 0);
 					return;
 				}
 				if (matchesKey(data, Key.enter) || matchesKey(data, Key.right) || matchesKey(data, Key.space)) {
@@ -447,9 +529,14 @@ export async function showInterviewRound(
 			}
 
 			// ── Multi-question navigation ────────────────────────────────
+			const visible = visibleQuestionIndices();
+			const isMultiQuestion = visible.length > 1;
 			if (isMultiQuestion) {
-				if (matchesKey(data, Key.left)) { switchQuestion((currentIdx - 1 + questions.length) % questions.length); return; }
-				if (matchesKey(data, Key.right)) { switchQuestion((currentIdx + 1) % questions.length); return; }
+				const visiblePos = visible.indexOf(currentIdx);
+				if (visiblePos >= 0) {
+					if (matchesKey(data, Key.left)) { switchQuestion(visible[(visiblePos - 1 + visible.length) % visible.length] ?? currentIdx); return; }
+					if (matchesKey(data, Key.right)) { switchQuestion(visible[(visiblePos + 1) % visible.length] ?? currentIdx); return; }
+				}
 			}
 
 			// ── Cursor navigation ────────────────────────────────────────
@@ -488,7 +575,8 @@ export async function showInterviewRound(
 
 			push(ui.bar(), ui.blank(), ui.header(`  ${opts.reviewHeadline ?? "Review your answers"}`), ui.blank());
 
-			for (let i = 0; i < questions.length; i++) {
+			const visible = visibleQuestionIndices();
+			for (const i of visible) {
 				const q = questions[i];
 				const st = states[i];
 
@@ -571,6 +659,11 @@ export async function showInterviewRound(
 			const lines: string[] = [];
 			const push = (...rows: string[][]) => { for (const r of rows) lines.push(...r); };
 
+			reconcileVisibility();
+			const visible = visibleQuestionIndices();
+			const isMultiQuestion = visible.length > 1;
+			const visiblePos = Math.max(visible.indexOf(currentIdx), 0);
+
 			const q = questions[currentIdx];
 			const st = states[currentIdx];
 			const multiSel = isMultiSelect(currentIdx);
@@ -579,13 +672,13 @@ export async function showInterviewRound(
 
 			// ── Progress header ────────────────────────────────────────────
 			if (isMultiQuestion) {
-				const unanswered = questions.filter((_, i) => !isQuestionAnswered(i)).length;
-				const answeredSet = new Set(questions.map((_, i) => i).filter(i => isQuestionAnswered(i)));
-				push(ui.questionTabs(questions.map(q => q.header), currentIdx, answeredSet));
+				const unanswered = visible.filter((i) => !isQuestionAnswered(i)).length;
+				const answeredSet = new Set(visible.map((i, visibleIndex) => (isQuestionAnswered(i) ? visibleIndex : -1)).filter((i) => i >= 0));
+				push(ui.questionTabs(visible.map((i) => questions[i]?.header ?? ""), visiblePos, answeredSet));
 				push(ui.blank());
 				const progressParts = [
 					opts.progress,
-					`Question ${currentIdx + 1}/${questions.length}`,
+					`Question ${visiblePos + 1}/${visible.length}`,
 					unanswered > 0 ? `${unanswered} unanswered` : null,
 				].filter(Boolean).join("  •  ");
 				if (progressParts) push(ui.meta(`  ${progressParts}`));
@@ -647,7 +740,7 @@ export async function showInterviewRound(
 
 			// ── Footer hints ───────────────────────────────────────────────
 			push(ui.blank());
-			const isLast = !isMultiQuestion || currentIdx === questions.length - 1;
+			const isLast = !isMultiQuestion || visiblePos === visible.length - 1;
 			const hints: string[] = [];
 			if (focusNotes) {
 				hints.push("enter to confirm");

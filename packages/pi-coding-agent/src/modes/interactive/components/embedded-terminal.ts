@@ -202,7 +202,7 @@ export class EmbeddedTerminalComponent implements Focusable {
         const command = theme.bold(`$ ${this.command}`);
         const hint = this.focused
             ? theme.fg("muted", "Tab/Esc return · Shift+Tab sends Tab")
-            : theme.fg("muted", `${this.focusKeyLabel} focus`);
+            : theme.fg("muted", `${this.focusKeyLabel} to focus`);
 
         const left = `${prefix} ${command}`;
         const leftWidth = visibleWidth(left);

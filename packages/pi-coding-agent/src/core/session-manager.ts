@@ -59,10 +59,18 @@ export interface SessionHeader {
 	timestamp: string;
 	cwd: string;
 	parentSession?: string;
+	subagentName?: string;
+	subagentTask?: string;
+	subagentSystemPrompt?: string;
+	subagentTools?: string[];
 }
 
 export interface NewSessionOptions {
 	parentSession?: string;
+	subagentName?: string;
+	subagentTask?: string;
+	subagentSystemPrompt?: string;
+	subagentTools?: string[];
 }
 
 export interface SessionEntryBase {
@@ -915,6 +923,10 @@ export class SessionManager {
 			timestamp,
 			cwd: this.cwd,
 			parentSession: options?.parentSession,
+			subagentName: options?.subagentName,
+			subagentTask: options?.subagentTask,
+			subagentSystemPrompt: options?.subagentSystemPrompt,
+			subagentTools: options?.subagentTools,
 		};
 		this.fileEntries = [header];
 		this.sessionEntries = [];

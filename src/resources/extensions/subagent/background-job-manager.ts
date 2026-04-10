@@ -16,6 +16,21 @@ import type {
 
 export type { BackgroundSubagentJob, BackgroundJobStatus };
 
+type BackgroundJobResult = {
+    summary: string;
+    stderr: string;
+    exitCode: number;
+    model?: string;
+    sessionFile?: string;
+    parentSessionFile?: string;
+};
+
+type BackgroundJobMetadata = {
+    parentSessionFile?: string;
+    sessionFile?: string;
+    model?: string;
+};
+
 export class BackgroundJobManager {
     private jobs = new Map<string, BackgroundSubagentJob>();
     private evictionTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -44,10 +59,11 @@ export class BackgroundJobManager {
         agentName: string,
         task: string,
         cwd: string,
-        runFn: (signal: AbortSignal) => Promise<{ summary: string; stderr: string; exitCode: number; model?: string }>,
+        runFn: (signal: AbortSignal) => Promise<BackgroundJobResult>,
+        metadata?: BackgroundJobMetadata,
     ): string {
         const abortController = new AbortController();
-        return this.attachJob(agentName, task, cwd, abortController, runFn(abortController.signal));
+        return this.attachJob(agentName, task, cwd, abortController, runFn(abortController.signal), metadata);
     }
 
     /**
@@ -58,9 +74,10 @@ export class BackgroundJobManager {
         task: string,
         cwd: string,
         abortController: AbortController,
-        resultPromise: Promise<{ summary: string; stderr: string; exitCode: number; model?: string }>,
+        resultPromise: Promise<BackgroundJobResult>,
+        metadata?: BackgroundJobMetadata,
     ): string {
-        return this.attachJob(agentName, task, cwd, abortController, resultPromise);
+        return this.attachJob(agentName, task, cwd, abortController, resultPromise, metadata);
     }
 
     /**
@@ -121,7 +138,8 @@ export class BackgroundJobManager {
         task: string,
         cwd: string,
         abortController: AbortController,
-        resultPromise: Promise<{ summary: string; stderr: string; exitCode: number; model?: string }>,
+        resultPromise: Promise<BackgroundJobResult>,
+        metadata?: BackgroundJobMetadata,
     ): string {
         const running = this.getRunningJobs();
         if (running.length >= this.maxRunning) {
@@ -148,18 +166,23 @@ export class BackgroundJobManager {
             cwd,
             status: "running",
             startedAt: Date.now(),
+            model: metadata?.model,
+            sessionFile: metadata?.sessionFile,
+            parentSessionFile: metadata?.parentSessionFile,
             abortController,
             promise: undefined as unknown as Promise<void>,
         };
 
         job.promise = resultPromise
-            .then(({ summary, stderr, exitCode, model }) => {
+            .then(({ summary, stderr, exitCode, model, sessionFile, parentSessionFile }) => {
                 job.status = exitCode === 0 ? "completed" : "failed";
                 job.completedAt = Date.now();
                 job.resultSummary = summary;
                 job.stderr = stderr;
                 job.exitCode = exitCode;
                 job.model = model;
+                job.sessionFile = sessionFile;
+                job.parentSessionFile = parentSessionFile;
                 this.scheduleEviction(id);
                 this.deliverResult(job);
             })

@@ -483,28 +483,19 @@ function buildNewSessionOptionLabel(): string {
 }
 
 function buildApprovalActionInstructions(): string {
-  return [
-    "Ask for plan approval now using ask_user_questions.",
-    `One single-select question with id \"${PLAN_APPROVAL_ACTION_QUESTION_ID}\". Ask what to do next with the plan.`,
-    `Options: ${APPROVE_LABEL}, ${REVIEW_LABEL}, ${REVISE_LABEL}.`,
-    `Do not include \"${CANCEL_LABEL}\" as an explicit option — if the user wants to cancel they should choose \"None of the above\" and type \"${CANCEL_LABEL}\" in the note.`,
-    "Do not restate the plan. Just show the question.",
-  ].join(" ");
-}
-
-function buildApprovalModeInstructions(): string {
   const autoSwitchEnabled = readAutoSwitchPlanModelSetting();
   const showNewSessionOption = autoSwitchEnabled;
   const newSessionLabel = buildNewSessionOptionLabel();
 
-  const options = showNewSessionOption
-    ? `${APPROVE_AUTO_LABEL}, ${APPROVE_BYPASS_LABEL}, ${APPROVE_AUTO_SUBAGENT_LABEL}, ${APPROVE_BYPASS_SUBAGENT_LABEL}, ${newSessionLabel}`
-    : `${APPROVE_AUTO_LABEL}, ${APPROVE_BYPASS_LABEL}, ${APPROVE_AUTO_SUBAGENT_LABEL}, ${APPROVE_BYPASS_SUBAGENT_LABEL}`;
-
   return [
-    "Plan approved. Now ask which execution mode to use via ask_user_questions.",
-    `One single-select question with id \"${PLAN_APPROVAL_PERMISSION_QUESTION_ID}\".`,
-    `Options: ${options}.`,
+    "Ask for plan approval now via exactly one ask_user_questions tool call.",
+    `Question 1 (single-select) id \"${PLAN_APPROVAL_ACTION_QUESTION_ID}\": ask what to do next with the plan.`,
+    `Question 1 options: ${APPROVE_LABEL}, ${REVIEW_LABEL}, ${REVISE_LABEL}. Put "${APPROVE_LABEL}" first with a "(Recommended)" suffix in the description, not in the label.`,
+    `Do not include \"${CANCEL_LABEL}\" as an explicit option — if the user wants to cancel they should choose \"None of the above\" and type \"${CANCEL_LABEL}\" in the note.`,
+    `Question 2 (single-select) id \"${PLAN_APPROVAL_PERMISSION_QUESTION_ID}\": ask which execution mode to use.`,
+    `Question 2 options: ${APPROVE_AUTO_LABEL} (Recommended), ${APPROVE_BYPASS_LABEL}, ${APPROVE_AUTO_SUBAGENT_LABEL}, ${APPROVE_BYPASS_SUBAGENT_LABEL}${showNewSessionOption ? `, ${newSessionLabel}` : ""}.`,
+    `Set question 2 showWhen.questionId to \"${PLAN_APPROVAL_ACTION_QUESTION_ID}\" and showWhen.selectedAnyOf to [\"${APPROVE_LABEL}\"] so it appears only when the user selects Approve plan.`,
+    "Do not restate the plan in a normal assistant response. Just call ask_user_questions.",
   ].join(" ");
 }
 
@@ -813,8 +804,16 @@ export default function planCommand(pi: ExtensionAPI) {
     if (!actionSelection) return;
 
     if (actionSelection.includes(APPROVE_LABEL)) {
-      // Steer the second question — handle in the next tool_result cycle
-      pi.sendUserMessage(buildApprovalModeInstructions(), { deliverAs: "steer" });
+      const executionMode = approvalSelectionToExecutionMode(permissionValues[0]) ?? {
+        permissionMode: DEFAULT_APPROVAL_PERMISSION_MODE,
+        executeWithSubagent: false,
+      };
+      state = { ...state, targetPermissionMode: executionMode.permissionMode };
+      if (executionMode.executeWithSubagent) {
+        const modeLabel = executionMode.permissionMode === "danger-full-access" ? "bypass" : "auto";
+        ctx.ui?.notify?.(`Plan approved: subagent(${modeLabel})`, "info");
+      }
+      await approvePlan(pi, ctx, executionMode.permissionMode, executionMode.executeWithSubagent);
       return;
     }
 

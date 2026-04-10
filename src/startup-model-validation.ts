@@ -21,7 +21,7 @@ interface MinimalModelRegistry {
   getAvailable(): MinimalModel[]
 }
 
-type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'adaptive'
+type ThinkingLevel = 'off' | 'low' | 'medium' | 'high' | 'xhigh' | 'adaptive'
 
 interface MinimalSettingsManager {
   getDefaultProvider(): string | undefined

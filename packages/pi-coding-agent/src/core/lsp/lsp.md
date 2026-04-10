@@ -1,4 +1,6 @@
-Preferred tool for code navigation in typed codebases. Use this instead of grep/find when looking up symbol definitions, references, implementations, type info, callers, or rename targets.
+Preferred first-choice tool for code navigation in typed codebases. Use this instead of grep/find when looking up symbol definitions, references, implementations, type info, callers, or rename targets.
+
+Use `lsp` first when a language server is available. Do not use grep/find as a substitute for semantic symbol navigation unless LSP is unavailable or failing.
 
 Interacts with Language Server Protocol servers for code intelligence.
 

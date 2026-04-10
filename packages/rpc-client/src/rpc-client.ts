@@ -54,6 +54,7 @@ export interface RpcClientOptions {
 }
 
 export type RpcEventListener = (event: SdkAgentEvent) => void;
+export type RpcExitListener = (code: number | null, signal: NodeJS.Signals | null) => void;
 
 // ============================================================================
 // RPC Client
@@ -64,6 +65,7 @@ export class RpcClient {
 	private stopReadingStdout: (() => void) | null = null;
 	private _stderrHandler?: (data: Buffer) => void;
 	private eventListeners: RpcEventListener[] = [];
+	private exitListeners: RpcExitListener[] = [];
 	private pendingRequests: Map<string, { resolve: (response: RpcResponse) => void; reject: (error: Error) => void }> =
 		new Map();
 	private requestId = 0;
@@ -114,6 +116,9 @@ export class RpcClient {
 
 		// Detect unexpected subprocess exit and reject all pending requests
 		this.process.on("exit", (code, signal) => {
+			for (const listener of this.exitListeners) {
+				listener(code, signal);
+			}
 			if (this.pendingRequests.size > 0) {
 				const reason = signal ? `signal ${signal}` : `code ${code}`;
 				const error = new Error(`Agent process exited unexpectedly (${reason}). Stderr: ${this.stderr}`);
@@ -176,6 +181,30 @@ export class RpcClient {
 				this.eventListeners.splice(index, 1);
 			}
 		};
+	}
+
+	/**
+	 * Subscribe to subprocess exit events.
+	 */
+	onExit(listener: RpcExitListener): () => void {
+		this.exitListeners.push(listener);
+		return () => {
+			const index = this.exitListeners.indexOf(listener);
+			if (index !== -1) {
+				this.exitListeners.splice(index, 1);
+			}
+		};
+	}
+
+	/**
+	 * Write a raw JSONL line to stdin.
+	 * Used for non-RPC protocol messages like approval responses.
+	 */
+	writeRawLine(line: string): void {
+		if (!this.process?.stdin) {
+			throw new Error("Client not started");
+		}
+		this.process.stdin.write(line.endsWith("\n") ? line : `${line}\n`);
 	}
 
 	/**

@@ -148,6 +148,9 @@ export const readOnlyTools: Tool[] = [readTool, grepTool, findTool, lsTool];
 
 const ptyBuiltinTools = createPtyTools(process.cwd());
 
+/** Write raw input to an active agent PTY session. Used by the UI for user-controlled focus. */
+export const writeToPtySession: (sessionId: string, input: string) => void = ptyBuiltinTools.writeToSession;
+
 // All available tools (using process.cwd())
 export const allTools = {
 	read: readTool,

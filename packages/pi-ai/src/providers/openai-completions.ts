@@ -62,7 +62,7 @@ function hasToolHistory(messages: Message[]): boolean {
 
 export interface OpenAICompletionsOptions extends StreamOptions {
 	toolChoice?: "auto" | "none" | "required" | { type: "function"; function: { name: string } };
-	reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh";
+	reasoningEffort?: "low" | "medium" | "high" | "xhigh";
 }
 
 export const streamOpenAICompletions: StreamFunction<"openai-completions", OpenAICompletionsOptions> = (
@@ -718,7 +718,6 @@ function detectCompat(model: Model<"openai-completions">): Required<OpenAIComple
 	const reasoningEffortMap =
 		isGroq && model.id === "qwen/qwen3-32b"
 			? {
-					minimal: "default",
 					low: "default",
 					medium: "default",
 					high: "default",

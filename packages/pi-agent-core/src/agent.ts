@@ -4,7 +4,10 @@
  */
 
 import {
+	classifyAdaptiveThinking,
+	classifyAdaptiveThinkingWithLLM,
 	getModel,
+	supportsAdaptiveThinking,
 	type ImageContent,
 	type Message,
 	type Model,
@@ -108,6 +111,14 @@ export interface AgentOptions {
 	 * switches mid-session are handled correctly.
 	 */
 	externalToolExecution?: (model: Model<any>) => boolean;
+
+	/**
+	 * Model to use for LLM-based adaptive thinking classification.
+	 * When set and the current model does not support provider-side adaptive,
+	 * the agent calls this model to decide reasoning level instead of the
+	 * heuristic classifier. Falls back to heuristic on error.
+	 */
+	adaptiveClassifierModel?: Model<any>;
 }
 
 /**
@@ -152,6 +163,7 @@ export class Agent {
 	private _beforeToolCall?: AgentLoopConfig["beforeToolCall"];
 	private _afterToolCall?: AgentLoopConfig["afterToolCall"];
 	private _externalToolExecution?: (model: Model<any>) => boolean;
+	private _adaptiveClassifierModel?: Model<any>;
 
 	constructor(opts: AgentOptions = {}) {
 		this._state = { ...this._state, ...opts.initialState };
@@ -167,6 +179,7 @@ export class Agent {
 		this._transport = opts.transport ?? "sse";
 		this._maxRetryDelayMs = opts.maxRetryDelayMs;
 		this._externalToolExecution = opts.externalToolExecution;
+		this._adaptiveClassifierModel = opts.adaptiveClassifierModel;
 	}
 
 	/**
@@ -261,8 +274,15 @@ export class Agent {
 		this._state.model = m;
 	}
 
+	setAdaptiveClassifierModel(m: Model<any> | undefined) {
+		this._adaptiveClassifierModel = m;
+	}
+
 	setThinkingLevel(l: ThinkingLevel) {
 		this._state.thinkingLevel = l;
+		if (l !== "adaptive") {
+			this._state.lastAdaptiveDecision = undefined;
+		}
 	}
 
 	setSteeringMode(mode: "all" | "one-at-a-time") {
@@ -460,6 +480,67 @@ export class Agent {
 		await this._runLoop(undefined);
 	}
 
+	private _getLatestUserMessage(messages?: AgentMessage[]): Message | undefined {
+		const source = messages && messages.length > 0 ? messages : this._state.messages;
+		for (let i = source.length - 1; i >= 0; i--) {
+			const msg = source[i];
+			if (msg.role === "user") {
+				return msg;
+			}
+		}
+		return undefined;
+	}
+
+	private async _resolveReasoningForTurn(messages?: AgentMessage[]): Promise<Exclude<ThinkingLevel, "off"> | undefined> {
+		const configured = this._state.thinkingLevel;
+		if (configured === "off") {
+			return undefined;
+		}
+		if (configured !== "adaptive") {
+			return configured;
+		}
+		if (supportsAdaptiveThinking(this._state.model.id)) {
+			return "adaptive";
+		}
+
+		const latestUserMessage = this._getLatestUserMessage(messages);
+		if (!latestUserMessage) {
+			return "medium";
+		}
+
+		const previous = this._state.lastAdaptiveDecision;
+		if (previous && previous.messageTimestamp === latestUserMessage.timestamp) {
+			return previous.level;
+		}
+
+		const priorMessages = this._state.messages.filter(
+			(msg): msg is Message => msg.role === "user" || msg.role === "assistant" || msg.role === "toolResult",
+		);
+
+		const result = this._adaptiveClassifierModel
+			? await classifyAdaptiveThinkingWithLLM({
+					latestUserMessage,
+					priorMessages: priorMessages.slice(-6),
+					classifierModel: this._adaptiveClassifierModel,
+					signal: this.abortController?.signal,
+				})
+			: classifyAdaptiveThinking({
+					latestUserMessage,
+					priorMessages: priorMessages.slice(-6),
+				});
+
+		const decision = {
+			level: result.level,
+			score: result.score,
+			reasons: result.reasons,
+			at: Date.now(),
+			messageTimestamp: latestUserMessage.timestamp,
+		};
+		this._state.lastAdaptiveDecision = decision;
+		this.emit({ type: "adaptive_classified", decision });
+		return result.level;
+	}
+
 	/**
 	 * Run the agent loop.
 	 * If messages are provided, starts a new conversation turn with those messages.
@@ -480,7 +561,7 @@ export class Agent {
 		this._state.streamMessage = null;
 		this._state.error = undefined;
 
-		const reasoning = this._state.thinkingLevel === "off" ? undefined : this._state.thinkingLevel;
+		const reasoning = await this._resolveReasoningForTurn(messages);
 
 		const self = this;
 		const context: AgentContext = {

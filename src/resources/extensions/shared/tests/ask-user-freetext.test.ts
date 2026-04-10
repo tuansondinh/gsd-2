@@ -131,6 +131,67 @@ describe("ask-user-questions RPC fallback free-text", () => {
 		assert.deepStrictEqual(parsed.answers.q1.answers, ["Option A"]);
 	});
 
+	it("skips conditional follow-up when controlling answer does not match", async () => {
+		const tool = captureTool();
+		const { ctx, selectCalls } = makeMockCtx({
+			selectReturns: ["Review plan"],
+		});
+
+		const result = await tool.execute(
+			"call-conditional-skip",
+			{
+				questions: [
+					makeQuestion("plan_mode_approval_action", ["Approve plan", "Review plan"]),
+					{
+						...makeQuestion("plan_mode_approval_permission", ["Auto mode", "Bypass mode"]),
+						showWhen: {
+							questionId: "plan_mode_approval_action",
+							selectedAnyOf: ["Approve plan"],
+						},
+					},
+				],
+			},
+			undefined,
+			undefined,
+			ctx,
+		);
+
+		assert.equal(selectCalls.length, 1);
+		const parsed = JSON.parse(result.content[0]?.text ?? "{}");
+		assert.ok(parsed.answers.plan_mode_approval_action);
+		assert.equal(parsed.answers.plan_mode_approval_permission, undefined);
+	});
+
+	it("asks conditional follow-up when controlling answer matches", async () => {
+		const tool = captureTool();
+		const { ctx, selectCalls } = makeMockCtx({
+			selectReturns: ["Approve plan", "Auto mode"],
+		});
+
+		const result = await tool.execute(
+			"call-conditional-show",
+			{
+				questions: [
+					makeQuestion("plan_mode_approval_action", ["Approve plan", "Review plan"]),
+					{
+						...makeQuestion("plan_mode_approval_permission", ["Auto mode", "Bypass mode"]),
+						showWhen: {
+							questionId: "plan_mode_approval_action",
+							selectedAnyOf: ["Approve plan"],
+						},
+					},
+				],
+			},
+			undefined,
+			undefined,
+			ctx,
+		);
+
+		assert.equal(selectCalls.length, 2);
+		const parsed = JSON.parse(result.content[0]?.text ?? "{}");
+		assert.deepStrictEqual(parsed.answers.plan_mode_approval_permission.answers, ["Auto mode"]);
+	});
+
 	it("handles cancelled free-text input gracefully", async () => {
 		const tool = captureTool();
 		const { ctx, inputCalls } = makeMockCtx({

@@ -162,8 +162,6 @@ export function mapThinkingLevelToEffort(level: string | undefined, modelId: str
 		case "adaptive":
 			// No effort override — let Claude decide based on request complexity
 			return undefined;
-		case "minimal":
-			return "low";
 		case "low":
 			return "low";
 		case "medium":

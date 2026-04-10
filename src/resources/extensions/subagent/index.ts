@@ -18,7 +18,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { AgentToolResult } from "@gsd/pi-agent-core";
-import type { Message } from "@gsd/pi-ai";
+import type { ImageContent, Message } from "@gsd/pi-ai";
 import { StringEnum } from "@gsd/pi-ai";
 import {
     type ExtensionAPI,
@@ -49,12 +49,218 @@ import { loadEffectivePreferences } from "../shared/preferences.js";
 import { CmuxClient, shellEscape } from "../cmux/index.js";
 import { BackgroundJobManager, type BackgroundSubagentJob } from "./background-job-manager.js";
 import { runSubagentInBackground } from "./background-runner.js";
+import { showAgentSwitcher } from "./agent-switcher-component.js";
+import {
+    buildAgentSwitchTargets,
+    type AgentSwitchTarget,
+} from "./agent-switcher-model.js";
 
 const MAX_PARALLEL_TASKS = 8;
 const MAX_CONCURRENCY = 4;
 const COLLAPSED_ITEM_COUNT = 10;
 const DEFAULT_AWAIT_SUBAGENT_TIMEOUT_SECONDS = 120;
 const liveSubagentProcesses = new Set<ChildProcess>();
+
+type AgentSessionState = "running" | "completed" | "failed";
+
+interface AgentSessionLink {
+    id: string;
+    agentName: string;
+    task: string;
+    parentSessionFile: string;
+    subagentSessionFile: string;
+    createdAt: number;
+    updatedAt: number;
+    state: AgentSessionState;
+}
+
+const agentSessionLinksById = new Map<string, AgentSessionLink>();
+const agentSessionIdsByParent = new Map<string, string[]>();
+const parentSessionByChild = new Map<string, string>();
+
+interface LiveSubagentRuntime {
+    sessionFile?: string;
+    parentSessionFile?: string;
+    agentName: string;
+    isBusy: () => boolean;
+    sendPrompt: (text: string, images?: ImageContent[]) => Promise<void>;
+    sendSteer: (text: string, images?: ImageContent[]) => Promise<void>;
+    sendFollowUp: (text: string, images?: ImageContent[]) => Promise<void>;
+}
+
+const liveRuntimeBySessionFile = new Map<string, LiveSubagentRuntime>();
+let agentSessionLinkCounter = 0;
+
+function listSessionFiles(sessionDir: string): string[] {
+    if (!fs.existsSync(sessionDir)) return [];
+    try {
+        return fs
+            .readdirSync(sessionDir)
+            .filter((name) => name.endsWith(".jsonl"))
+            .map((name) => path.join(sessionDir, name));
+    } catch {
+        return [];
+    }
+}
+
+function detectNewSubagentSessionFile(sessionDir: string, before: Set<string>, startedAt: number): string | undefined {
+    const after = listSessionFiles(sessionDir);
+    const created = after.filter((file) => !before.has(file));
+    const candidates = created.length > 0 ? created : after;
+    const ranked = candidates
+        .map((file) => {
+            let mtime = 0;
+            try {
+                mtime = fs.statSync(file).mtimeMs;
+            } catch {
+                mtime = 0;
+            }
+            return { file, mtime };
+        })
+        .filter((entry) => entry.mtime >= startedAt - 5000)
+        .sort((a, b) => b.mtime - a.mtime);
+    return ranked[0]?.file;
+}
+
+function registerAgentSessionLink(link: Omit<AgentSessionLink, "id" | "createdAt" | "updatedAt">): AgentSessionLink {
+    const now = Date.now();
+    const id = `agent-${++agentSessionLinkCounter}`;
+    const full: AgentSessionLink = { ...link, id, createdAt: now, updatedAt: now };
+    agentSessionLinksById.set(id, full);
+    const list = agentSessionIdsByParent.get(link.parentSessionFile) ?? [];
+    list.push(id);
+    agentSessionIdsByParent.set(link.parentSessionFile, list);
+    parentSessionByChild.set(link.subagentSessionFile, link.parentSessionFile);
+    return full;
+}
+
+function updateAgentSessionLinkState(subagentSessionFile: string, state: AgentSessionState): void {
+    for (const link of agentSessionLinksById.values()) {
+        if (link.subagentSessionFile === subagentSessionFile) {
+            link.state = state;
+            link.updatedAt = Date.now();
+            return;
+        }
+    }
+}
+
+function upsertAgentSessionLink(
+    agentName: string,
+    task: string,
+    parentSessionFile: string,
+    subagentSessionFile: string,
+    state: AgentSessionState,
+): void {
+    const existingParent = parentSessionByChild.get(subagentSessionFile);
+    if (!existingParent) {
+        registerAgentSessionLink({
+            agentName,
+            task,
+            parentSessionFile,
+            subagentSessionFile,
+            state,
+        });
+        return;
+    }
+
+    updateAgentSessionLinkState(subagentSessionFile, state);
+}
+
+function getAgentSessionLinksForParent(parentSessionFile: string): AgentSessionLink[] {
+    const ids = agentSessionIdsByParent.get(parentSessionFile) ?? [];
+    return ids
+        .map((id) => agentSessionLinksById.get(id))
+        .filter((entry): entry is AgentSessionLink => Boolean(entry))
+        .sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+function readSessionHeader(sessionFile: string): {
+    parentSession?: string;
+    subagentName?: string;
+    subagentTask?: string;
+    subagentSystemPrompt?: string;
+    subagentTools?: string[];
+} | null {
+    try {
+        const content = fs.readFileSync(sessionFile, "utf-8");
+        const firstLine = content.split("\n").find((line) => line.trim().length > 0);
+        if (!firstLine) return null;
+        const parsed = JSON.parse(firstLine);
+        if (!parsed || parsed.type !== "session") return null;
+        return {
+            parentSession: typeof parsed.parentSession === "string" ? parsed.parentSession : undefined,
+            subagentName: typeof parsed.subagentName === "string" ? parsed.subagentName : undefined,
+            subagentTask: typeof parsed.subagentTask === "string" ? parsed.subagentTask : undefined,
+            subagentSystemPrompt: typeof parsed.subagentSystemPrompt === "string" ? parsed.subagentSystemPrompt : undefined,
+            subagentTools: Array.isArray(parsed.subagentTools)
+                ? parsed.subagentTools.filter((tool: unknown): tool is string => typeof tool === "string")
+                : undefined,
+        };
+    } catch {
+        return null;
+    }
+}
+
+function backfillAgentSessionLinksForParent(parentSessionFile: string, sessionDir: string): AgentSessionLink[] {
+    for (const sessionFile of listSessionFiles(sessionDir)) {
+        if (sessionFile === parentSessionFile) continue;
+        const header = readSessionHeader(sessionFile);
+        if (header?.parentSession !== parentSessionFile) continue;
+        const existingParent = parentSessionByChild.get(sessionFile);
+        if (!existingParent) {
+            registerAgentSessionLink({
+                agentName: header.subagentName ?? "subagent",
+                task: header.subagentTask ?? "Recovered from persisted session lineage",
+                parentSessionFile,
+                subagentSessionFile: sessionFile,
+                state: "completed",
+            });
+        }
+    }
+    return getAgentSessionLinksForParent(parentSessionFile);
+}
+
+function formatSwitchTargetSummary(target: AgentSwitchTarget): string {
+    const current = target.isCurrent ? " (current)" : "";
+    if (target.kind === "parent") {
+        return `● parent — main session${current}`;
+    }
+
+    const icon = target.state === "running" ? "▶" : target.state === "failed" ? "✗" : "✓";
+    return `${icon} ${target.agentName} — ${target.taskPreview}${current}`;
+}
+
+function buildSwitchTargetsForParent(
+    parentSessionFile: string,
+    currentSessionFile: string,
+    currentCwd: string,
+    trackedLinks: AgentSessionLink[],
+    runningJobs: BackgroundSubagentJob[],
+): AgentSwitchTarget[] {
+    return buildAgentSwitchTargets({
+        currentSessionFile,
+        rootParentSessionFile: parentSessionFile,
+        currentCwd,
+        trackedLinks: trackedLinks.map((link) => ({
+            id: link.id,
+            agentName: link.agentName,
+            task: link.task,
+            parentSessionFile: link.parentSessionFile,
+            subagentSessionFile: link.subagentSessionFile,
+            updatedAt: link.updatedAt,
+            state: link.state,
+        })),
+        runningJobs: runningJobs.map((job) => ({
+            id: job.id,
+            agentName: job.agentName,
+            task: job.task,
+            startedAt: job.startedAt,
+            parentSessionFile: job.parentSessionFile,
+            sessionFile: job.sessionFile,
+            cwd: job.cwd,
+        })),
+    });
+}
 
 const AwaitSubagentParams = Type.Object({
     jobs: Type.Optional(
@@ -325,15 +531,31 @@ interface SingleResult {
     errorMessage?: string;
     step?: number;
     backgroundJobId?: string;
+    sessionFile?: string;
+    parentSessionFile?: string;
 }
+
+type BackgroundResultPayload = {
+    summary: string;
+    stderr: string;
+    exitCode: number;
+    model?: string;
+    sessionFile?: string;
+    parentSessionFile?: string;
+};
 
 interface ForegroundSingleRunControl {
     agentName: string;
     task: string;
     cwd: string;
+    parentSessionFile?: string;
     abortController: AbortController;
-    resultPromise: Promise<{ summary: string; stderr: string; exitCode: number; model?: string }>;
+    resultPromise: Promise<BackgroundResultPayload>;
     adoptToBackground: (jobId: string) => boolean;
+    sendPrompt?: (text: string, images?: ImageContent[]) => Promise<void>;
+    sendSteer?: (text: string, images?: ImageContent[]) => Promise<void>;
+    sendFollowUp?: (text: string, images?: ImageContent[]) => Promise<void>;
+    isBusy?: () => boolean;
 }
 
 interface ForegroundSingleRunHooks {
@@ -447,13 +669,39 @@ function processSubagentEventLine(
     line: string,
     currentResult: SingleResult,
     emitUpdate: () => void,
-    proc?: ChildProcess,
+    proc: ChildProcess | undefined,
+    onSessionInfo?: (info: { sessionFile?: string; parentSessionFile?: string }) => void,
+    onEventType?: (eventType: string) => void,
+    onParsedEvent?: (event: any) => void,
 ): boolean {
     if (!line.trim()) return false;
     let event: any;
     try {
         event = JSON.parse(line);
     } catch {
+        return false;
+    }
+
+    const eventType = typeof event.type === "string" ? event.type : "unknown";
+    onEventType?.(eventType);
+    onParsedEvent?.(event);
+
+    if (event.type === "subagent_session_info") {
+        let changed = false;
+        if (typeof event.sessionFile === "string" && event.sessionFile) {
+            if (currentResult.sessionFile !== event.sessionFile) changed = true;
+            currentResult.sessionFile = event.sessionFile;
+        }
+        if (typeof event.parentSessionFile === "string" && event.parentSessionFile) {
+            if (currentResult.parentSessionFile !== event.parentSessionFile) changed = true;
+            currentResult.parentSessionFile = event.parentSessionFile;
+        }
+        if (changed) {
+            onSessionInfo?.({
+                sessionFile: currentResult.sessionFile,
+                parentSessionFile: currentResult.parentSessionFile,
+            });
+        }
         return false;
     }
 
@@ -516,6 +764,10 @@ async function runSingleAgent(
     signal: AbortSignal | undefined,
     onUpdate: OnUpdateCallback | undefined,
     makeDetails: (results: SingleResult[]) => SubagentDetails,
+    parentSessionFile: string | undefined,
+    attachableSession: boolean,
+    onSessionInfo?: (info: { sessionFile?: string; parentSessionFile?: string }) => void,
+    onSubagentEvent?: (event: any, currentResult: SingleResult) => void,
     foregroundHooks?: ForegroundSingleRunHooks,
 ): Promise<SingleResult> {
     const agent = agents.find((a) => a.name === agentName);
@@ -555,6 +807,7 @@ async function runSingleAgent(
         usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
         model: inferredModel,
         step,
+        parentSessionFile,
     };
 
     const emitUpdate = () => {
@@ -593,12 +846,23 @@ async function runSingleAgent(
             tmpPromptDir = tmp.dir;
             tmpPromptPath = tmp.filePath;
         }
-        const args = buildSubagentProcessArgs(agent, task, tmpPromptPath, inferredModel);
+        const effectiveCwd = cwd ?? defaultCwd;
+        const subagentSessionDir = parentSessionFile ? path.dirname(parentSessionFile) : undefined;
+        const sessionFilesBefore = attachableSession && subagentSessionDir
+            ? new Set(listSessionFiles(subagentSessionDir))
+            : undefined;
+        const launchStartedAt = Date.now();
+
+        const args = buildSubagentProcessArgs(agent, task, tmpPromptPath, inferredModel, {
+            noSession: !attachableSession,
+            parentSessionFile: parentSessionFile,
+            mode: attachableSession ? "rpc" : "json",
+        });
 
         const exitCode = await new Promise<number>((resolve) => {
             const bundledPaths = getBundledExtensionPathsFromEnv();
             const extensionArgs = bundledPaths.flatMap((p) => ["--extension", p]);
-            const cliPath = resolveSubagentCliPath(cwd ?? defaultCwd);
+            const cliPath = resolveSubagentCliPath(effectiveCwd);
             if (!cliPath) {
                 currentResult.stderr += "Unable to resolve LSD/GSD CLI path for subagent launch.";
                 resolve(1);
@@ -607,7 +871,7 @@ async function runSingleAgent(
             const proc = spawn(
                 process.execPath,
                 [cliPath, ...extensionArgs, ...args],
-                { cwd: cwd ?? defaultCwd, shell: false, stdio: ["pipe", "pipe", "pipe"] },
+                { cwd: effectiveCwd, shell: false, stdio: ["pipe", "pipe", "pipe"] },
             );
             // Keep stdin open so approval/classifier responses can be proxied back
             // into the child process. Closing it here can leave the subagent stuck
@@ -617,13 +881,25 @@ async function runSingleAgent(
             let completionSeen = false;
             let resolved = false;
             let foregroundReleased = false;
+            let isBusy = false;
+            let commandSeq = 0;
+            const pendingCommandResponses = new Map<string, { resolve: (data: any) => void; reject: (error: Error) => void }>();
             const procAbortController = new AbortController();
-            let resolveBackgroundResult: ((value: { summary: string; stderr: string; exitCode: number; model?: string }) => void) | undefined;
+            let resolveBackgroundResult: ((value: BackgroundResultPayload) => void) | undefined;
             let rejectBackgroundResult: ((reason?: unknown) => void) | undefined;
-            const backgroundResultPromise = new Promise<{ summary: string; stderr: string; exitCode: number; model?: string }>((resolveBg, rejectBg) => {
+            const backgroundResultPromise = new Promise<BackgroundResultPayload>((resolveBg, rejectBg) => {
                 resolveBackgroundResult = resolveBg;
                 rejectBackgroundResult = rejectBg;
             });
+
+            const sendRpcCommand = async (command: Record<string, unknown>): Promise<any> => {
+                const id = `sa_cmd_${++commandSeq}`;
+                if (!proc.stdin) throw new Error("Subagent RPC stdin is not available.");
+                return new Promise((resolveCmd, rejectCmd) => {
+                    pendingCommandResponses.set(id, { resolve: resolveCmd, reject: rejectCmd });
+                    proc.stdin!.write(JSON.stringify({ id, ...command }) + "\n");
+                });
+            };
 
             const finishForeground = (code: number) => {
                 if (resolved) return;
@@ -648,9 +924,26 @@ async function runSingleAgent(
                 agentName,
                 task,
                 cwd: cwd ?? defaultCwd,
+                parentSessionFile,
                 abortController: procAbortController,
                 resultPromise: backgroundResultPromise,
                 adoptToBackground,
+                sendPrompt: attachableSession
+                    ? async (text: string, images?: ImageContent[]) => {
+                        await sendRpcCommand({ type: "prompt", message: text, images });
+                    }
+                    : undefined,
+                sendSteer: attachableSession
+                    ? async (text: string, images?: ImageContent[]) => {
+                        await sendRpcCommand({ type: "steer", message: text, images });
+                    }
+                    : undefined,
+                sendFollowUp: attachableSession
+                    ? async (text: string, images?: ImageContent[]) => {
+                        await sendRpcCommand({ type: "follow_up", message: text, images });
+                    }
+                    : undefined,
+                isBusy: attachableSession ? () => isBusy : undefined,
             });
 
             proc.stdout.on("data", (data) => {
@@ -658,7 +951,30 @@ async function runSingleAgent(
                 const lines = buffer.split("\n");
                 buffer = lines.pop() || "";
                 for (const line of lines) {
-                    if (processSubagentEventLine(line, currentResult, emitUpdate, proc)) {
+                    const trimmed = line.trim();
+                    if (!trimmed) continue;
+                    if (attachableSession) {
+                        try {
+                            const parsed = JSON.parse(trimmed);
+                            if (parsed?.type === "response" && typeof parsed.id === "string" && pendingCommandResponses.has(parsed.id)) {
+                                const pending = pendingCommandResponses.get(parsed.id)!;
+                                pendingCommandResponses.delete(parsed.id);
+                                if (parsed.success === false) {
+                                    pending.reject(new Error(typeof parsed.error === "string" ? parsed.error : "Subagent RPC command failed."));
+                                } else {
+                                    pending.resolve(parsed.data);
+                                }
+                                continue;
+                            }
+                        } catch {
+                            // Fall through to generic event processing.
+                        }
+                    }
+
+                    if (processSubagentEventLine(trimmed, currentResult, emitUpdate, proc, onSessionInfo, (eventType) => {
+                        if (eventType === "agent_start") isBusy = true;
+                        if (eventType === "agent_end") isBusy = false;
+                    }, (event) => onSubagentEvent?.(event, currentResult))) {
                         completionSeen = true;
                         try {
                             proc.kill("SIGTERM");
@@ -676,16 +992,33 @@ async function runSingleAgent(
             proc.on("close", (code) => {
                 liveSubagentProcesses.delete(proc);
                 if (buffer.trim()) {
-                    const completedOnFlush = processSubagentEventLine(buffer, currentResult, emitUpdate, proc);
+                    const completedOnFlush = processSubagentEventLine(buffer, currentResult, emitUpdate, proc, onSessionInfo, (eventType) => {
+                        if (eventType === "agent_start") isBusy = true;
+                        if (eventType === "agent_end") isBusy = false;
+                    }, (event) => onSubagentEvent?.(event, currentResult));
                     completionSeen = completionSeen || completedOnFlush;
                 }
+                isBusy = false;
+                for (const pending of pendingCommandResponses.values()) {
+                    pending.reject(new Error("Subagent process closed before command response."));
+                }
+                pendingCommandResponses.clear();
+
                 const finalExitCode = completionSeen && (code === null || code === 143 || code === 15) ? 0 : (code ?? 0);
                 currentResult.exitCode = finalExitCode;
+
+                if (attachableSession && sessionFilesBefore && subagentSessionDir && !currentResult.sessionFile) {
+                    const detected = detectNewSubagentSessionFile(subagentSessionDir, sessionFilesBefore, launchStartedAt);
+                    if (detected) currentResult.sessionFile = detected;
+                }
+
                 resolveBackgroundResult?.({
                     summary: getFinalOutput(currentResult.messages),
                     stderr: currentResult.stderr,
                     exitCode: finalExitCode,
                     model: currentResult.model,
+                    sessionFile: currentResult.sessionFile,
+                    parentSessionFile: currentResult.parentSessionFile,
                 });
                 foregroundHooks?.onFinish?.();
                 finishForeground(finalExitCode);
@@ -693,10 +1026,26 @@ async function runSingleAgent(
 
             proc.on("error", (error) => {
                 liveSubagentProcesses.delete(proc);
+                isBusy = false;
+                for (const pending of pendingCommandResponses.values()) {
+                    pending.reject(error instanceof Error ? error : new Error(String(error)));
+                }
+                pendingCommandResponses.clear();
                 rejectBackgroundResult?.(error);
                 foregroundHooks?.onFinish?.();
                 finishForeground(1);
             });
+
+            if (attachableSession) {
+                void sendRpcCommand({ type: "prompt", message: task }).catch((error) => {
+                    currentResult.stderr += error instanceof Error ? error.message : String(error);
+                    try {
+                        proc.kill("SIGTERM");
+                    } catch {
+                        /* ignore */
+                    }
+                });
+            }
 
             const killProc = () => {
                 wasAborted = true;
@@ -725,6 +1074,12 @@ async function runSingleAgent(
         });
 
         currentResult.exitCode = exitCode;
+        if (attachableSession && sessionFilesBefore && subagentSessionDir) {
+            const detected = detectNewSubagentSessionFile(subagentSessionDir, sessionFilesBefore, launchStartedAt);
+            if (detected) {
+                currentResult.sessionFile = detected;
+            }
+        }
         if (wasAborted) throw new Error("Subagent was aborted");
         return currentResult;
     } finally {
@@ -805,15 +1160,68 @@ export default function(pi: ExtensionAPI) {
     const foregroundSubagentHint = "Ctrl+B: move foreground subagent to background";
     type ActiveForegroundSubagent = ForegroundSingleRunControl & { claimed: boolean };
     let activeForegroundSubagent: ActiveForegroundSubagent | null = null;
+    let activeSessionFileForUi: string | undefined;
+    const liveStreamBufferBySession = new Map<string, string>();
+
+    function flushLiveStream(sessionFile: string): void {
+        const buffered = liveStreamBufferBySession.get(sessionFile);
+        if (!buffered || !buffered.trim()) return;
+        liveStreamBufferBySession.set(sessionFile, "");
+        pi.sendMessage(
+            {
+                customType: "live_subagent_stream",
+                content: buffered,
+                display: true,
+            },
+            { deliverAs: "followUp" },
+        );
+    }
+
+    function pushLiveStreamDelta(sessionFile: string, delta: string): void {
+        const prev = liveStreamBufferBySession.get(sessionFile) ?? "";
+        const next = prev + delta;
+        liveStreamBufferBySession.set(sessionFile, next);
+        if (next.length >= 120 || next.includes("\n")) {
+            flushLiveStream(sessionFile);
+        }
+    }
+
+    function getCurrentSessionSubagentMetadata(sessionFile: string | undefined) {
+        if (!sessionFile) return null;
+        return readSessionHeader(sessionFile);
+    }
+
+    function applyCurrentSessionSubagentTools(ctx: any): void {
+        const metadata = getCurrentSessionSubagentMetadata(ctx.sessionManager.getSessionFile());
+        if (metadata?.subagentTools && metadata.subagentTools.length > 0) {
+            ctx.setActiveTools(metadata.subagentTools);
+        }
+    }
 
     function getBgManager(): BackgroundJobManager {
         if (!bgManager) throw new Error("BackgroundJobManager not initialized.");
         return bgManager;
     }
 
-    pi.on("session_start", async () => {
+    pi.on("session_start", async (_event, ctx) => {
+        activeSessionFileForUi = ctx.sessionManager.getSessionFile();
         bgManager = new BackgroundJobManager({
             onJobComplete: (job) => {
+                if (job.sessionFile && job.parentSessionFile) {
+                    const existingParent = parentSessionByChild.get(job.sessionFile);
+                    if (!existingParent) {
+                        registerAgentSessionLink({
+                            agentName: job.agentName,
+                            task: job.task,
+                            parentSessionFile: job.parentSessionFile,
+                            subagentSessionFile: job.sessionFile,
+                            state: job.status === "failed" ? "failed" : "completed",
+                        });
+                    } else {
+                        updateAgentSessionLinkState(job.sessionFile, job.status === "failed" ? "failed" : "completed");
+                    }
+                }
+
                 if (job.awaited) return;
                 const statusEmoji = job.status === "completed" ? "✓" : job.status === "cancelled" ? "✗ cancelled" : "✗ failed";
                 const elapsed = ((Date.now() - job.startedAt) / 1000).toFixed(1);
@@ -839,25 +1247,82 @@ export default function(pi: ExtensionAPI) {
                 );
             },
         });
+        applyCurrentSessionSubagentTools(ctx);
+    });
+
+    pi.on("session_switch", async (_event, ctx) => {
+        activeSessionFileForUi = ctx.sessionManager.getSessionFile();
+        applyCurrentSessionSubagentTools(ctx);
+    });
+
+    pi.on("before_agent_start", async (event, ctx) => {
+        const metadata = getCurrentSessionSubagentMetadata(ctx.sessionManager.getSessionFile());
+        if (!metadata?.subagentSystemPrompt) return;
+        const subagentName = metadata.subagentName ?? "subagent";
+        const taskNote = metadata.subagentTask
+            ? `Original delegated task: ${metadata.subagentTask}`
+            : "Continue operating as the delegated subagent for this session.";
+        const antiRecursion = [
+            `You are already the ${subagentName} subagent for this session.`,
+            "Do not spawn or delegate to another subagent with the same name as yourself.",
+            `If the user asks you to continue ${subagentName} work, do that work directly in this session.`,
+            taskNote,
+            "IMPORTANT: There is NO human available to answer questions in this session. Do NOT call ask_user_questions. Make all decisions autonomously based on the task and context.",
+        ].join("\n");
+        return {
+            systemPrompt: `${event.systemPrompt}\n\n${antiRecursion}\n\n${metadata.subagentSystemPrompt}`,
+        };
+    });
+    pi.on("input", async (event, ctx) => {
+        const sessionFile = ctx.sessionManager.getSessionFile();
+        if (!sessionFile) return;
+        const runtime = liveRuntimeBySessionFile.get(sessionFile);
+        if (!runtime) return;
+
+        const text = event.text?.trim();
+        if (!text) return { action: "handled" as const };
+
+        const isSlashCommand = text.startsWith("/");
+        if (isSlashCommand) return;
+
+        try {
+            if (runtime.isBusy()) {
+                await runtime.sendSteer(text, event.images);
+                ctx.ui.notify(`Sent steer to running subagent ${runtime.agentName}.`, "info");
+            } else {
+                await runtime.sendPrompt(text, event.images);
+                ctx.ui.notify(`Sent prompt to live subagent ${runtime.agentName}.`, "info");
+            }
+            return { action: "handled" as const };
+        } catch (error) {
+            ctx.ui.notify(
+                `Failed to send input to live subagent ${runtime.agentName}: ${error instanceof Error ? error.message : String(error)}`,
+                "error",
+            );
+            return { action: "handled" as const };
+        }
     });
 
 
     pi.on("session_before_switch", async () => {
+        if (activeSessionFileForUi) flushLiveStream(activeSessionFileForUi);
         activeForegroundSubagent = null;
-        if (bgManager) {
-            for (const job of bgManager.getRunningJobs()) {
-                bgManager.cancel(job.id);
-            }
-        }
     });
 
     pi.on("session_shutdown", async () => {
+        if (activeSessionFileForUi) flushLiveStream(activeSessionFileForUi);
+        activeSessionFileForUi = undefined;
         activeForegroundSubagent = null;
         await stopLiveSubagents();
         if (bgManager) {
             bgManager.shutdown();
             bgManager = null;
         }
+        agentSessionLinksById.clear();
+        agentSessionIdsByParent.clear();
+        parentSessionByChild.clear();
+        liveRuntimeBySessionFile.clear();
+        liveStreamBufferBySession.clear();
     });
 
     // /subagents command
@@ -972,6 +1437,189 @@ export default function(pi: ExtensionAPI) {
         },
     });
 
+    // /agent command - switch to the parent or a tracked subagent session
+    pi.registerCommand("agent", {
+        description: "Switch focus to parent/subagent sessions (/agent picker, /agent <id|index|name>, /agent parent)",
+        handler: async (args: string, ctx) => {
+            const currentSessionFile = ctx.sessionManager.getSessionFile();
+            if (!currentSessionFile) {
+                ctx.ui.notify("Current session is in-memory only; /agent requires a persisted session file.", "warning");
+                return;
+            }
+
+            const arg = args.trim();
+            const parentSessionFile = parentSessionByChild.get(currentSessionFile);
+            const currentParent = parentSessionFile ?? currentSessionFile;
+            const currentSessionDir = path.dirname(currentParent);
+
+            let tracked = getAgentSessionLinksForParent(currentParent).filter((entry) => fs.existsSync(entry.subagentSessionFile));
+            if (tracked.length === 0) {
+                tracked = backfillAgentSessionLinksForParent(currentParent, currentSessionDir)
+                    .filter((entry) => fs.existsSync(entry.subagentSessionFile));
+            }
+
+            const runningJobs = bgManager?.getRunningJobs() ?? [];
+            const switchTargets = buildSwitchTargetsForParent(
+                currentParent,
+                currentSessionFile,
+                ctx.cwd,
+                tracked,
+                runningJobs,
+            );
+
+            const applySwitchTarget = async (target: AgentSwitchTarget): Promise<void> => {
+                if (target.selectionAction === "blocked") {
+                    ctx.ui.notify(target.blockedReason ?? "That target cannot be selected yet.", "warning");
+                    return;
+                }
+
+                if (target.selectionAction === "attach_live") {
+                    if (!fs.existsSync(target.sessionFile)) {
+                        ctx.ui.notify(`Live subagent session file is missing: ${target.sessionFile}`, "error");
+                        return;
+                    }
+                    const liveRuntime = liveRuntimeBySessionFile.get(target.sessionFile);
+                    if (!liveRuntime) {
+                        ctx.ui.notify("Live runtime is no longer available for this subagent. It may have completed.", "warning");
+                        return;
+                    }
+                    const switched = await ctx.switchSession(target.sessionFile);
+                    if (switched.cancelled) {
+                        ctx.ui.notify("Session switch was cancelled.", "warning");
+                        return;
+                    }
+                    ctx.ui.notify(`Attached to running subagent ${target.agentName}. Prompts in this session are routed live (busy => steer, idle => prompt). Use /agent parent to return.`, "info");
+                    return;
+                }
+
+                if (target.kind === "parent") {
+                    if (!fs.existsSync(target.sessionFile)) {
+                        ctx.ui.notify(`Parent session file not found: ${target.sessionFile}`, "error");
+                        return;
+                    }
+                    const switched = await ctx.switchSession(target.sessionFile);
+                    if (switched.cancelled) {
+                        ctx.ui.notify("Session switch was cancelled.", "warning");
+                        return;
+                    }
+                    ctx.ui.notify("Switched to parent session.", "info");
+                    return;
+                }
+
+                if (!fs.existsSync(target.sessionFile)) {
+                    ctx.ui.notify(`Subagent session file is missing: ${target.sessionFile}`, "error");
+                    return;
+                }
+
+                const switched = await ctx.switchSession(target.sessionFile);
+                if (switched.cancelled) {
+                    ctx.ui.notify("Session switch was cancelled.", "warning");
+                    return;
+                }
+                updateAgentSessionLinkState(target.sessionFile, target.state === "failed" ? "failed" : "completed");
+                ctx.ui.notify(`Switched to subagent ${target.agentName}. This resumes the saved subagent session; use /agent parent to return.`, "info");
+            };
+
+            if (!arg) {
+                const subagentTargets = switchTargets.filter((target) => target.kind === "subagent");
+                if (ctx.hasUI) {
+                    if (subagentTargets.length === 0 && !parentSessionFile) {
+                        ctx.ui.notify("No tracked subagent sessions for this parent session yet. Run a single-mode subagent first (foreground or background).", "info");
+                        return;
+                    }
+
+                    const selected = await showAgentSwitcher(ctx, switchTargets);
+                    if (!selected) return;
+                    await applySwitchTarget(selected);
+                    return;
+                }
+
+                if (subagentTargets.length === 0 && !parentSessionFile) {
+                    ctx.ui.notify("No tracked subagent sessions for this parent session yet. Run a single-mode subagent first (foreground or background).", "info");
+                    return;
+                }
+
+                const lines = ["Agent switch targets:"];
+                switchTargets.forEach((target, index) => {
+                    lines.push(`${index + 1}. ${formatSwitchTargetSummary(target)}`);
+                });
+                lines.push("", "Use `/agent <index|id|name>` for explicit targeting, or `/agent parent`.");
+                ctx.ui.notify(lines.join("\n"), "info");
+                return;
+            }
+
+            if (arg === "parent" || arg === "main") {
+                if (!parentSessionFile) {
+                    ctx.ui.notify("You are already in the parent/main session.", "info");
+                    return;
+                }
+                if (!fs.existsSync(parentSessionFile)) {
+                    ctx.ui.notify(`Parent session file not found: ${parentSessionFile}`, "error");
+                    return;
+                }
+                const switched = await ctx.switchSession(parentSessionFile);
+                if (switched.cancelled) {
+                    ctx.ui.notify("Session switch was cancelled.", "warning");
+                    return;
+                }
+                ctx.ui.notify("Switched to parent session.", "info");
+                return;
+            }
+
+            let target: AgentSessionLink | undefined;
+            if (/^\d+$/.test(arg)) {
+                const index = Number.parseInt(arg, 10) - 1;
+                target = tracked[index];
+            }
+            if (!target) {
+                target = tracked.find((entry) => entry.id === arg);
+            }
+            if (!target) {
+                target = tracked.find((entry) => entry.agentName === arg);
+            }
+            if (!target) {
+                target = tracked.find((entry) => path.basename(entry.subagentSessionFile) === arg);
+            }
+
+            if (!target) {
+                const runningTarget = switchTargets.find((entry) => entry.id === arg && entry.kind === "subagent");
+                if (runningTarget?.state === "running") {
+                    ctx.ui.notify(runningTarget.blockedReason ?? "Selected subagent is still running. Live attach is not implemented yet.", "warning");
+                    return;
+                }
+                ctx.ui.notify(`Unknown subagent target: ${arg}. Run /agent to list available targets.`, "warning");
+                return;
+            }
+
+            if (!fs.existsSync(target.subagentSessionFile)) {
+                ctx.ui.notify(`Subagent session file is missing: ${target.subagentSessionFile}`, "error");
+                return;
+            }
+
+            if (target.state === "running") {
+                const liveRuntime = liveRuntimeBySessionFile.get(target.subagentSessionFile);
+                if (!liveRuntime) {
+                    ctx.ui.notify("Live runtime is no longer available for this subagent. It may have completed.", "warning");
+                    return;
+                }
+                const switched = await ctx.switchSession(target.subagentSessionFile);
+                if (switched.cancelled) {
+                    ctx.ui.notify("Session switch was cancelled.", "warning");
+                    return;
+                }
+                ctx.ui.notify(`Attached to running subagent ${target.agentName}. Prompts in this session are routed live (busy => steer, idle => prompt). Use /agent parent to return.`, "info");
+                return;
+            }
+
+            const switched = await ctx.switchSession(target.subagentSessionFile);
+            if (switched.cancelled) {
+                ctx.ui.notify("Session switch was cancelled.", "warning");
+                return;
+            }
+            updateAgentSessionLinkState(target.subagentSessionFile, target.state === "failed" ? "failed" : "completed");
+            ctx.ui.notify(`Switched to subagent ${target.agentName}. This resumes the saved subagent session; use /agent parent to return.`, "info");
+        },
+    });
     pi.registerShortcut(Key.ctrl("b"), {
         description: shortcutDesc("Move foreground subagent to background", "/subagents list"),
         handler: async (ctx) => {
@@ -992,6 +1640,9 @@ export default function(pi: ExtensionAPI) {
                     running.cwd,
                     running.abortController,
                     running.resultPromise,
+                    {
+                        parentSessionFile: running.parentSessionFile ?? ctx.sessionManager.getSessionFile(),
+                    },
                 );
             } catch (error) {
                 running.claimed = false;
@@ -1075,6 +1726,7 @@ export default function(pi: ExtensionAPI) {
             const confirmProjectAgents = params.confirmProjectAgents ?? false;
             const cmuxClient = CmuxClient.fromPreferences(loadEffectivePreferences()?.preferences);
             const cmuxSplitsEnabled = cmuxClient.getConfig().splits;
+            const invokingSessionFile = ctx.sessionManager.getSessionFile();
 
             // Resolve isolation mode
             const isolationMode = readIsolationMode();
@@ -1175,6 +1827,10 @@ export default function(pi: ExtensionAPI) {
                         signal,
                         chainUpdate,
                         makeDetails("chain"),
+                        invokingSessionFile,
+                        false,
+                        undefined,
+                        undefined,
                     );
                     results.push(result);
 
@@ -1263,6 +1919,9 @@ export default function(pi: ExtensionAPI) {
                                 }
                             },
                             makeDetails("parallel"),
+                            invokingSessionFile,
+                            false,
+                            undefined,
                         );
                     let result = await runTask();
 
@@ -1337,8 +1996,10 @@ export default function(pi: ExtensionAPI) {
                             params.task,
                             params.cwd,
                             params.model,
-                            { defaultCwd: ctx.cwd, model: ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined },
+                            { defaultCwd: ctx.cwd, model: ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined, parentSessionFile: invokingSessionFile },
                             async (bgSignal) => {
+                                let liveSessionFile: string | undefined;
+                                let liveRuntime: LiveSubagentRuntime | undefined;
                                 const result = await runSingleAgent(
                                     ctx.cwd,
                                     agents,
@@ -1351,12 +2012,63 @@ export default function(pi: ExtensionAPI) {
                                     bgSignal,
                                     undefined, // no streaming updates for background jobs
                                     makeDetails("single"),
+                                    invokingSessionFile,
+                                    true,
+                                    (info) => {
+                                        if (!invokingSessionFile || !info.sessionFile) return;
+                                        upsertAgentSessionLink(
+                                            params.agent!,
+                                            params.task!,
+                                            invokingSessionFile,
+                                            info.sessionFile,
+                                            "running",
+                                        );
+                                        liveSessionFile = info.sessionFile;
+                                        if (liveRuntime) {
+                                            liveRuntime.sessionFile = info.sessionFile;
+                                            liveRuntime.parentSessionFile = info.parentSessionFile ?? invokingSessionFile;
+                                            liveRuntimeBySessionFile.set(info.sessionFile, liveRuntime);
+                                        }
+                                    },
+                                    (event, partial) => {
+                                        const sessionFile = partial.sessionFile;
+                                        if (!sessionFile || activeSessionFileForUi !== sessionFile) return;
+                                        if (event?.type === "message_update" && event.assistantMessageEvent?.type === "text_delta") {
+                                            const delta = String(event.assistantMessageEvent.delta ?? "");
+                                            if (delta) pushLiveStreamDelta(sessionFile, delta);
+                                        }
+                                        if (event?.type === "message_end") {
+                                            flushLiveStream(sessionFile);
+                                        }
+                                    },
+                                    {
+                                        onStart: (control) => {
+                                            if (!control.sendPrompt || !control.sendSteer || !control.sendFollowUp || !control.isBusy) return;
+                                            liveRuntime = {
+                                                sessionFile: liveSessionFile,
+                                                parentSessionFile: invokingSessionFile,
+                                                agentName: params.agent!,
+                                                isBusy: control.isBusy,
+                                                sendPrompt: control.sendPrompt,
+                                                sendSteer: control.sendSteer,
+                                                sendFollowUp: control.sendFollowUp,
+                                            };
+                                            if (liveSessionFile) {
+                                                liveRuntimeBySessionFile.set(liveSessionFile, liveRuntime);
+                                            }
+                                        },
+                                        onFinish: () => {
+                                            if (liveSessionFile) liveRuntimeBySessionFile.delete(liveSessionFile);
+                                        },
+                                    },
                                 );
                                 return {
                                     exitCode: result.exitCode,
                                     finalOutput: getFinalOutput(result.messages),
                                     stderr: result.stderr,
                                     model: result.model,
+                                    sessionFile: result.sessionFile,
+                                    parentSessionFile: result.parentSessionFile,
                                 };
                             },
                         );
@@ -1387,6 +2099,8 @@ export default function(pi: ExtensionAPI) {
                         isolation = await createIsolation(effectiveCwd, taskId, isolationMode);
                     }
 
+                    let liveSessionFile: string | undefined;
+                    let liveRuntime: LiveSubagentRuntime | undefined;
                     const result = await runSingleAgent(
                         ctx.cwd,
                         agents,
@@ -1399,19 +2113,82 @@ export default function(pi: ExtensionAPI) {
                         signal,
                         onUpdate,
                         makeDetails("single"),
+                        invokingSessionFile,
+                        !isolation,
+                        !isolation
+                            ? (info) => {
+                                if (!invokingSessionFile || !info.sessionFile) return;
+                                upsertAgentSessionLink(
+                                    params.agent!,
+                                    params.task!,
+                                    invokingSessionFile,
+                                    info.sessionFile,
+                                    "running",
+                                );
+                                liveSessionFile = info.sessionFile;
+                                if (liveRuntime) {
+                                    liveRuntime.sessionFile = info.sessionFile;
+                                    liveRuntime.parentSessionFile = info.parentSessionFile ?? invokingSessionFile;
+                                    liveRuntimeBySessionFile.set(info.sessionFile, liveRuntime);
+                                }
+                            }
+                            : undefined,
+                        !isolation
+                            ? (event, partial) => {
+                                const sessionFile = partial.sessionFile;
+                                if (!sessionFile || activeSessionFileForUi !== sessionFile) return;
+                                if (event?.type === "message_update" && event.assistantMessageEvent?.type === "text_delta") {
+                                    const delta = String(event.assistantMessageEvent.delta ?? "");
+                                    if (delta) pushLiveStreamDelta(sessionFile, delta);
+                                }
+                                if (event?.type === "message_end") {
+                                    flushLiveStream(sessionFile);
+                                }
+                            }
+                            : undefined,
                         !isolation
                             ? {
                                 onStart: (control) => {
                                     activeForegroundSubagent = { ...control, claimed: false };
                                     ctx.ui.setStatus(foregroundSubagentStatusKey, foregroundSubagentHint);
+
+                                    if (!control.sendPrompt || !control.sendSteer || !control.sendFollowUp || !control.isBusy) return;
+                                    liveRuntime = {
+                                        sessionFile: liveSessionFile,
+                                        parentSessionFile: invokingSessionFile,
+                                        agentName: params.agent!,
+                                        isBusy: control.isBusy,
+                                        sendPrompt: control.sendPrompt,
+                                        sendSteer: control.sendSteer,
+                                        sendFollowUp: control.sendFollowUp,
+                                    };
+                                    if (liveSessionFile && liveRuntime) {
+                                        liveRuntimeBySessionFile.set(liveSessionFile, liveRuntime);
+                                    }
                                 },
                                 onFinish: () => {
                                     activeForegroundSubagent = null;
                                     ctx.ui.setStatus(foregroundSubagentStatusKey, undefined);
+                                    if (liveSessionFile) liveRuntimeBySessionFile.delete(liveSessionFile);
                                 },
                             }
                             : undefined,
                     );
+
+                    if (result.sessionFile && invokingSessionFile) {
+                        const existingParent = parentSessionByChild.get(result.sessionFile);
+                        if (!existingParent) {
+                            registerAgentSessionLink({
+                                agentName: result.agent,
+                                task: result.task,
+                                parentSessionFile: invokingSessionFile,
+                                subagentSessionFile: result.sessionFile,
+                                state: result.exitCode === 0 ? "completed" : "failed",
+                            });
+                        } else {
+                            updateAgentSessionLinkState(result.sessionFile, result.exitCode === 0 ? "completed" : "failed");
+                        }
+                    }
 
                     if (result.backgroundJobId) {
                         return {
@@ -1429,11 +2206,12 @@ export default function(pi: ExtensionAPI) {
                     }
 
                     const isError = result.exitCode !== 0 || result.stopReason === "error" || result.stopReason === "aborted";
+                    const agentSwitchHint = result.sessionFile ? "\n\nTip: run `/agent` to switch focus to this subagent session." : "";
                     if (isError) {
                         const errorMsg =
                             result.errorMessage || result.stderr || getFinalOutput(result.messages) || "(no output)";
                         return {
-                            content: [{ type: "text", text: `Agent ${result.stopReason || "failed"}: ${errorMsg}` }],
+                            content: [{ type: "text", text: `Agent ${result.stopReason || "failed"}: ${errorMsg}${agentSwitchHint}` }],
                             details: makeDetails("single")([result]),
                             isError: true,
                         };
@@ -1444,6 +2222,7 @@ export default function(pi: ExtensionAPI) {
                     if (mergeResult && !mergeResult.success) {
                         outputText += `\n\n⚠ Patch merge failed: ${mergeResult.error || "unknown error"}`;
                     }
+                    if (agentSwitchHint) outputText += agentSwitchHint;
                     return {
                         content: [{ type: "text", text: outputText }],
                         details: makeDetails("single")([result]),
