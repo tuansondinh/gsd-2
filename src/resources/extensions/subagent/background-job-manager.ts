@@ -31,6 +31,11 @@ type BackgroundJobMetadata = {
     model?: string;
 };
 
+type InProcessHandleLike = {
+    abort: () => void;
+    dispose: () => void;
+};
+
 export class BackgroundJobManager {
     private jobs = new Map<string, BackgroundSubagentJob>();
     private evictionTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -78,6 +83,29 @@ export class BackgroundJobManager {
         metadata?: BackgroundJobMetadata,
     ): string {
         return this.attachJob(agentName, task, cwd, abortController, resultPromise, metadata);
+    }
+
+    /**
+     * Adopt an in-process subagent handle into background tracking.
+     */
+    adoptHandle(
+        agentName: string,
+        task: string,
+        cwd: string,
+        handle: InProcessHandleLike,
+        resultPromise: Promise<BackgroundJobResult>,
+        metadata?: BackgroundJobMetadata,
+    ): string {
+        const abortController = new AbortController();
+        const onAbort = () => handle.abort();
+        abortController.signal.addEventListener("abort", onAbort, { once: true });
+
+        const wrapped = resultPromise.finally(() => {
+            abortController.signal.removeEventListener("abort", onAbort);
+            handle.dispose();
+        });
+
+        return this.attachJob(agentName, task, cwd, abortController, wrapped, metadata);
     }
 
     /**

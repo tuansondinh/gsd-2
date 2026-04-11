@@ -328,6 +328,9 @@ export class InteractiveMode {
 	// Thinking block visibility state
 	private hideThinkingBlock = false;
 
+	// Notification sound (terminal bell on agent_end)
+	notificationSoundEnabled = false;
+
 	// Pin last prompt feature
 	private pinLastPromptEnabled = false;
 	private lastSentPromptText: string | undefined = undefined;
@@ -434,6 +437,9 @@ export class InteractiveMode {
 
 		// Load pin last prompt setting
 		this.pinLastPromptEnabled = this.settingsManager.getPinLastPrompt();
+
+		// Load notification sound setting
+		this.notificationSoundEnabled = this.settingsManager.getNotificationSound();
 
 		// Register themes from resource loader and initialize
 		setRegisteredThemes(this.session.resourceLoader.getThemes().themes);
@@ -3483,6 +3489,7 @@ export class InteractiveMode {
 					editorScheme: this.settingsManager.getEditorScheme(),
 					autoDream: this.settingsManager.getAutoDream(),
 					autoMemory: this.settingsManager.getAutoMemory(),
+					notificationSound: this.notificationSoundEnabled,
 					telegramLiveRelayAutoConnect: this.settingsManager.getTelegramLiveRelayAutoConnect(),
 					sandboxEnabled: this.settingsManager.getSandboxSettings().enabled ?? true,
 					sandboxNetworkMode: this.settingsManager.getSandboxSettings().networkMode
@@ -3674,6 +3681,11 @@ export class InteractiveMode {
 					onAutoMemoryChange: (enabled) => {
 						this.settingsManager.setAutoMemory(enabled);
 						this.showStatus(`Auto memory: ${enabled ? "enabled" : "disabled"}`);
+					},
+					onNotificationSoundChange: (enabled) => {
+						this.notificationSoundEnabled = enabled;
+						this.settingsManager.setNotificationSound(enabled);
+						this.showStatus(`Notification sound: ${enabled ? "enabled" : "disabled"}`);
 					},
 					onTelegramLiveRelayAutoConnectChange: (enabled) => {
 						this.settingsManager.setTelegramLiveRelayAutoConnect(enabled);

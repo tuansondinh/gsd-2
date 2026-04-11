@@ -13,6 +13,7 @@ export interface InteractiveModeStateHost {
 	pendingTools: Map<string, any>;
 	toolOutputExpanded: boolean;
 	hideThinkingBlock: boolean;
+	notificationSoundEnabled: boolean;
 	isBashMode: boolean;
 	onInputCallback?: (text: string) => void;
 	isInitialized: boolean;

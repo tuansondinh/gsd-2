@@ -70,6 +70,7 @@ export interface SettingsConfig {
 	editorScheme: "auto" | "vscode" | "cursor" | "zed" | "jetbrains" | "sublime" | "file";
 	autoDream: boolean;
 	autoMemory: boolean;
+	notificationSound: boolean;
 	telegramLiveRelayAutoConnect: boolean;
 	sandboxEnabled?: boolean;
 	sandboxNetworkMode?: "allow" | "ask" | "deny";
@@ -96,6 +97,7 @@ export interface SettingsCallbacks {
 	onAutoSwitchPlanModelChange: (enabled: boolean) => void;
 	onAutoDreamChange: (enabled: boolean) => void;
 	onAutoMemoryChange: (enabled: boolean) => void;
+	onNotificationSoundChange: (enabled: boolean) => void;
 	onTelegramLiveRelayAutoConnectChange: (enabled: boolean) => void;
 	onSandboxEnabledChange?: (enabled: boolean) => void;
 	onSandboxNetworkModeChange?: (mode: "allow" | "ask" | "deny") => void;
@@ -553,9 +555,19 @@ export class SettingsSelectorComponent extends Container {
 			values: ["true", "false"],
 		});
 
-		// Telegram relay auto-connect toggle (insert after auto-memory)
+		// Notification sound toggle (insert after auto-memory)
 		const autoMemoryIdx = items.findIndex((item) => item.id === "auto-memory");
 		items.splice(autoMemoryIdx + 1, 0, {
+			id: "notification-sound",
+			label: "Notification sound",
+			description: "Play a terminal bell when the agent finishes responding",
+			currentValue: config.notificationSound ? "true" : "false",
+			values: ["true", "false"],
+		});
+
+		// Telegram relay auto-connect toggle (insert after notification-sound)
+		const notificationSoundIdx = items.findIndex((item) => item.id === "notification-sound");
+		items.splice(notificationSoundIdx + 1, 0, {
 			id: "telegram-live-relay-autoconnect",
 			label: "Telegram autoconnect",
 			description: "Auto-run /lsd telegram connect on startup",
@@ -714,6 +726,9 @@ export class SettingsSelectorComponent extends Container {
 						break;
 					case "auto-memory":
 						callbacks.onAutoMemoryChange(newValue === "true");
+						break;
+					case "notification-sound":
+						callbacks.onNotificationSoundChange(newValue === "true");
 						break;
 					case "telegram-live-relay-autoconnect":
 						callbacks.onTelegramLiveRelayAutoConnectChange(newValue === "true");

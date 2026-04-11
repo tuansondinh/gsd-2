@@ -186,6 +186,7 @@ export interface Settings {
 	editorScheme?: "auto" | "vscode" | "cursor" | "zed" | "jetbrains" | "sublime" | "file"; // URI scheme for Cmd+click file links (default: "auto")
 	autoDream?: boolean; // default: false — enable automatic memory consolidation (dream) after sessions
 	autoMemory?: boolean; // default: false — enable automatic memory extraction from session transcripts
+	notificationSound?: boolean; // default: false — play terminal bell when agent finishes responding
 	telegramLiveRelayAutoConnect?: boolean; // default: false — auto-run /lsd telegram connect on startup
 }
 
@@ -1443,6 +1444,14 @@ export class SettingsManager {
 
 	setAutoMemory(enabled: boolean): void {
 		this.setGlobalSetting("autoMemory", enabled);
+	}
+
+	getNotificationSound(): boolean {
+		return this.settings.notificationSound ?? false;
+	}
+
+	setNotificationSound(enabled: boolean): void {
+		this.setGlobalSetting("notificationSound", enabled);
 	}
 
 	getTelegramLiveRelayAutoConnect(): boolean {

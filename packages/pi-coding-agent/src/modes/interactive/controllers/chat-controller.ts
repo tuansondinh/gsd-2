@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { Loader, Spacer, Text } from "@gsd/pi-tui";
 
 import type { InteractiveModeEvent, InteractiveModeStateHost } from "../interactive-mode-state.js";
@@ -321,6 +322,22 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 			// Update hint: show expand/collapse if tool outputs exist, else clear
 			host.defaultEditor.bottomHint = "";
 			host.updateEditorExpandHint();
+			// Play notification sound if enabled
+			if (host.notificationSoundEnabled) {
+				if (process.platform === "darwin") {
+					try {
+						const child = spawn("afplay", ["/System/Library/Sounds/Glass.aiff"], {
+							stdio: "ignore",
+							detached: true,
+						});
+						child.unref();
+					} catch {
+						host.ui.terminal.write("\x07");
+					}
+				} else {
+					host.ui.terminal.write("\x07");
+				}
+			}
 			await host.checkShutdownRequested();
 			host.ui.requestRender();
 			break;
