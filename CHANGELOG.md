@@ -6,6 +6,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-04-11
+
+### Changed
+- removed 38 stale documentation files: GSD-specific feature docs, auto-generated review artifacts, obsolete plan files, dead reference docs, and temp files
+- cleaned up .plans/ directory (21 GSD-era plan files removed)
+
 ## [1.3.1] - 2026-04-11
 
 ### Added
