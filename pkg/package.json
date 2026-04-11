@@ -1,6 +1,6 @@
 {
   "name": "lsd-pi",
-  "version": "1.3.1",
+  "version": "1.3.3",
   "piConfig": {
     "name": "lsd",
     "configDir": ".lsd"
