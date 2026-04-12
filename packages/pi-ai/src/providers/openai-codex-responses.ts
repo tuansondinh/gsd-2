@@ -1,5 +1,5 @@
 import type * as NodeOs from "node:os";
-import type { Tool as OpenAITool, ResponseInput, ResponseStreamEvent } from "openai/resources/responses/responses.js";
+import type { Tool as OpenAITool, ResponseCreateParamsStreaming, ResponseInput, ResponseStreamEvent } from "openai/resources/responses/responses.js";
 
 // NEVER convert to top-level runtime imports - breaks browser/Vite builds (web-ui)
 let _os: typeof NodeOs | null = null;
@@ -57,6 +57,7 @@ export interface OpenAICodexResponsesOptions extends StreamOptions {
 	reasoningEffort?: "none" | "low" | "medium" | "high" | "xhigh";
 	reasoningSummary?: "auto" | "concise" | "detailed" | "off" | "on" | null;
 	textVerbosity?: "low" | "medium" | "high";
+	serviceTier?: ResponseCreateParamsStreaming["service_tier"];
 }
 
 type CodexResponseStatus = "completed" | "incomplete" | "failed" | "cancelled" | "queued" | "in_progress";
@@ -73,6 +74,7 @@ interface RequestBody {
 	temperature?: number;
 	reasoning?: { effort?: string; summary?: string };
 	text?: { verbosity?: string };
+	service_tier?: ResponseCreateParamsStreaming["service_tier"];
 	include?: string[];
 	prompt_cache_key?: string;
 	[key: string]: unknown;
@@ -294,6 +296,13 @@ export const streamSimpleOpenAICodexResponses: StreamFunction<"openai-codex-resp
 // Request Building
 // ============================================================================
 
+function resolveCodexServiceTier(options?: OpenAICodexResponsesOptions): ResponseCreateParamsStreaming["service_tier"] | undefined {
+	if (options?.serviceTier !== undefined) {
+		return options.serviceTier;
+	}
+	return options?.fastMode ? "priority" : undefined;
+}
+
 function buildRequestBody(
 	model: Model<"openai-codex-responses">,
 	context: Context,
@@ -318,6 +327,11 @@ function buildRequestBody(
 
 	if (options?.temperature !== undefined) {
 		body.temperature = options.temperature;
+	}
+
+	const resolvedServiceTier = resolveCodexServiceTier(options);
+	if (resolvedServiceTier !== undefined) {
+		body.service_tier = resolvedServiceTier;
 	}
 
 	if (context.tools) {
@@ -474,6 +488,7 @@ interface CachedWebSocketConnection {
 	socket: WebSocketLike;
 	busy: boolean;
 	idleTimer?: ReturnType<typeof setTimeout>;
+	serviceTier?: ResponseCreateParamsStreaming["service_tier"];
 }
 
 const websocketSessionCache = new Map<string, CachedWebSocketConnection>();
@@ -589,6 +604,7 @@ async function acquireWebSocket(
 	url: string,
 	headers: Headers,
 	sessionId: string | undefined,
+	serviceTier: ResponseCreateParamsStreaming["service_tier"] | undefined,
 	signal?: AbortSignal,
 ): Promise<{ socket: WebSocketLike; release: (options?: { keep?: boolean }) => void }> {
 	if (!sessionId) {
@@ -611,7 +627,8 @@ async function acquireWebSocket(
 			clearTimeout(cached.idleTimer);
 			cached.idleTimer = undefined;
 		}
-		if (!cached.busy && isWebSocketReusable(cached.socket)) {
+
+		if (!cached.busy && isWebSocketReusable(cached.socket) && cached.serviceTier === serviceTier) {
 			cached.busy = true;
 			return {
 				socket: cached.socket,
@@ -625,6 +642,10 @@ async function acquireWebSocket(
 					scheduleSessionWebSocketExpiry(sessionId, cached);
 				},
 			};
+		}
+		if (!cached.busy && isWebSocketReusable(cached.socket) && cached.serviceTier !== serviceTier) {
+			closeWebSocketSilently(cached.socket, 1000, "service_tier_changed");
+			websocketSessionCache.delete(sessionId);
 		}
 		if (cached.busy) {
 			const socket = await connectWebSocket(url, headers, signal);
@@ -642,7 +663,7 @@ async function acquireWebSocket(
 	}
 
 	const socket = await connectWebSocket(url, headers, signal);
-	const entry: CachedWebSocketConnection = { socket, busy: true };
+	const entry: CachedWebSocketConnection = { socket, busy: true, serviceTier };
 
 	// Evict the oldest entry if the cache is at capacity (LRU eviction).
 	if (websocketSessionCache.size >= MAX_WEBSOCKET_CACHE_SIZE) {
@@ -830,7 +851,13 @@ async function processWebSocketStream(
 	onStart: () => void,
 	options?: OpenAICodexResponsesOptions,
 ): Promise<void> {
-	const { socket, release } = await acquireWebSocket(url, headers, options?.sessionId, options?.signal);
+	const { socket, release } = await acquireWebSocket(
+		url,
+		headers,
+		options?.sessionId,
+		body.service_tier,
+		options?.signal,
+	);
 	let keepConnection = true;
 	try {
 		socket.send(JSON.stringify({ type: "response.create", ...body }));
@@ -922,3 +949,19 @@ function buildHeaders(
 
 	return headers;
 }
+
+function clearWebSocketSessionCache(): void {
+	for (const [, entry] of websocketSessionCache) {
+		if (entry.idleTimer) {
+			clearTimeout(entry.idleTimer);
+		}
+		closeWebSocketSilently(entry.socket);
+	}
+	websocketSessionCache.clear();
+}
+
+export const __testing = {
+	buildRequestBody,
+	resolveCodexServiceTier,
+	clearWebSocketSessionCache,
+};

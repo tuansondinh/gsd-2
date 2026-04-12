@@ -66,6 +66,11 @@ export interface StreamOptions {
 	signal?: AbortSignal;
 	apiKey?: string;
 	/**
+	 * Enable fast mode for providers/models that support OpenAI service tiers.
+	 * For OpenAI/Codex Responses, this maps to service_tier="priority".
+	 */
+	fastMode?: boolean;
+	/**
 	 * Preferred transport for providers that support multiple transports.
 	 * Providers that do not support this option ignore it.
 	 */

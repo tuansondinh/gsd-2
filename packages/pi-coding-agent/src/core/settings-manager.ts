@@ -159,6 +159,7 @@ export interface Settings {
 	images?: ImageSettings;
 	enabledModels?: string[]; // Model patterns for cycling (same format as --models CLI flag)
 	codexRotate?: boolean; // Enable the bundled codex-rotate extension (default: false)
+	fastMode?: boolean; // Enable OpenAI/Codex fast tier routing (priority service tier where supported)
 	cacheTimer?: boolean; // Show elapsed time since last response in the footer (default: true)
 	pinLastPrompt?: boolean; // Pin last sent prompt above the editor as a reminder (default: false)
 	doubleEscapeAction?: "fork" | "tree" | "none"; // Action for double-escape with empty editor (default: "tree")
@@ -1186,6 +1187,14 @@ export class SettingsManager {
 
 	setCodexRotate(enabled: boolean): void {
 		this.setGlobalSetting("codexRotate", enabled);
+	}
+
+	getFastMode(): boolean {
+		return this.settings.fastMode ?? false;
+	}
+
+	setFastMode(enabled: boolean): void {
+		this.setGlobalSetting("fastMode", enabled);
 	}
 
 	getCacheTimer(): boolean {

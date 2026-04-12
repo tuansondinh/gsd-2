@@ -354,7 +354,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
         }
     }
 
-    agent = new Agent({
+    const agentOptions: ConstructorParameters<typeof Agent>[0] & { getFastMode?: () => boolean } = {
         initialState: {
             systemPrompt: "",
             model,
@@ -369,6 +369,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
             }
             return runner.emitBeforeProviderRequest(payload, currentModel);
         },
+        getFastMode: () => settingsManager.getFastMode(),
         sessionId: sessionManager.getSessionId(),
         transformContext: async (messages) => {
             const runner = extensionRunnerRef.current;
@@ -451,7 +452,8 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
                 `Set an API key environment variable or run '/login ${resolvedProvider}'.`,
             );
         },
-    });
+    };
+    agent = new Agent(agentOptions);
 
     // Restore messages if session has existing data
     if (hasExistingSession) {

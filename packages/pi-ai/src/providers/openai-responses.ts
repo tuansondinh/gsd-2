@@ -86,6 +86,7 @@ export const streamOpenAIResponses: StreamFunction<"openai-responses", OpenAIRes
 			if (nextParams !== undefined) {
 				params = nextParams as ResponseCreateParamsStreaming;
 			}
+			const resolvedServiceTier = resolveOpenAIServiceTier(model, options);
 			const openaiStream = await client.responses.create(
 				params,
 				options?.signal ? { signal: options.signal } : undefined,
@@ -93,7 +94,7 @@ export const streamOpenAIResponses: StreamFunction<"openai-responses", OpenAIRes
 			stream.push({ type: "start", partial: output });
 
 			await processResponsesStream(openaiStream, output, stream, model, {
-				serviceTier: options?.serviceTier,
+				serviceTier: resolvedServiceTier,
 				applyServiceTierPricing,
 			});
 
@@ -127,8 +128,25 @@ export const streamSimpleOpenAIResponses: StreamFunction<"openai-responses", Sim
 	} satisfies OpenAIResponsesOptions);
 };
 
+function resolveOpenAIServiceTier(
+	model: Model<"openai-responses">,
+	options?: OpenAIResponsesOptions,
+): ResponseCreateParamsStreaming["service_tier"] | undefined {
+	if (options?.serviceTier !== undefined) {
+		return options.serviceTier;
+	}
+	if (options?.fastMode !== true) {
+		return undefined;
+	}
+	if (model.provider !== "openai") {
+		return undefined;
+	}
+	return model.capabilities?.supportsServiceTier ? "priority" : undefined;
+}
+
 function buildParams(model: Model<"openai-responses">, context: Context, options?: OpenAIResponsesOptions) {
 	const messages = convertResponsesMessages(model, context, OPENAI_TOOL_CALL_PROVIDERS);
+	const resolvedServiceTier = resolveOpenAIServiceTier(model, options);
 
 	const cacheRetention = resolveCacheRetention(options?.cacheRetention);
 	const params: ResponseCreateParamsStreaming = {
@@ -148,8 +166,8 @@ function buildParams(model: Model<"openai-responses">, context: Context, options
 		params.temperature = options?.temperature;
 	}
 
-	if (options?.serviceTier !== undefined) {
-		params.service_tier = options.serviceTier;
+	if (resolvedServiceTier !== undefined) {
+		params.service_tier = resolvedServiceTier;
 	}
 
 	if (context.tools) {
@@ -204,3 +222,8 @@ function applyServiceTierPricing(usage: Usage, serviceTier: ResponseCreateParams
 	usage.cost.cacheWrite *= multiplier;
 	usage.cost.total = usage.cost.input + usage.cost.output + usage.cost.cacheRead + usage.cost.cacheWrite;
 }
+
+export const __testing = {
+	buildParams,
+	resolveOpenAIServiceTier,
+};

@@ -3479,6 +3479,7 @@ export class InteractiveMode {
 					enableSkillCommands: this.settingsManager.getEnableSkillCommands(),
 					toolProfile: this.settingsManager.getToolProfile(),
 					codexRotate: this.settingsManager.getCodexRotate(),
+					fastMode: this.settingsManager.getFastMode(),
 					cacheTimer: this.settingsManager.getCacheTimer(),
 					pinLastPrompt: this.settingsManager.getPinLastPrompt(),
 					steeringMode: this.session.steeringMode,
@@ -3678,6 +3679,10 @@ export class InteractiveMode {
 					onCodexRotateChange: (enabled) => {
 						this.settingsManager.setCodexRotate(enabled);
 						this.showStatus(`Codex rotate: ${enabled ? "enabled" : "disabled"} (restart required)`);
+					},
+					onFastModeChange: (enabled) => {
+						this.settingsManager.setFastMode(enabled);
+						this.showStatus(`Fast mode: ${enabled ? "enabled" : "disabled"}`);
 					},
 					onCacheTimerChange: (enabled) => {
 						this.settingsManager.setCacheTimer(enabled);

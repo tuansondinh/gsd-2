@@ -41,6 +41,7 @@ export interface SettingsConfig {
 	enableSkillCommands: boolean;
 	toolProfile: "balanced" | "standard" | "full";
 	codexRotate: boolean;
+	fastMode: boolean;
 	cacheTimer: boolean;
 	pinLastPrompt: boolean;
 	steeringMode: "all" | "one-at-a-time";
@@ -107,6 +108,7 @@ export interface SettingsCallbacks {
 	onEnableSkillCommandsChange: (enabled: boolean) => void;
 	onToolProfileChange: (profile: "balanced" | "standard" | "full") => void;
 	onCodexRotateChange: (enabled: boolean) => void;
+	onFastModeChange: (enabled: boolean) => void;
 	onCacheTimerChange: (enabled: boolean) => void;
 	onPinLastPromptChange: (enabled: boolean) => void;
 	onSteeringModeChange: (mode: "all" | "one-at-a-time") => void;
@@ -515,9 +517,19 @@ export class SettingsSelectorComponent extends Container {
 			values: ["true", "false"],
 		});
 
-		// Cache timer toggle (insert after codex-rotate)
+		// Fast mode toggle (insert after codex-rotate)
 		const codexRotateIndex = items.findIndex((item) => item.id === "codex-rotate");
 		items.splice(codexRotateIndex + 1, 0, {
+			id: "fast-mode",
+			label: "Fast mode",
+			description: "OpenAI/Codex supported models use priority service tier",
+			currentValue: config.fastMode ? "true" : "false",
+			values: ["true", "false"],
+		});
+
+		// Cache timer toggle (insert after fast-mode)
+		const fastModeIndex = items.findIndex((item) => item.id === "fast-mode");
+		items.splice(fastModeIndex + 1, 0, {
 			id: "cache-timer",
 			label: "Cache timer",
 			description: "Show elapsed time since last response in the footer (tracks 5-min cache window)",
@@ -714,6 +726,9 @@ export class SettingsSelectorComponent extends Container {
 						break;
 					case "codex-rotate":
 						callbacks.onCodexRotateChange(newValue === "true");
+						break;
+					case "fast-mode":
+						callbacks.onFastModeChange(newValue === "true");
 						break;
 					case "cache-timer":
 						callbacks.onCacheTimerChange(newValue === "true");

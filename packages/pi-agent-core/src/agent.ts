@@ -97,6 +97,17 @@ export interface AgentOptions {
 	transport?: Transport;
 
 	/**
+	 * Enable provider fast mode for supported models/providers.
+	 */
+	fastMode?: boolean;
+
+	/**
+	 * Dynamic fast-mode resolver evaluated before each LLM call.
+	 * Useful when settings can change at runtime via slash commands/extensions.
+	 */
+	getFastMode?: () => boolean;
+
+	/**
 	 * Maximum delay in milliseconds to wait for a retry when the server requests a long wait.
 	 * If the server's requested delay exceeds this value, the request fails immediately,
 	 * allowing higher-level retry logic to handle it with user visibility.
@@ -156,6 +167,8 @@ export class Agent {
 	private resolveRunningPrompt?: () => void;
 	private _thinkingBudgets?: ThinkingBudgets;
 	private _transport: Transport;
+	private _fastMode = false;
+	private _getFastMode?: () => boolean;
 	private _maxRetryDelayMs?: number;
 	private _beforeToolCall?: AgentLoopConfig["beforeToolCall"];
 	private _afterToolCall?: AgentLoopConfig["afterToolCall"];
@@ -174,6 +187,8 @@ export class Agent {
 		this._onPayload = opts.onPayload;
 		this._thinkingBudgets = opts.thinkingBudgets;
 		this._transport = opts.transport ?? "sse";
+		this._fastMode = opts.fastMode ?? false;
+		this._getFastMode = opts.getFastMode;
 		this._maxRetryDelayMs = opts.maxRetryDelayMs;
 		this._externalToolExecution = opts.externalToolExecution;
 		this._adaptiveClassifierModel = opts.adaptiveClassifierModel;
@@ -220,6 +235,20 @@ export class Agent {
 	 */
 	setTransport(value: Transport) {
 		this._transport = value;
+	}
+
+	/**
+	 * Get fast mode resolved for the next provider request.
+	 */
+	get fastMode(): boolean {
+		return this._getFastMode?.() ?? this._fastMode;
+	}
+
+	/**
+	 * Set fast mode explicitly.
+	 */
+	setFastMode(value: boolean): void {
+		this._fastMode = value;
 	}
 
 	/**
@@ -594,12 +623,13 @@ export class Agent {
 
 		let skipInitialSteeringPoll = options?.skipInitialSteeringPoll === true;
 
-		const config: AgentLoopConfig = {
+		const config = {
 			model,
 			reasoning,
 			sessionId: this._sessionId,
 			onPayload: this._onPayload,
 			transport: this._transport,
+			fastMode: this.fastMode,
 			thinkingBudgets: this._thinkingBudgets,
 			maxRetryDelayMs: this._maxRetryDelayMs,
 			convertToLlm: this.convertToLlm,
@@ -616,7 +646,7 @@ export class Agent {
 			beforeToolCall: this._beforeToolCall,
 			afterToolCall: this._afterToolCall,
 			externalToolExecution: this._externalToolExecution?.(model) ?? false,
-		};
+		} as AgentLoopConfig;
 
 		let partial: AgentMessage | null = null;
 
