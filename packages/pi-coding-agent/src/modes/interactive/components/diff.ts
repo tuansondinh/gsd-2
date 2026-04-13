@@ -1,3 +1,4 @@
+import { visibleWidth, wrapTextWithAnsi } from "@gsd/pi-tui";
 import * as Diff from "diff";
 import chalk from "chalk";
 import { theme } from "../theme/theme.js";
@@ -32,24 +33,40 @@ function formatLineNum(raw: string, width: number): string {
 	return trimmed.padStart(width, " ");
 }
 
-function fillLineBackground(text: string): string {
-	return `${text}\u001b[K`;
+function padToWidth(text: string, width: number): string {
+	if (!Number.isFinite(width) || width > 10_000) {
+		return text;
+	}
+	const paddingNeeded = Math.max(0, width - visibleWidth(text));
+	return text + " ".repeat(paddingNeeded);
+}
+
+function styleRemovedPrefix(prefix: string): string {
+	return chalk.hex("#fb7185")(prefix);
+}
+
+function styleAddedPrefix(prefix: string): string {
+	return chalk.hex("#4ade80")(prefix);
 }
 
 function styleRemovedToken(value: string): string {
-	return chalk.bgHex(DIFF_BG.removedToken).whiteBright(theme.bold(value));
+	return chalk.bgHex(DIFF_BG.removedToken).whiteBright(value);
 }
 
 function styleAddedToken(value: string): string {
-	return chalk.bgHex(DIFF_BG.addedToken).whiteBright(theme.bold(value));
+	return chalk.bgHex(DIFF_BG.addedToken).whiteBright(value);
 }
 
-function styleAddedLine(text: string): string {
-	return chalk.bgHex(DIFF_BG.addedLine).whiteBright(fillLineBackground(text));
+function styleAddedLine(text: string, width: number): string {
+	const prefix = text.startsWith("+") ? styleAddedPrefix("+") : "";
+	const rest = prefix ? text.slice(1) : text;
+	return chalk.bgHex(DIFF_BG.addedLine).whiteBright(padToWidth(`${prefix}${rest}`, width));
 }
 
-function styleRemovedLine(text: string): string {
-	return chalk.bgHex(DIFF_BG.removedLine).whiteBright(fillLineBackground(text));
+function styleRemovedLine(text: string, width: number): string {
+	const prefix = text.startsWith("-") ? styleRemovedPrefix("-") : "";
+	const rest = prefix ? text.slice(1) : text;
+	return chalk.bgHex(DIFF_BG.removedLine).whiteBright(padToWidth(`${prefix}${rest}`, width));
 }
 
 /**
@@ -102,14 +119,23 @@ export interface RenderDiffOptions {
 	filePath?: string;
 }
 
-/**
- * Render a diff string with Claude-like colored lines.
- * - Context lines: muted gray
- * - Removed lines: red text on subtle red background
- * - Added lines: green text on subtle green background
- * - Changed tokens: slightly stronger background + bold
- */
-export function renderDiff(diffText: string, _options: RenderDiffOptions = {}): string {
+function renderStyledLine(
+	text: string,
+	width: number,
+	kind: "context" | "added" | "removed",
+): string[] {
+	const wrapWidth = Math.max(1, width);
+	const wrapped = wrapTextWithAnsi(text, wrapWidth);
+	if (kind === "added") {
+		return wrapped.map((line) => styleAddedLine(line, width));
+	}
+	if (kind === "removed") {
+		return wrapped.map((line) => styleRemovedLine(line, width));
+	}
+	return wrapped.map((line) => padToWidth(theme.fg("toolDiffContext", line), width));
+}
+
+export function renderDiffLines(diffText: string, width: number, _options: RenderDiffOptions = {}): string[] {
 	const lines = diffText.split("\n");
 	const result: string[] = [];
 
@@ -133,7 +159,7 @@ export function renderDiff(diffText: string, _options: RenderDiffOptions = {}): 
 		const parsed = parseDiffLine(line);
 
 		if (!parsed) {
-			result.push(theme.fg("toolDiffContext", line));
+			result.push(...renderStyledLine(line, width, "context"));
 			i++;
 			continue;
 		}
@@ -164,24 +190,35 @@ export function renderDiff(diffText: string, _options: RenderDiffOptions = {}): 
 					replaceTabs(added.content),
 				);
 
-				result.push(styleRemovedLine(formatLine("-", removed.lineNum, removedLine)));
-				result.push(styleAddedLine(formatLine("+", added.lineNum, addedLine)));
+				result.push(...renderStyledLine(formatLine("-", removed.lineNum, removedLine), width, "removed"));
+				result.push(...renderStyledLine(formatLine("+", added.lineNum, addedLine), width, "added"));
 			} else {
 				for (const removed of removedLines) {
-					result.push(styleRemovedLine(formatLine("-", removed.lineNum, removed.content)));
+					result.push(...renderStyledLine(formatLine("-", removed.lineNum, removed.content), width, "removed"));
 				}
 				for (const added of addedLines) {
-					result.push(styleAddedLine(formatLine("+", added.lineNum, added.content)));
+					result.push(...renderStyledLine(formatLine("+", added.lineNum, added.content), width, "added"));
 				}
 			}
 		} else if (parsed.prefix === "+") {
-			result.push(styleAddedLine(formatLine("+", parsed.lineNum, parsed.content)));
+			result.push(...renderStyledLine(formatLine("+", parsed.lineNum, parsed.content), width, "added"));
 			i++;
 		} else {
-			result.push(theme.fg("toolDiffContext", formatLine(" ", parsed.lineNum, parsed.content)));
+			result.push(...renderStyledLine(formatLine(" ", parsed.lineNum, parsed.content), width, "context"));
 			i++;
 		}
 	}
 
-	return result.join("\n");
+	return result;
+}
+
+/**
+ * Render a diff string with Claude-like colored lines.
+ * - Context lines: muted gray
+ * - Removed lines: red text on subtle red background
+ * - Added lines: green text on subtle green background
+ * - Changed tokens: slightly stronger background + bold
+ */
+export function renderDiff(diffText: string, options: RenderDiffOptions = {}): string {
+	return renderDiffLines(diffText, Number.MAX_SAFE_INTEGER, options).join("\n");
 }

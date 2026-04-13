@@ -26,7 +26,7 @@ import { renderTerminalText } from "../../../utils/terminal-serializer.js";
 import { getLanguageFromPath, highlightCode, theme } from "../theme/theme.js";
 import { type EditorScheme, editorLink } from "../utils/editor-link.js";
 import { shortenPath } from "../utils/shorten-path.js";
-import { renderDiff } from "./diff.js";
+import { renderDiff, renderDiffLines } from "./diff.js";
 import { keyHint } from "./keybinding-hints.js";
 import { truncateToVisualLines } from "./visual-truncate.js";
 
@@ -182,6 +182,40 @@ export class ToolExecutionComponent extends Container {
         const isBuiltInName = this.toolName in allTools;
         const hasCustomRenderers = this.toolDefinition?.renderCall || this.toolDefinition?.renderResult;
         return isBuiltInName && !hasCustomRenderers;
+    }
+
+    private setPrimaryContent(useBox: boolean): void {
+        const hasBox = this.children.includes(this.contentBox);
+        const hasText = this.children.includes(this.contentText);
+
+        if (useBox) {
+            if (hasText) this.removeChild(this.contentText);
+            if (!hasBox) this.addChild(this.contentBox);
+        } else {
+            if (hasBox) this.removeChild(this.contentBox);
+            if (!hasText) this.addChild(this.contentText);
+        }
+    }
+
+    private getDiffTextToRender(): string | undefined {
+        if (this.toolName === "write") {
+            if (!this.isPartial && this.writeDiffPreview && !("error" in this.writeDiffPreview) && this.writeDiffPreview.diff) {
+                return this.writeDiffPreview.diff;
+            }
+            return undefined;
+        }
+
+        if (this.toolName !== "edit" || this.result?.isError) {
+            return undefined;
+        }
+
+        if (this.result?.details?.diff) {
+            return this.result.details.diff;
+        }
+        if (this.editDiffPreview && !("error" in this.editDiffPreview) && this.editDiffPreview.diff) {
+            return this.editDiffPreview.diff;
+        }
+        return undefined;
     }
 
     updateArgs(args: any): void {
@@ -504,15 +538,22 @@ export class ToolExecutionComponent extends Container {
         }
 
         const useBuiltInRenderer = this.shouldUseBuiltInRenderer();
+        const diffTextToRender = this.getDiffTextToRender();
         let customRendererHasContent = false;
 
         // Use built-in rendering for built-in tools (or overrides without custom renderers)
         if (useBuiltInRenderer) {
+            const useDiffBox = !!diffTextToRender && !this.shouldHideCollapsedPreview();
+            this.setPrimaryContent(this.toolName === "bash" || useDiffBox);
             if (this.toolName === "bash") {
                 // Bash uses Box with visual line truncation - no background
                 this.contentBox.setBgFn((text: string) => text);
                 this.contentBox.clear();
                 this.renderBashContent(statusIndicator);
+            } else if (useDiffBox && diffTextToRender) {
+                this.contentBox.setBgFn((text: string) => text);
+                this.contentBox.clear();
+                this.renderBuiltInDiffContent(statusIndicator, diffTextToRender);
             } else {
                 // Other built-in tools: use Text directly with caching - no background
                 this.contentText.setCustomBgFn((text: string) => text);
@@ -652,6 +693,21 @@ export class ToolExecutionComponent extends Container {
 
         const computedHidden = !useBuiltInRenderer && this.toolDefinition ? !customRendererHasContent && this.imageComponents.length === 0 : false;
         this.hideComponent = this.manuallyHidden || computedHidden;
+    }
+
+    /**
+     * Render built-in edit/write diff blocks with width-aware full-line backgrounds.
+     */
+    private renderBuiltInDiffContent(statusIndicator: string, diffText: string): void {
+        const header = this.formatToolExecution(statusIndicator).split("\n\n", 1)[0] ?? "";
+        this.contentBox.addChild(new Text(header, 0, 0));
+        this.contentBox.addChild({
+            render: (width: number) => {
+                const contentWidth = Math.max(1, width - 2);
+                return ["", ...renderDiffLines(diffText, contentWidth).map((line) => ` ${line} `)];
+            },
+            invalidate: () => { },
+        });
     }
 
     /**

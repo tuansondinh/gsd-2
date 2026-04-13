@@ -8,15 +8,16 @@ import { initTheme } from "../../theme/theme.js";
 initTheme("dark");
 
 describe("ToolSummaryLine", () => {
-	it("renders action-based summaries for known tools", () => {
+	it("renders action-based summaries for grouped identical tools", () => {
 		const summary = new ToolSummaryLine();
 		summary.addTool("read", 600);
-		summary.addTool("lsp", 250);
 		summary.addTool("read", 150);
 
 		const rendered = stripAnsi(summary.render(160).join("\n"));
 		assert.match(rendered, /^ ● /);
-		assert.ok(rendered.includes("reading 2 files · looking up 1 symbol · 1.0s"));
+		assert.ok(rendered.includes("reading 2 files · 0.8s"));
+		assert.equal(summary.canGroupWith("read"), true);
+		assert.equal(summary.canGroupWith("find"), false);
 		assert.equal(rendered.includes("collapsed tools"), false);
 		assert.equal(rendered.includes("⎯"), false);
 	});
@@ -24,10 +25,9 @@ describe("ToolSummaryLine", () => {
 	it("keeps fallback format for unknown tools", () => {
 		const summary = new ToolSummaryLine();
 		summary.addTool("custom_tool", 100);
-		summary.addTool("custom_tool", 100);
 
 		const rendered = stripAnsi(summary.render(160).join("\n"));
-		assert.ok(rendered.includes("custom_tool ×2 · 0.2s"));
+		assert.ok(rendered.includes("custom_tool · 0.1s"));
 	});
 
 	it("renders nothing when empty or hidden", () => {

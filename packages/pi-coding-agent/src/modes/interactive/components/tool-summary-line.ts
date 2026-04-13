@@ -7,6 +7,11 @@ interface CollapsedTool {
 	elapsed: number;
 }
 
+// Tools that can be mixed together in one summary line
+const MIXED_GROUPABLE_TOOLS = new Set([
+	"read", "find", "ls", "grep", "lsp",
+]);
+
 type SummaryDescriptor = {
 	action: string;
 	singular: string;
@@ -26,6 +31,7 @@ const TOOL_SUMMARY_DESCRIPTORS: Record<string, SummaryDescriptor> = {
 	fetch_page: { action: "reading", singular: "page", plural: "pages" },
 	resolve_library: { action: "searching for", singular: "library", plural: "libraries" },
 	get_library_docs: { action: "reading", singular: "doc", plural: "docs" },
+	web_search: { action: "searching web for", singular: "query", plural: "queries" },
 	"search-the-web": { action: "searching web for", singular: "query", plural: "queries" },
 	search_and_read: { action: "researching", singular: "topic", plural: "topics" },
 	google_search: { action: "searching web for", singular: "query", plural: "queries" },
@@ -52,6 +58,16 @@ export class ToolSummaryLine extends Container {
 	private tools: CollapsedTool[] = [];
 	private hidden = false;
 	private contentText: Text;
+
+	canGroupWith(toolName: string): boolean {
+		if (this.tools.length === 0) return true;
+		// Mixed-groupable tools can share a summary line regardless of order
+		if (MIXED_GROUPABLE_TOOLS.has(toolName) && this.tools.every((t) => MIXED_GROUPABLE_TOOLS.has(t.name))) {
+			return true;
+		}
+		// Otherwise only same-tool grouping
+		return this.tools.every((tool) => tool.name === toolName);
+	}
 
 	constructor() {
 		super();

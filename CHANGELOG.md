@@ -6,6 +6,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.7] - 2026-04-13
+
+### Added
+- action-based collapsed tool summaries for grouped low-priority tool calls
+- git-style diff previews for completed write tool output
+
+### Changed
+- diff rendering now keeps foreground text white and extends added/removed backgrounds across full line width
+- write previews now link to first changed line and align more closely with Claude-style diff presentation
+
 ## [1.3.6] - 2026-04-12
 
 ### Added
@@ -2529,7 +2539,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 - License updated to MIT
 
-[Unreleased]: https://github.com/gsd-build/gsd-2/compare/v1.3.6...HEAD
+[Unreleased]: https://github.com/gsd-build/gsd-2/compare/v1.3.7...HEAD
+[1.3.7]: https://github.com/gsd-build/gsd-2/compare/v1.3.6...v1.3.7
 [1.3.6]: https://github.com/gsd-build/gsd-2/compare/v1.3.4...v1.3.6
 [1.3.4]: https://github.com/gsd-build/gsd-2/compare/v1.3.1...v1.3.4
 [1.3.1]: https://github.com/gsd-build/gsd-2/compare/v1.3.0...v1.3.1

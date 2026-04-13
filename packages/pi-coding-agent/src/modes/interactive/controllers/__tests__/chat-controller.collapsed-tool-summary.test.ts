@@ -16,6 +16,15 @@ function assistantMessage(content: any[] = []): any {
     };
 }
 
+function toolStartEvent(toolCallId: string, toolName: string, args: Record<string, unknown> = {}): any {
+    return {
+        type: "tool_execution_start",
+        toolCallId,
+        toolName,
+        args,
+    };
+}
+
 function toolEndEvent(toolCallId: string, toolName: string): any {
     return {
         type: "tool_execution_end",
@@ -126,7 +135,75 @@ function summaryLines(host: any): ToolSummaryLine[] {
 }
 
 describe("chat-controller collapsed tool summary lifecycle", () => {
-    it("keeps single grouped summary across text-only message updates", async () => {
+    it("hides collapsible tool calls immediately to avoid blink before grouping", async () => {
+        const host = createHost();
+
+        await handleAgentEvent(host, {
+            type: "message_start",
+            message: assistantMessage(),
+        });
+
+        await handleAgentEvent(host, toolStartEvent("tool-1", "read", { path: "README.md" }));
+        const pending = host.pendingTools.get("tool-1");
+        assert.ok(pending);
+        assert.equal(pending.isHidden(), true);
+
+        await handleAgentEvent(host, toolEndEvent("tool-1", "read"));
+        assert.equal(summaryLines(host).length, 1);
+    });
+
+    it("hides streamed tool-call blocks immediately to avoid blink before grouping", async () => {
+        const host = createHost();
+
+        await handleAgentEvent(host, {
+            type: "message_start",
+            message: assistantMessage(),
+        });
+
+        await handleAgentEvent(host, {
+            type: "message_update",
+            message: assistantMessage([
+                { type: "toolCall", id: "tool-1", name: "read", arguments: { path: "README.md" } },
+            ]),
+        } as any);
+
+        const pending = host.pendingTools.get("tool-1");
+        assert.ok(pending);
+        assert.equal(pending.isHidden(), true);
+
+        await handleAgentEvent(host, toolEndEvent("tool-1", "read"));
+        assert.equal(summaryLines(host).length, 1);
+    });
+
+    it("reveals initially hidden on-error tools when they fail", async () => {
+        const host = createHost();
+
+        await handleAgentEvent(host, {
+            type: "message_start",
+            message: assistantMessage(),
+        });
+
+        await handleAgentEvent(host, toolStartEvent("tool-1", "bash", { command: "exit 1" }));
+        const pending = host.pendingTools.get("tool-1");
+        assert.ok(pending);
+        assert.equal(pending.isHidden(), true);
+
+        await handleAgentEvent(host, {
+            type: "tool_execution_end",
+            toolCallId: "tool-1",
+            toolName: "bash",
+            isError: true,
+            result: {
+                content: [{ type: "text", text: "failed" }],
+                details: {},
+            },
+        });
+
+        assert.equal(summaryLines(host).length, 0);
+        assert.equal(pending.isHidden(), false);
+    });
+
+    it("groups consecutive identical collapsed tools", async () => {
         const host = createHost();
 
         await handleAgentEvent(host, {
@@ -149,6 +226,46 @@ describe("chat-controller collapsed tool summary lifecycle", () => {
         const summaries = summaryLines(host);
         assert.equal(summaries.length, 1);
         assert.ok(stripAnsi(summaries[0].render(160).join("\n")).includes("reading 2 files · 1.0s"));
+    });
+
+    it("does not group web fetches", async () => {
+        const host = createHost();
+
+        await handleAgentEvent(host, {
+            type: "message_start",
+            message: assistantMessage(),
+        });
+
+        addPendingTool(host, "tool-1", 200);
+        await handleAgentEvent(host, toolEndEvent("tool-1", "fetch_page"));
+
+        addPendingTool(host, "tool-2", 300);
+        await handleAgentEvent(host, toolEndEvent("tool-2", "fetch_page"));
+
+        const summaries = summaryLines(host);
+        assert.equal(summaries.length, 2);
+        assert.ok(stripAnsi(summaries[0].render(160).join("\n")).includes("reading 1 page · 0.2s"));
+        assert.ok(stripAnsi(summaries[1].render(160).join("\n")).includes("reading 1 page · 0.3s"));
+    });
+
+    it("keeps different collapsed tool types in separate summaries", async () => {
+        const host = createHost();
+
+        await handleAgentEvent(host, {
+            type: "message_start",
+            message: assistantMessage(),
+        });
+
+        addPendingTool(host, "tool-1", 200);
+        await handleAgentEvent(host, toolEndEvent("tool-1", "read"));
+
+        addPendingTool(host, "tool-2", 300);
+        await handleAgentEvent(host, toolEndEvent("tool-2", "find"));
+
+        const summaries = summaryLines(host);
+        assert.equal(summaries.length, 2);
+        assert.ok(stripAnsi(summaries[0].render(160).join("\n")).includes("reading 1 file · 0.2s"));
+        assert.ok(stripAnsi(summaries[1].render(160).join("\n")).includes("finding 1 path · 0.3s"));
     });
 
     it("resets grouping after visible tool result", async () => {
@@ -175,7 +292,7 @@ describe("chat-controller collapsed tool summary lifecycle", () => {
         assert.ok(stripAnsi(summaries[1].render(160).join("\n")).includes("0.4s"));
     });
 
-    it("merges adjacent collapsed groups across empty assistant message boundaries", async () => {
+    it("groups identical collapsed tools across empty assistant message boundaries", async () => {
         const host = createHost();
 
         await handleAgentEvent(host, {
