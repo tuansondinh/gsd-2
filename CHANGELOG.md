@@ -6,6 +6,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- `/usage` now shows average output token speed (`tok/s`) alongside token and cost totals
+
+### Changed
+- collapsed tool groups now render with consistent spacing, white summary labels, and indented dim active tool rows
+- `Ctrl+O` expand hints now appear as soon as tool activity starts, and subagent tool calls stay visible when tool collapsing is enabled
+- push-to-talk voice activation now triggers only while the main editor is focused, preventing stray transcription from ask-user/custom UI input
+- raised CLI process listener budget to avoid noisy SIGINT/SIGTERM MaxListeners warnings during complex sessions
+
 ## [1.3.7] - 2026-04-13
 
 ### Added

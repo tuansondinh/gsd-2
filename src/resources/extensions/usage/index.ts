@@ -75,6 +75,8 @@ type UsageRow = {
 	cacheWrite: number;
 	total: number;
 	cost: number;
+	totalDurationMs: number;
+	totalOutputForSpeed: number;
 };
 
 type UsageReport = {
@@ -313,6 +315,7 @@ function collectUsage(sessionFiles: string[], startMs: number, endMs: number, sc
 		let projectLabel = basename(file);
 		let headerResolved = false;
 		let currentModel = "";
+		let lastUserTimestamp = 0;
 
 		const raw = readFileSync(file, "utf-8");
 		for (const line of raw.split("\n")) {
@@ -367,6 +370,8 @@ function collectUsage(sessionFiles: string[], startMs: number, endMs: number, sc
 					cacheWrite: 0,
 					total: 0,
 					cost: 0,
+					totalDurationMs: 0,
+					totalOutputForSpeed: 0,
 				};
 
 				existing.messages += 1;
@@ -376,10 +381,27 @@ function collectUsage(sessionFiles: string[], startMs: number, endMs: number, sc
 				existing.cacheWrite += cacheWrite;
 				existing.total += total;
 				existing.cost += cost;
+
+				// Track tok/sec: use preceding user message timestamp
+				if (output > 0 && lastUserTimestamp > 0) {
+					const durationMs = timestamp - lastUserTimestamp;
+					if (durationMs > 0) {
+						existing.totalDurationMs += durationMs;
+						existing.totalOutputForSpeed += output;
+					}
+				}
+
 				rows.set(key, existing);
 			} else if (message.role === "user") {
 				const timestamp = Number(message.timestamp ?? 0);
-				if (!timestamp || timestamp < startMs || timestamp >= endMs) continue;
+				if (!timestamp) continue;
+
+				// Always track last user timestamp for tok/sec calculation,
+				// even if this user message is outside the time range
+				// (the assistant response may still be within range).
+				lastUserTimestamp = timestamp;
+
+				if (timestamp < startMs || timestamp >= endMs) continue;
 
 				matchedUserPrompts++;
 				const model = currentModel;
@@ -397,6 +419,8 @@ function collectUsage(sessionFiles: string[], startMs: number, endMs: number, sc
 					cacheWrite: 0,
 					total: 0,
 					cost: 0,
+					totalDurationMs: 0,
+					totalOutputForSpeed: 0,
 				};
 
 				existing.userPrompts += 1;
@@ -431,9 +455,11 @@ function collectUsage(sessionFiles: string[], startMs: number, endMs: number, sc
 			acc.cacheWrite += row.cacheWrite;
 			acc.total += row.total;
 			acc.cost += row.cost;
+			acc.totalDurationMs += row.totalDurationMs;
+			acc.totalOutputForSpeed += row.totalOutputForSpeed;
 			return acc;
 		},
-		{ messages: 0, userPrompts: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0, cost: 0 },
+		{ messages: 0, userPrompts: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0, cost: 0, totalDurationMs: 0, totalOutputForSpeed: 0 },
 	);
 
 	return {
@@ -446,6 +472,11 @@ function collectUsage(sessionFiles: string[], startMs: number, endMs: number, sc
 		rows: orderedRows,
 		totals,
 	};
+}
+
+function formatSpeed(totalDurationMs: number, totalOutputForSpeed: number): string {
+	if (totalDurationMs <= 0) return "—";
+	return Math.round(totalOutputForSpeed / (totalDurationMs / 1000)).toLocaleString();
 }
 
 function renderTable(report: UsageReport): string {
@@ -465,7 +496,10 @@ function renderTable(report: UsageReport): string {
 		write: formatInt(row.cacheWrite),
 		total: formatInt(row.total),
 		cost: formatCost(row.cost),
+		speed: formatSpeed(row.totalDurationMs, row.totalOutputForSpeed),
 	}));
+
+	const totalsSpeed = formatSpeed(report.totals.totalDurationMs, report.totals.totalOutputForSpeed);
 
 	const widths = {
 		label: Math.max(firstColumnHeader.length, ...displayRows.map((row) => row.label.length), 5),
@@ -477,6 +511,7 @@ function renderTable(report: UsageReport): string {
 		write: Math.max(5, ...displayRows.map((row) => row.write.length), formatInt(report.totals.cacheWrite).length),
 		total: Math.max(5, ...displayRows.map((row) => row.total.length), formatInt(report.totals.total).length),
 		cost: Math.max(7, ...displayRows.map((row) => row.cost.length), formatCost(report.totals.cost).length),
+		speed: Math.max(5, ...displayRows.map((row) => row.speed.length), totalsSpeed.length),
 	};
 
 	const header = [
@@ -489,6 +524,7 @@ function renderTable(report: UsageReport): string {
 		"write".padStart(widths.write),
 		"total".padStart(widths.total),
 		"cost".padStart(widths.cost),
+		"tok/s".padStart(widths.speed),
 	].join("  ");
 
 	const divider = "-".repeat(header.length);
@@ -502,6 +538,7 @@ function renderTable(report: UsageReport): string {
 		row.write.padStart(widths.write),
 		row.total.padStart(widths.total),
 		row.cost.padStart(widths.cost),
+		row.speed.padStart(widths.speed),
 	].join("  "));
 
 	const totalsLine = [
@@ -514,6 +551,7 @@ function renderTable(report: UsageReport): string {
 		formatInt(report.totals.cacheWrite).padStart(widths.write),
 		formatInt(report.totals.total).padStart(widths.total),
 		formatCost(report.totals.cost).padStart(widths.cost),
+		totalsSpeed.padStart(widths.speed),
 	].join("  ");
 
 	return [header, divider, ...body, divider, totalsLine].join("\n");

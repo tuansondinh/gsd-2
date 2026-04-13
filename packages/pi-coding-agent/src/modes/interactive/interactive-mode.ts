@@ -3110,6 +3110,7 @@ export class InteractiveMode {
 			}
 			if (child instanceof ToolExecutionComponent) {
 				child.setHidden(!showCollapsedToolCalls && child.shouldHideWhenCollapsed(collapseToolCalls));
+				child.setIndented(false);
 			}
 			if (child instanceof ToolSummaryLine) {
 				child.setHidden(!collapseToolCalls || showCollapsedToolCalls);

@@ -55,6 +55,7 @@ export function createExtensionUIContext(host: any): ExtensionUIContext {
 		},
 		getToolsExpanded: () => host.collapsedToolCallsExpanded || host.toolOutputExpanded,
 		setToolsExpanded: (expanded) => host.setToolsExpanded(expanded),
+		isEditorFocused: () => !!host.editor.focused,
 	};
 }
 

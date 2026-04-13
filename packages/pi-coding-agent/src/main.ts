@@ -347,6 +347,7 @@ async function handleConfigCommand(args: string[]): Promise<boolean> {
 }
 
 export async function main(args: string[]) {
+	process.setMaxListeners(20);
 	// Catch unhandled promise rejections so the process doesn't silently disappear
 	process.on("unhandledRejection", (reason) => {
 		const message = reason instanceof Error ? reason.stack ?? reason.message : String(reason);

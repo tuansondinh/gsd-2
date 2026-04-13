@@ -1,6 +1,6 @@
 export type ToolPriority = "always" | "on-error" | "collapse";
 
-const ALWAYS_VISIBLE = new Set(["edit", "write"]);
+const ALWAYS_VISIBLE = new Set(["edit", "write", "subagent", "await_subagent"]);
 const ON_ERROR = new Set(["bash", "bg_shell"]);
 
 export function getToolPriority(toolName: string): ToolPriority {

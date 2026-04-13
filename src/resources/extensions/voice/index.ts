@@ -303,6 +303,7 @@ export default function(pi: ExtensionAPI) {
             activationMode,
             editorText: ctx.ui.getEditorText(),
             holdToTalkSupported: isKittyProtocolActive(),
+            isEditorFocused: ctx.ui.isEditorFocused(),
             onUnsupported: () => {
                 if (holdToTalkUnsupportedNotified) return;
                 holdToTalkUnsupportedNotified = true;

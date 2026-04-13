@@ -134,6 +134,7 @@ export class ToolExecutionComponent extends Container {
     // When true, this component intentionally renders no lines
     private hideComponent = false;
     private manuallyHidden = false;
+    private indented = false;
     private startTime = Date.now();
 
     // Tool status spinner state
@@ -457,6 +458,11 @@ export class ToolExecutionComponent extends Container {
         this.updateDisplay();
     }
 
+    setIndented(indented: boolean): void {
+        this.indented = indented;
+        this.updateDisplay();
+    }
+
     isHidden(): boolean {
         return this.hideComponent;
     }
@@ -502,7 +508,18 @@ export class ToolExecutionComponent extends Container {
         if (this.hideComponent) {
             return [];
         }
-        return [...super.render(width), ""];
+        const lines = super.render(width);
+        if (this.indented) {
+            const gutter = theme.fg("dim", "│");
+            return lines.map((line, i) => {
+                if (i === lines.length - 1 && line === "") {
+                    // Trailing empty spacer line → gutter only
+                    return gutter;
+                }
+                return gutter + " " + theme.fg("dim", line);
+            });
+        }
+        return [...lines, ""];
     }
 
     private updateDisplay(): void {

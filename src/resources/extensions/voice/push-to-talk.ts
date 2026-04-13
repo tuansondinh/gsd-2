@@ -8,6 +8,7 @@ export interface PushToTalkState {
     activationMode: VoiceActivationMode | null;
     editorText: string;
     holdToTalkSupported: boolean;
+    isEditorFocused: boolean;
     onUnsupported?(): void;
     startPushToTalk(): void | Promise<void>;
     stopVoice(): void | Promise<void>;
@@ -15,6 +16,8 @@ export interface PushToTalkState {
 
 export function handlePushToTalkInput(data: string, state: PushToTalkState): ReturnType<TerminalInputHandler> {
     if (!matchesKey(data, Key.space)) return undefined;
+
+    if (!state.isEditorFocused) return undefined;
 
     if (isKeyRelease(data)) {
         if (state.activationMode === "push-to-talk") {

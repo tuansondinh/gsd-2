@@ -93,7 +93,7 @@ export class ToolSummaryLine extends Container {
 		if (this.hidden || this.tools.length === 0) {
 			return [];
 		}
-		return super.render(width);
+		return [...super.render(width), ""];
 	}
 
 	private updateDisplay(): void {
@@ -114,7 +114,7 @@ export class ToolSummaryLine extends Container {
 			.join(" · ");
 		const elapsed = (totalElapsed / 1000).toFixed(1);
 		const indicator = theme.fg("success", "●");
-		const details = theme.fg("muted", `${groupedTools} · ${elapsed}s`);
+		const details = theme.fg("text", groupedTools) + theme.fg("muted", ` · ${elapsed}s`);
 		this.contentText.setText(`${indicator} ${details}`);
 	}
 }

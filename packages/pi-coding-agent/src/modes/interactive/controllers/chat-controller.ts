@@ -56,18 +56,8 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
         "bash", "bg_shell",
         "web_search", "search-the-web", "google_search", "search_and_read",
         "fetch_page", "resolve_library", "get_library_docs",
+        "subagent", "await_subagent",
     ]);
-
-    const shouldStartToolHidden = (toolName: string): boolean => {
-        const collapseToolCalls = host.settingsManager.getCollapseToolCalls?.() ?? false;
-        if (!collapseToolCalls || host.collapsedToolCallsExpanded) {
-            return false;
-        }
-        if (ALWAYS_DIRECT_TOOLS.has(toolName)) {
-            return false;
-        }
-        return shouldCollapse(toolName, false);
-    };
 
     const hasVisibleRender = (child: { render?: (width: number) => string[] } | undefined): boolean => {
         if (!child?.render) return true;
@@ -253,9 +243,19 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
                                 host.ui,
                             );
                             component.setExpanded(host.toolOutputExpanded);
-                            component.setHidden(shouldStartToolHidden(content.name));
+                            const collapseToolCalls = host.settingsManager.getCollapseToolCalls?.() ?? false;
+                            const shouldHide = collapseToolCalls && !host.collapsedToolCallsExpanded && shouldCollapse(content.name, false) && !ALWAYS_DIRECT_TOOLS.has(content.name);
                             host.chatContainer.addChild(component);
+                            if (shouldHide) {
+                                // Check for adjacent summary AFTER adding to container so indexOf works
+                                const adjacentSummary = findAdjacentCollapsedToolSummary(content.name, component);
+                                if (adjacentSummary) {
+                                    component.setIndented(true);
+                                }
+                            }
+                            component.setHidden(shouldHide);
                             host.pendingTools.set(content.id, component);
+                            host.updateEditorExpandHint();
                         } else {
                             host.pendingTools.get(content.id)?.updateArgs(content.arguments);
                         }
@@ -273,9 +273,19 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
                                 host.ui,
                             );
                             component.setExpanded(host.toolOutputExpanded);
-                            component.setHidden(shouldStartToolHidden(content.name));
+                            const collapseToolCalls = host.settingsManager.getCollapseToolCalls?.() ?? false;
+                            const shouldHide = collapseToolCalls && !host.collapsedToolCallsExpanded && shouldCollapse(content.name, false) && !ALWAYS_DIRECT_TOOLS.has(content.name);
                             host.chatContainer.addChild(component);
+                            if (shouldHide) {
+                                // Check for adjacent summary AFTER adding to container so indexOf works
+                                const adjacentSummary = findAdjacentCollapsedToolSummary(content.name, component);
+                                if (adjacentSummary) {
+                                    component.setIndented(true);
+                                }
+                            }
+                            component.setHidden(shouldHide);
                             host.pendingTools.set(content.id, component);
+                            host.updateEditorExpandHint();
                         }
                     } else if (content.type === "webSearchResult") {
                         const component = host.pendingTools.get(content.toolUseId);
@@ -356,9 +366,19 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
                     host.ui,
                 );
                 component.setExpanded(host.toolOutputExpanded);
-                component.setHidden(shouldStartToolHidden(event.toolName));
+                const collapseToolCalls = host.settingsManager.getCollapseToolCalls?.() ?? false;
+                const shouldHide = collapseToolCalls && !host.collapsedToolCallsExpanded && shouldCollapse(event.toolName, false) && !ALWAYS_DIRECT_TOOLS.has(event.toolName);
                 host.chatContainer.addChild(component);
+                if (shouldHide) {
+                    // Check for adjacent summary AFTER adding to container so indexOf works
+                    const adjacentSummary = findAdjacentCollapsedToolSummary(event.toolName, component);
+                    if (adjacentSummary) {
+                        component.setIndented(true);
+                    }
+                }
+                component.setHidden(shouldHide);
                 host.pendingTools.set(event.toolCallId, component);
+                host.updateEditorExpandHint();
                 host.ui.requestRender();
             }
             break;
@@ -410,6 +430,8 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
                 if (collapseToolCalls && shouldCollapse(event.toolName, event.isError) && !ALWAYS_DIRECT_TOOLS.has(event.toolName)) {
                     appendCollapsedToolSummary(event.toolName, component.getElapsed(), component);
                     component.setHidden(!host.collapsedToolCallsExpanded);
+                    component.setIndented(false);
+                    host.updateEditorExpandHint();
                 } else {
                     component.setHidden(false);
                     resetCollapsedToolSummary();

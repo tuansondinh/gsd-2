@@ -237,6 +237,9 @@ export interface ExtensionUIContext {
 
 	/** Set tool output expansion state. */
 	setToolsExpanded(expanded: boolean): void;
+
+	/** Whether the main editor component currently has focus. */
+	isEditorFocused(): boolean;
 }
 
 // ============================================================================

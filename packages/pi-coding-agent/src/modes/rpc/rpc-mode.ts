@@ -422,6 +422,10 @@ export async function runRpcMode(session: AgentSession): Promise<never> {
 		setToolsExpanded(_expanded: boolean) {
 			// Tool expansion not supported in RPC mode - no TUI
 		},
+
+		isEditorFocused() {
+			return false;
+		},
 	});
 
 	// Set up extensions with RPC-based UI context.
