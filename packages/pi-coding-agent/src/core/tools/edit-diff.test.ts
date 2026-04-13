@@ -6,6 +6,7 @@ import { describe, it } from "node:test";
 
 import {
 	computeEditDiff,
+	computeWriteDiff,
 	fuzzyFindText,
 	generateDiffString,
 	normalizeForFuzzyMatch,
@@ -58,6 +59,25 @@ describe("edit-diff", () => {
 		const result = generateDiffString(oldLines.join("\n") + "\n", newLines.join("\n") + "\n");
 		assert.ok(result.firstChangedLine !== undefined);
 		assert.match(result.diff, /CHANGED/);
+	});
+
+	it("computes diffs for write preview against existing files", async (t) => {
+		const dir = mkdtempSync(join(tmpdir(), "write-diff-test-"));
+		t.after(() => {
+			rmSync(dir, { recursive: true, force: true });
+		});
+
+		const file = join(dir, "sample.ts");
+		writeFileSync(file, "const title = \"Hello\";\n", "utf-8");
+
+		const result = await computeWriteDiff(file, "const title = \"Hi\";\n", dir);
+
+		assert.ok(!("error" in result), "expected a diff result");
+		if (!("error" in result)) {
+			assert.equal(result.firstChangedLine, 1);
+			assert.match(result.diff, /-1 const title = "Hello";/);
+			assert.match(result.diff, /\+1 const title = "Hi";/);
+		}
 	});
 
 	it("computes diffs for preview without native helpers", async (t) => {

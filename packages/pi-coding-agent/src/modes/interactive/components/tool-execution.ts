@@ -11,7 +11,12 @@ import {
 } from "@gsd/pi-tui";
 import stripAnsi from "strip-ansi";
 import type { ToolDefinition } from "../../../core/extensions/types.js";
-import { computeEditDiff, type EditDiffError, type EditDiffResult } from "../../../core/tools/edit-diff.js";
+import {
+	computeEditDiff,
+	computeWriteDiff,
+	type EditDiffError,
+	type EditDiffResult,
+} from "../../../core/tools/edit-diff.js";
 import { allTools } from "../../../core/tools/index.js";
 import { shouldCollapse } from "../../../core/tool-priority.js";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize } from "../../../core/tools/truncate.js";
@@ -119,6 +124,9 @@ export class ToolExecutionComponent extends Container {
     // Cached edit diff preview (computed when args arrive, before tool executes)
     private editDiffPreview?: EditDiffResult | EditDiffError;
     private editDiffArgsKey?: string; // Track which args the preview is for
+    // Cached write diff preview (computed when args arrive, before tool executes)
+    private writeDiffPreview?: EditDiffResult | EditDiffError;
+    private writeDiffArgsKey?: string; // Track which args the preview is for
     // Cached converted images for Kitty protocol (which requires PNG), keyed by index
     private convertedImages: Map<number, { data: string; mimeType: string }> = new Map();
     // Incremental syntax highlighting cache for write tool call args
@@ -287,8 +295,35 @@ export class ToolExecutionComponent extends Container {
             if (rawPath !== null && fileContent !== null) {
                 this.rebuildWriteHighlightCacheFull(rawPath, fileContent);
             }
+            this.maybeComputeWriteDiff();
         }
         this.maybeComputeEditDiff();
+    }
+
+    /**
+     * Compute write diff preview when we have complete args.
+     * This runs async and updates display when done.
+     */
+    private maybeComputeWriteDiff(): void {
+        if (this.toolName !== "write") return;
+
+        const path = this.args?.path ?? this.args?.file_path;
+        const content = this.args?.content;
+
+        if (!path || content === undefined) return;
+
+        const argsKey = JSON.stringify({ path, content });
+        if (this.writeDiffArgsKey === argsKey) return;
+
+        this.writeDiffArgsKey = argsKey;
+
+        computeWriteDiff(path, content, this.cwd).then((result) => {
+            if (this.writeDiffArgsKey === argsKey) {
+                this.writeDiffPreview = result;
+                this.updateDisplay();
+                this.ui.requestRender();
+            }
+        });
     }
 
     /**
@@ -874,15 +909,38 @@ export class ToolExecutionComponent extends Container {
             const rawPath = str(this.args?.file_path ?? this.args?.path);
             const fileContent = str(this.args?.content);
             const path = rawPath !== null ? shortenPath(rawPath) : null;
+            const firstChangedLine = this.writeDiffPreview && "firstChangedLine" in this.writeDiffPreview
+                ? this.writeDiffPreview.firstChangedLine
+                : undefined;
 
             let writePathDisplay = path === null ? invalidArg : path ? theme.fg("accent", path) : theme.fg("toolOutput", "...");
             if (rawPath && path) {
-                writePathDisplay = editorLink(rawPath, writePathDisplay, { cwd: this.cwd, scheme: this.editorScheme });
+                writePathDisplay = editorLink(rawPath, writePathDisplay, {
+                    cwd: this.cwd,
+                    line: firstChangedLine ?? undefined,
+                    scheme: this.editorScheme,
+                });
+            }
+            if (firstChangedLine) {
+                writePathDisplay += theme.fg("warning", `:${firstChangedLine}`);
             }
             text = `${statusIndicator} ${theme.fg("toolTitle", theme.bold("write"))} ${writePathDisplay}`;
 
             if (fileContent === null) {
                 text += `\n\n${theme.fg("error", "[invalid content arg - expected string]")}`;
+            } else if (this.result?.isError) {
+                const errorText = this.getTextOutput();
+                if (errorText) {
+                    text += `\n\n${theme.fg("error", errorText)}`;
+                }
+            } else if (!this.isPartial && this.writeDiffPreview) {
+                if ("error" in this.writeDiffPreview) {
+                    text += `\n\n${theme.fg("error", this.writeDiffPreview.error)}`;
+                } else if (this.writeDiffPreview.diff) {
+                    text += hideCollapsedPreview
+                        ? this.collapsedHintWithPrefix()
+                        : `\n\n${renderDiff(this.writeDiffPreview.diff, { filePath: rawPath ?? undefined })}`;
+                }
             } else if (fileContent) {
                 const lang = rawPath ? getLanguageFromPath(rawPath) : undefined;
 
@@ -922,14 +980,6 @@ export class ToolExecutionComponent extends Container {
                     if (remaining > 0) {
                         text += theme.fg("muted", `\n... (${remaining} more lines, ${totalLines} total)`);
                     }
-                }
-            }
-
-            // Show error if tool execution failed
-            if (this.result?.isError) {
-                const errorText = this.getTextOutput();
-                if (errorText) {
-                    text += `\n\n${theme.fg("error", errorText)}`;
                 }
             }
         } else if (this.toolName === "edit") {

@@ -330,6 +330,32 @@ function buildLineDiffLinear(oldLines: string[], newLines: string[]): LineDiffOp
 }
 
 /**
+ * Compute the diff for a write operation without applying it.
+ * Used for preview rendering in the TUI before the tool executes.
+ */
+export async function computeWriteDiff(
+	path: string,
+	newContent: string,
+	cwd: string,
+): Promise<EditDiffResult | EditDiffError> {
+	const absolutePath = resolveToCwd(path, cwd);
+
+	try {
+		let oldContent = "";
+		try {
+			await access(absolutePath, constants.R_OK);
+			oldContent = await readFile(absolutePath, "utf-8");
+		} catch {
+			oldContent = "";
+		}
+
+		return generateDiffString(normalizeToLF(stripBom(oldContent).text), normalizeToLF(newContent));
+	} catch (err) {
+		return { error: err instanceof Error ? err.message : String(err) };
+	}
+}
+
+/**
  * Compute the diff for an edit operation without applying it.
  * Used for preview rendering in the TUI before the tool executes.
  */

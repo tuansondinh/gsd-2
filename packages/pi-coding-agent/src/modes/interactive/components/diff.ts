@@ -32,20 +32,24 @@ function formatLineNum(raw: string, width: number): string {
 	return trimmed.padStart(width, " ");
 }
 
+function fillLineBackground(text: string): string {
+	return `${text}\u001b[K`;
+}
+
 function styleRemovedToken(value: string): string {
-	return chalk.bgHex(DIFF_BG.removedToken)(theme.bold(value));
+	return chalk.bgHex(DIFF_BG.removedToken).whiteBright(theme.bold(value));
 }
 
 function styleAddedToken(value: string): string {
-	return chalk.bgHex(DIFF_BG.addedToken)(theme.bold(value));
+	return chalk.bgHex(DIFF_BG.addedToken).whiteBright(theme.bold(value));
 }
 
 function styleAddedLine(text: string): string {
-	return chalk.bgHex(DIFF_BG.addedLine)(theme.fg("toolDiffAdded", text));
+	return chalk.bgHex(DIFF_BG.addedLine).whiteBright(fillLineBackground(text));
 }
 
 function styleRemovedLine(text: string): string {
-	return chalk.bgHex(DIFF_BG.removedLine)(theme.fg("toolDiffRemoved", text));
+	return chalk.bgHex(DIFF_BG.removedLine).whiteBright(fillLineBackground(text));
 }
 
 /**
