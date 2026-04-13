@@ -53,7 +53,7 @@ export function createExtensionUIContext(host: any): ExtensionUIContext {
 			}
 			return result;
 		},
-		getToolsExpanded: () => host.toolOutputExpanded,
+		getToolsExpanded: () => host.collapsedToolCallsExpanded || host.toolOutputExpanded,
 		setToolsExpanded: (expanded) => host.setToolsExpanded(expanded),
 	};
 }

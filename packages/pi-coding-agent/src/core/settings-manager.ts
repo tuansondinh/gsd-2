@@ -161,6 +161,7 @@ export interface Settings {
 	codexRotate?: boolean; // Enable the bundled codex-rotate extension (default: false)
 	fastMode?: boolean; // Enable OpenAI/Codex fast tier routing (priority service tier where supported)
 	cacheTimer?: boolean; // Show elapsed time since last response in the footer (default: true)
+	verboseFooter?: boolean; // Show extra footer usage stats like input/output/cache tokens (default: false)
 	pinLastPrompt?: boolean; // Pin last sent prompt above the editor as a reminder (default: false)
 	doubleEscapeAction?: "fork" | "tree" | "none"; // Action for double-escape with empty editor (default: "tree")
 	treeFilterMode?: "default" | "no-tools" | "user-only" | "labeled-only" | "all"; // Default filter when opening /tree
@@ -181,6 +182,7 @@ export interface Settings {
 	editMode?: "standard" | "hashline"; // Edit tool mode: "standard" (text match) or "hashline" (LINE#ID anchors). Default: "standard"
 	timestampFormat?: "date-time-iso" | "date-time-us"; // Timestamp display format for messages. Default: "date-time-iso"
 	toolOutputMode?: "minimal" | "normal"; // Collapsed tool rendering mode. "minimal" hides previews until expanded.
+	collapseToolCalls?: boolean; // default: false — group low-priority tool calls into collapsed summary lines
 	lspAutoInstall?: boolean; // default: false — whether to auto-install missing language servers during onboarding
 	lspInstalledServers?: string[]; // list of server names installed via the onboarding wizard
 	rtk?: boolean; // default: false — enable RTK shell-command compression (requires restart)
@@ -1051,6 +1053,14 @@ export class SettingsManager {
 		this.setGlobalSetting("toolOutputMode", mode);
 	}
 
+	getCollapseToolCalls(): boolean {
+		return this.settings.collapseToolCalls ?? false;
+	}
+
+	setCollapseToolCalls(enabled: boolean): void {
+		this.setGlobalSetting("collapseToolCalls", enabled);
+	}
+
 	getPackages(): PackageSource[] {
 		return [...(this.settings.packages ?? [])];
 	}
@@ -1203,6 +1213,14 @@ export class SettingsManager {
 
 	setCacheTimer(enabled: boolean): void {
 		this.setGlobalSetting("cacheTimer", enabled);
+	}
+
+	getVerboseFooter(): boolean {
+		return this.settings.verboseFooter ?? false;
+	}
+
+	setVerboseFooter(enabled: boolean): void {
+		this.setGlobalSetting("verboseFooter", enabled);
 	}
 
 	getPinLastPrompt(): boolean {

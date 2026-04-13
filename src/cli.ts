@@ -31,6 +31,7 @@ import { getProjectSessionsDir } from './project-sessions.js'
 import { markStartup, printStartupTimings } from './startup-timings.js'
 import { bootstrapRtk, GSD_RTK_DISABLED_ENV } from './rtk.js'
 import { loadEffectivePreferences } from './shared-preferences.js'
+import { createLsdSettingsManager } from './lsd-settings-manager.js'
 
 // ---------------------------------------------------------------------------
 // V8 compile cache — Node 22+ can cache compiled bytecode across runs,
@@ -319,7 +320,7 @@ const modelsJsonPath = resolveModelsJsonPath()
 
 const modelRegistry = new ModelRegistry(authStorage, modelsJsonPath)
 markStartup('ModelRegistry')
-const settingsManager = SettingsManager.create(agentDir)
+const settingsManager = createLsdSettingsManager(process.cwd(), agentDir)
 markStartup('SettingsManager.create')
 if (cliFlags.noSandbox) {
   process.env.PI_NO_SANDBOX = '1'

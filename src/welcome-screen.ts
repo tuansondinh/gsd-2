@@ -73,8 +73,8 @@ export function printWelcomeScreen(opts: WelcomeScreenOptions): void {
   // Keep welcome colors anchored to the active CLI theme accent so the banner
   // feels native regardless of custom themes.
   const ACCENT = accentHex()
-  const LOGO_EDGE = chalk.white
-  const LOGO_CENTER = chalk.whiteBright
+  const LOGO_EDGE = chalk.hex(mixHex(ACCENT, '#000000', 0.35))
+  const LOGO_CENTER = chalk.hex(mixHex(ACCENT, '#ffffff', 0.2))
   const TITLE_BASE = chalk.bold
   const TITLE_MARK = chalk.hex(mixHex(ACCENT, '#ffffff', 0.35)).bold
   const VERSION = chalk.dim

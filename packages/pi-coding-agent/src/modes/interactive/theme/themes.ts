@@ -78,8 +78,8 @@ const dark: ThemeJson = {
 		mdHr: "gray",
 		mdListBullet: "accent",
 
-		toolDiffAdded: "green",
-		toolDiffRemoved: "red",
+		toolDiffAdded: "#4ade80",
+		toolDiffRemoved: "#fb7185",
 		toolDiffContext: "gray",
 
 		syntaxComment: "#6A9955",
@@ -174,8 +174,8 @@ const light: ThemeJson = {
 		mdHr: "mediumGray",
 		mdListBullet: "green",
 
-		toolDiffAdded: "green",
-		toolDiffRemoved: "red",
+		toolDiffAdded: "#15803d",
+		toolDiffRemoved: "#b91c1c",
 		toolDiffContext: "mediumGray",
 
 		syntaxComment: "#008000",

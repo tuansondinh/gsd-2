@@ -325,6 +325,7 @@ export class InteractiveMode {
 	private agentPtyComponents = new Map<string, EmbeddedTerminalComponent>();
 
 	// Tool output expansion state
+	private collapsedToolCallsExpanded = false;
 	private toolOutputExpanded = false;
 
 	// Thinking block visibility state
@@ -444,6 +445,7 @@ export class InteractiveMode {
 		// Load notification sound setting
 		this.notificationSoundEnabled = this.settingsManager.getNotificationSound();
 		this.footer.setNotificationSoundEnabled(this.notificationSoundEnabled);
+		this.footer.setVerboseFooterEnabled(this.settingsManager.getVerboseFooter());
 
 		// Register themes from resource loader and initialize
 		setRegisteredThemes(this.session.resourceLoader.getThemes().themes);
@@ -2358,6 +2360,7 @@ export class InteractiveMode {
 			if (wasBashMode !== this.isBashMode) {
 				this.updateEditorBorderColor();
 			}
+			this.updateEditorExpandHint();
 		};
 
 		// Handle clipboard image paste (triggered on Ctrl+V)
@@ -3072,63 +3075,92 @@ export class InteractiveMode {
 		}
 	}
 
+	private hasCollapsedToolCallSummaries(): boolean {
+		return this.chatContainer.children.some((child) => child instanceof ToolSummaryLine);
+	}
+
+	private shouldUseCollapsedToolCallIntermediateState(): boolean {
+		return this.settingsManager.getCollapseToolCalls() && this.hasCollapsedToolCallSummaries();
+	}
+
 	private toggleToolOutputExpansion(): void {
-		this.setToolsExpanded(!this.toolOutputExpanded);
+		if (this.toolOutputExpanded) {
+			this.setToolOutputExpansionState(false, false);
+			return;
+		}
+		if (this.shouldUseCollapsedToolCallIntermediateState() && !this.collapsedToolCallsExpanded) {
+			this.setToolOutputExpansionState(true, false);
+			return;
+		}
+		this.setToolOutputExpansionState(true, true);
 	}
 
 	private setToolsExpanded(expanded: boolean): void {
-		this.toolOutputExpanded = expanded;
+		this.setToolOutputExpansionState(expanded, expanded);
+	}
+
+	private setToolOutputExpansionState(collapsedToolCallsExpanded: boolean, toolOutputExpanded: boolean): void {
+		this.collapsedToolCallsExpanded = collapsedToolCallsExpanded || toolOutputExpanded;
+		this.toolOutputExpanded = toolOutputExpanded;
+		const collapseToolCalls = this.settingsManager.getCollapseToolCalls();
+		const showCollapsedToolCalls = collapseToolCalls && this.collapsedToolCallsExpanded;
 		for (const child of this.chatContainer.children) {
 			if (isExpandable(child)) {
-				child.setExpanded(expanded);
+				child.setExpanded(toolOutputExpanded);
 			}
 			if (child instanceof ToolExecutionComponent) {
-				child.setHidden(!expanded && child.shouldHideWhenCollapsed());
+				child.setHidden(!showCollapsedToolCalls && child.shouldHideWhenCollapsed(collapseToolCalls));
 			}
 			if (child instanceof ToolSummaryLine) {
-				child.setHidden(expanded);
+				child.setHidden(!collapseToolCalls || showCollapsedToolCalls);
 			}
 		}
 		if (this.bashComponent) {
-			this.bashComponent.setExpanded(expanded);
+			this.bashComponent.setExpanded(toolOutputExpanded);
 		}
 		for (const component of this.pendingBashComponents) {
-			component.setExpanded(expanded);
+			component.setExpanded(toolOutputExpanded);
 		}
 		this.updateEditorExpandHint();
 		this.ui.requestRender();
 	}
 
-	/** Append/remove the "ctrl+o to expand" hint in the editor bottom border. */
+	/** Append/remove right-aligned expand and streaming hints in editor bottom border. */
 	updateEditorExpandHint(): void {
 		const expandKey = appKey(this.keybindings, "expandTools");
 		const collapseHint = `${theme.fg("dim", expandKey)}${theme.fg("muted", " collapse")}`;
-		const expandHint = `${theme.fg("dim", expandKey)}${theme.fg("muted", " : verbose")}`;
-		// The base hint set during agent_start
-		const enterKey = theme.fg("dim", "↵");
-		const followUpKey = theme.fg("dim", appKey(this.keybindings, "followUp"));
-		const steerLabel = theme.fg("muted", " steer");
-		const queueLabel = theme.fg("muted", " queue");
-		const baseHint = `${enterKey}${steerLabel}  ${followUpKey}${queueLabel}`;
+		const expandToolCallsHint = `${theme.fg("dim", expandKey)}${theme.fg("muted", " : uncollapsed tools")}`;
+		const expandVerboseHint = `${theme.fg("dim", expandKey)}${theme.fg("muted", " : verbose")}`;
+		const editorHasText = this.defaultEditor.getText().trim().length > 0;
+		const streamingHints = editorHasText
+			? `${theme.fg("dim", "↵")}${theme.fg("muted", " steer")}  ${theme.fg("dim", appKey(this.keybindings, "followUp"))}${theme.fg("muted", " queue")}`
+			: "";
 
 		// Check if there are any expandable tool outputs in the chat
 		const hasToolOutputs =
 			this.chatContainer.children.some(isExpandable) ||
 			!!this.bashComponent ||
 			this.pendingBashComponents.length > 0;
+		const canExpandCollapsedToolCalls = this.shouldUseCollapsedToolCallIntermediateState();
 
-		const activeHint = this.toolOutputExpanded ? collapseHint : expandHint;
-
-		if (this.loadingAnimation) {
-			// Agent is running - always show expand/collapse hint when there are tool outputs
-			this.defaultEditor.bottomHint = hasToolOutputs
-				? `${baseHint}  ${activeHint}`
-				: baseHint;
-		} else if (hasToolOutputs) {
-			// Idle - show expand/collapse hint so user knows ctrl+o works
-			this.defaultEditor.bottomHint = activeHint;
+		let activeHint = expandVerboseHint;
+		if (this.toolOutputExpanded) {
+			activeHint = collapseHint;
+		} else if (this.collapsedToolCallsExpanded && canExpandCollapsedToolCalls) {
+			activeHint = expandVerboseHint;
+		} else if (canExpandCollapsedToolCalls) {
+			activeHint = expandToolCallsHint;
 		}
-		// If no tool outputs and idle, leave bottomHint as-is (cleared by agent_end)
+
+		const rightHints: string[] = [];
+		if (this.loadingAnimation && streamingHints) {
+			rightHints.push(streamingHints);
+		}
+		if (hasToolOutputs) {
+			rightHints.push(activeHint);
+		}
+
+		this.defaultEditor.bottomHint = rightHints.join("  ");
 	}
 
 	private toggleThinkingBlockVisibility(): void {
@@ -3481,6 +3513,7 @@ export class InteractiveMode {
 					codexRotate: this.settingsManager.getCodexRotate(),
 					fastMode: this.settingsManager.getFastMode(),
 					cacheTimer: this.settingsManager.getCacheTimer(),
+					verboseFooter: this.settingsManager.getVerboseFooter(),
 					pinLastPrompt: this.settingsManager.getPinLastPrompt(),
 					steeringMode: this.session.steeringMode,
 					followUpMode: this.session.followUpMode,
@@ -3505,6 +3538,7 @@ export class InteractiveMode {
 					clearOnShrink: this.settingsManager.getClearOnShrink(),
 					timestampFormat: this.settingsManager.getTimestampFormat(),
 					toolOutputMode: this.settingsManager.getToolOutputMode(),
+					collapseToolCalls: this.settingsManager.getCollapseToolCalls(),
 					rtk: this.settingsManager.getRtk(),
 					editorScheme: this.settingsManager.getEditorScheme(),
 					autoDream: this.settingsManager.getAutoDream(),
@@ -3688,6 +3722,12 @@ export class InteractiveMode {
 						this.settingsManager.setCacheTimer(enabled);
 						this.showStatus(`Cache timer: ${enabled ? "enabled" : "disabled"}`);
 					},
+					onVerboseFooterChange: (enabled) => {
+						this.settingsManager.setVerboseFooter(enabled);
+						this.footer.setVerboseFooterEnabled(enabled);
+						this.ui.requestRender();
+						this.showStatus(`Verbose footer: ${enabled ? "enabled" : "disabled"}`);
+					},
 					onPinLastPromptChange: (enabled) => {
 						this.settingsManager.setPinLastPrompt(enabled);
 						this.pinLastPromptEnabled = enabled;
@@ -3826,6 +3866,14 @@ export class InteractiveMode {
 					onEditorSchemeChange: (scheme) => {
 						this.settingsManager.setEditorScheme(scheme);
 						this.showStatus(`Editor link scheme: ${scheme}`);
+					},
+					onCollapseToolCallsChange: (enabled) => {
+						this.settingsManager.setCollapseToolCalls(enabled);
+						this.setToolOutputExpansionState(enabled && (this.collapsedToolCallsExpanded || this.toolOutputExpanded), this.toolOutputExpanded);
+						if (!enabled) {
+							this.collapsedToolSummaryLine = undefined;
+						}
+						this.showStatus(`Collapse tool calls: ${enabled ? "enabled" : "disabled"}`);
 					},
 					onToolOutputModeChange: (mode) => {
 						this.settingsManager.setToolOutputMode(mode);

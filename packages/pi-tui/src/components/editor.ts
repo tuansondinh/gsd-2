@@ -452,15 +452,15 @@ export class Editor implements Component, Focusable {
 			const remaining = width - visibleWidth(indicator);
 			result.push(this.borderColor(indicator + "─".repeat(Math.max(0, remaining))));
 		} else if (this.bottomHint) {
-			// Embed hint right-aligned in the bottom border: ─────── hint ─
+			// Embed hint at far right in bottom border: ─────────────── hint ─
 			// Apply borderColor only to the dashes so the hint's own styling is preserved.
 			const hintVisible = visibleWidth(this.bottomHint);
 			const minDashes = 1;
 			const separatorWidth = 1; // single space on each side of hint
 			const totalFixed = hintVisible + separatorWidth * 2 + minDashes * 2;
 			if (width >= totalFixed) {
-				const leftDashes = Math.floor((width - hintVisible - separatorWidth * 2) * 0.75);
-				const rightDashes = Math.max(minDashes, width - hintVisible - separatorWidth * 2 - leftDashes);
+				const rightDashes = minDashes;
+				const leftDashes = Math.max(minDashes, width - hintVisible - separatorWidth * 2 - rightDashes);
 				const line =
 					this.borderColor("─".repeat(leftDashes)) +
 					" " +

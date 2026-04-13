@@ -43,6 +43,7 @@ export interface SettingsConfig {
 	codexRotate: boolean;
 	fastMode: boolean;
 	cacheTimer: boolean;
+	verboseFooter: boolean;
 	pinLastPrompt: boolean;
 	steeringMode: "all" | "one-at-a-time";
 	followUpMode: "all" | "one-at-a-time";
@@ -67,6 +68,7 @@ export interface SettingsConfig {
 	clearOnShrink: boolean;
 	timestampFormat: "date-time-iso" | "date-time-us";
 	toolOutputMode: "minimal" | "normal";
+	collapseToolCalls: boolean;
 	rtk: boolean;
 	editorScheme: "auto" | "vscode" | "cursor" | "zed" | "jetbrains" | "sublime" | "file";
 	autoDream: boolean;
@@ -110,6 +112,7 @@ export interface SettingsCallbacks {
 	onCodexRotateChange: (enabled: boolean) => void;
 	onFastModeChange: (enabled: boolean) => void;
 	onCacheTimerChange: (enabled: boolean) => void;
+	onVerboseFooterChange: (enabled: boolean) => void;
 	onPinLastPromptChange: (enabled: boolean) => void;
 	onSteeringModeChange: (mode: "all" | "one-at-a-time") => void;
 	onFollowUpModeChange: (mode: "all" | "one-at-a-time") => void;
@@ -132,6 +135,7 @@ export interface SettingsCallbacks {
 	onClearOnShrinkChange: (enabled: boolean) => void;
 	onTimestampFormatChange: (format: "date-time-iso" | "date-time-us") => void;
 	onToolOutputModeChange: (mode: "minimal" | "normal") => void;
+	onCollapseToolCallsChange: (enabled: boolean) => void;
 	onRtkChange: (enabled: boolean) => void;
 	onEditorSchemeChange: (scheme: "auto" | "vscode" | "cursor" | "zed" | "jetbrains" | "sublime" | "file") => void;
 	onCancel: () => void;
@@ -316,6 +320,13 @@ export class SettingsSelectorComponent extends Container {
 				label: "Hide thinking",
 				description: "Hide thinking blocks in assistant responses",
 				currentValue: config.hideThinkingBlock ? "true" : "false",
+				values: ["true", "false"],
+			},
+			{
+				id: "collapse-tool-calls",
+				label: "Collapse tool calls",
+				description: "Group low-priority tool calls into collapsed summary lines",
+				currentValue: config.collapseToolCalls ? "true" : "false",
 				values: ["true", "false"],
 			},
 			{
@@ -537,9 +548,19 @@ export class SettingsSelectorComponent extends Container {
 			values: ["true", "false"],
 		});
 
-		// Pin last prompt toggle (insert after cache-timer)
+		// Verbose footer toggle (insert after cache-timer)
 		const cacheTimerIdx = items.findIndex((item) => item.id === "cache-timer");
 		items.splice(cacheTimerIdx + 1, 0, {
+			id: "verbose-footer",
+			label: "Verbose footer",
+			description: "Show extra footer stats like input, output, and cache tokens",
+			currentValue: config.verboseFooter ? "true" : "false",
+			values: ["true", "false"],
+		});
+
+		// Pin last prompt toggle (insert after verbose-footer)
+		const verboseFooterIdx = items.findIndex((item) => item.id === "verbose-footer");
+		items.splice(verboseFooterIdx + 1, 0, {
 			id: "pin-last-prompt",
 			label: "Pin last prompt",
 			description: "Show your last sent message above the editor so you remember the topic",
@@ -587,9 +608,9 @@ export class SettingsSelectorComponent extends Container {
 			values: ["true", "false"],
 		});
 
-		// RTK toggle (insert after cache-timer)
-		const cacheTimerIndex = items.findIndex((item) => item.id === "cache-timer");
-		items.splice(cacheTimerIndex + 1, 0, {
+		// RTK toggle (insert after verbose-footer)
+		const verboseFooterIndex = items.findIndex((item) => item.id === "verbose-footer");
+		items.splice(verboseFooterIndex + 1, 0, {
 			id: "rtk",
 			label: "RTK",
 			description: "Enable RTK shell-command compression (requires restart)",
@@ -733,6 +754,9 @@ export class SettingsSelectorComponent extends Container {
 					case "cache-timer":
 						callbacks.onCacheTimerChange(newValue === "true");
 						break;
+					case "verbose-footer":
+						callbacks.onVerboseFooterChange(newValue === "true");
+						break;
 					case "pin-last-prompt":
 						callbacks.onPinLastPromptChange(newValue === "true");
 						break;
@@ -768,6 +792,9 @@ export class SettingsSelectorComponent extends Container {
 						break;
 					case "hide-thinking":
 						callbacks.onHideThinkingBlockChange(newValue === "true");
+						break;
+					case "collapse-tool-calls":
+						callbacks.onCollapseToolCallsChange(newValue === "true");
 						break;
 					case "tool-output-mode":
 						callbacks.onToolOutputModeChange(newValue as "minimal" | "normal");

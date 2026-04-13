@@ -22,6 +22,7 @@ const IS_CACHE_TIMER_FORCED_OFF = process.env.LSD_DISABLE_CACHE_TIMER === "1" ||
 
 // ANSI color codes for timer display
 const ANSI_RESET = "\x1b[0m";
+const ANSI_GREEN = "\x1b[32m";
 const ANSI_YELLOW = "\x1b[33m";
 const ANSI_RED = "\x1b[31m";
 
@@ -68,8 +69,8 @@ function formatElapsed(ms: number): string {
         // 5–10 minutes: yellow
         return `${ANSI_YELLOW}⏱ ${time}${ANSI_RESET}`;
     }
-    // Under 5 minutes: plain (inherits footer dim styling)
-    return `⏱ ${time}`;
+    // Under 5 minutes: green
+    return `${ANSI_GREEN}⏱ ${time}${ANSI_RESET}`;
 }
 
 export default function cacheTimerExtension(pi: ExtensionAPI) {

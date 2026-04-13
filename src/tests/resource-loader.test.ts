@@ -104,32 +104,21 @@ test("buildResourceLoader excludes duplicate top-level pi extensions when bundle
   );
 });
 
-test("initResources prunes stale top-level extension siblings next to bundled compiled extensions", async (t) => {
+test("initResources restores missing bundled extension files even when version/hash are unchanged", async (t) => {
   const { initResources } = await import("../resource-loader.ts");
-  const tmp = mkdtempSync(join(tmpdir(), "gsd-resource-loader-sync-"));
+  const tmp = mkdtempSync(join(tmpdir(), "gsd-resource-loader-missing-"));
   const fakeAgentDir = join(tmp, "agent");
-  const bundledTsPath = join(fakeAgentDir, "extensions", "ask-user-questions.ts");
-  const bundledJsPath = join(fakeAgentDir, "extensions", "ask-user-questions.js");
+  const missingFile = join(fakeAgentDir, "extensions", "browser-tools", "settle.js");
 
   t.after(() => { rmSync(tmp, { recursive: true, force: true }); });
 
   initResources(fakeAgentDir);
+  assert.equal(existsSync(missingFile), true, "bundled file should exist after first sync");
 
-  const bundledPath = existsSync(bundledJsPath)
-    ? bundledJsPath
-    : bundledTsPath;
-  const staleSiblingPath = bundledPath.endsWith(".js")
-    ? bundledTsPath
-    : bundledJsPath;
-
-  assert.equal(existsSync(bundledPath), true, "bundled top-level extension should exist");
-
-  // Simulate a stale opposite-format sibling left from a previous sync/build mismatch.
-  writeFileSync(staleSiblingPath, "export {};\n");
-  assert.equal(existsSync(staleSiblingPath), true);
+  rmSync(missingFile, { force: true });
+  assert.equal(existsSync(missingFile), false, "test setup should remove bundled file");
 
   initResources(fakeAgentDir);
 
-  assert.equal(existsSync(staleSiblingPath), false, "stale top-level sibling should be removed during sync");
-  assert.equal(existsSync(bundledPath), true, "bundled extension should remain after cleanup");
+  assert.equal(existsSync(missingFile), true, "missing bundled file should be restored on next launch");
 });

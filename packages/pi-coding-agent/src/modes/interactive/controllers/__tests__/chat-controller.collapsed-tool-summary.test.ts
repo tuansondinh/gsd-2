@@ -44,7 +44,7 @@ function createChatContainer() {
     };
 }
 
-function createHost(): any {
+function createHost(options: { collapseToolCalls?: boolean; collapsedToolCallsExpanded?: boolean; toolOutputExpanded?: boolean } = {}): any {
     const chatContainer = createChatContainer();
     return {
         isInitialized: true,
@@ -61,10 +61,12 @@ function createHost(): any {
             getShowImages: () => true,
             getToolOutputMode: () => "normal",
             getEditorScheme: () => "auto",
+            getCollapseToolCalls: () => options.collapseToolCalls ?? true,
         },
         pendingTools: new Map(),
         collapsedToolSummaryLine: undefined,
-        toolOutputExpanded: false,
+        collapsedToolCallsExpanded: options.collapsedToolCallsExpanded ?? options.toolOutputExpanded ?? false,
+        toolOutputExpanded: options.toolOutputExpanded ?? false,
         hideThinkingBlock: false,
         notificationSoundEnabled: false,
         defaultEditor: { onEscape: undefined, bottomHint: "" },
@@ -146,7 +148,7 @@ describe("chat-controller collapsed tool summary lifecycle", () => {
 
         const summaries = summaryLines(host);
         assert.equal(summaries.length, 1);
-        assert.ok(stripAnsi(summaries[0].render(160).join("\n")).includes("read ×2 · 1.0s"));
+        assert.ok(stripAnsi(summaries[0].render(160).join("\n")).includes("reading 2 files · 1.0s"));
     });
 
     it("resets grouping after visible tool result", async () => {
@@ -194,7 +196,7 @@ describe("chat-controller collapsed tool summary lifecycle", () => {
 
         const summaries = summaryLines(host);
         assert.equal(summaries.length, 1);
-        assert.ok(stripAnsi(summaries[0].render(160).join("\n")).includes("read ×2 · 0.7s"));
+        assert.ok(stripAnsi(summaries[0].render(160).join("\n")).includes("reading 2 files · 0.7s"));
     });
 
     it("starts new collapsed group after visible assistant content", async () => {
@@ -224,5 +226,54 @@ describe("chat-controller collapsed tool summary lifecycle", () => {
         assert.equal(summaries.length, 2);
         assert.ok(stripAnsi(summaries[0].render(160).join("\n")).includes("0.3s"));
         assert.ok(stripAnsi(summaries[1].render(160).join("\n")).includes("0.4s"));
+    });
+
+    it("keeps collapsed tool calls visible in intermediate mode", async () => {
+        const host = createHost({ collapseToolCalls: true, collapsedToolCallsExpanded: true });
+
+        await handleAgentEvent(host, {
+            type: "message_start",
+            message: assistantMessage(),
+        });
+
+        const tool = addPendingTool(host, "tool-1", 250);
+        await handleAgentEvent(host, toolEndEvent("tool-1", "read"));
+
+        const summaries = summaryLines(host);
+        assert.equal(tool.hidden, false);
+        assert.equal(summaries.length, 1);
+        assert.deepEqual(summaries[0].render(160), []);
+    });
+
+    it("keeps collapsed tools visible when verbose mode is active", async () => {
+        const host = createHost({ collapseToolCalls: true, toolOutputExpanded: true });
+
+        await handleAgentEvent(host, {
+            type: "message_start",
+            message: assistantMessage(),
+        });
+
+        const tool = addPendingTool(host, "tool-1", 250);
+        await handleAgentEvent(host, toolEndEvent("tool-1", "read"));
+
+        const summaries = summaryLines(host);
+        assert.equal(tool.hidden, false);
+        assert.equal(summaries.length, 1);
+        assert.deepEqual(summaries[0].render(160), []);
+    });
+
+    it("does not collapse tool calls when setting is disabled", async () => {
+        const host = createHost({ collapseToolCalls: false });
+
+        await handleAgentEvent(host, {
+            type: "message_start",
+            message: assistantMessage(),
+        });
+
+        const tool = addPendingTool(host, "tool-1", 250);
+        await handleAgentEvent(host, toolEndEvent("tool-1", "read"));
+
+        assert.equal(tool.hidden, false);
+        assert.equal(summaryLines(host).length, 0);
     });
 });

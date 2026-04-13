@@ -71,7 +71,11 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
         return undefined;
     };
 
-    const appendCollapsedToolSummary = (toolName: string, elapsed: number, anchor?: { render: (width: number) => string[] }): void => {
+    const appendCollapsedToolSummary = (
+        toolName: string,
+        elapsed: number,
+        anchor?: { render: (width: number) => string[] },
+    ): ToolSummaryLine => {
         let summary = host.collapsedToolSummaryLine;
         if ((!summary || !host.chatContainer.children.includes(summary)) && anchor) {
             summary = findAdjacentCollapsedToolSummary(anchor);
@@ -81,7 +85,7 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
         }
         if (!summary || !host.chatContainer.children.includes(summary)) {
             summary = new ToolSummaryLine();
-            summary.setHidden(host.toolOutputExpanded);
+            summary.setHidden(host.collapsedToolCallsExpanded);
             if (anchor) {
                 const anchorIndex = host.chatContainer.children.indexOf(anchor);
                 if (anchorIndex >= 0) {
@@ -95,6 +99,7 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
             host.collapsedToolSummaryLine = summary;
         }
         summary.addTool(toolName, elapsed);
+        return summary;
     };
 
     switch (event.type) {
@@ -371,9 +376,10 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
             const component = host.pendingTools.get(event.toolCallId);
             if (component) {
                 component.updateResult({ ...event.result, isError: event.isError });
-                if (shouldCollapse(event.toolName, event.isError)) {
+                const collapseToolCalls = host.settingsManager.getCollapseToolCalls?.() ?? false;
+                if (collapseToolCalls && shouldCollapse(event.toolName, event.isError)) {
                     appendCollapsedToolSummary(event.toolName, component.getElapsed(), component);
-                    component.setHidden(true);
+                    component.setHidden(!host.collapsedToolCallsExpanded);
                 } else {
                     component.setHidden(false);
                     resetCollapsedToolSummary();

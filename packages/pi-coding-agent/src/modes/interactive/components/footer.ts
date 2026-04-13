@@ -47,6 +47,7 @@ export class FooterComponent implements Component {
 	private autoCompactEnabled = true;
 	private permissionMode: PermissionMode = "danger-full-access";
 	private notificationSoundEnabled = false;
+	private verboseFooterEnabled = false;
 
 	constructor(
 		private session: AgentSession,
@@ -63,6 +64,10 @@ export class FooterComponent implements Component {
 
 	setNotificationSoundEnabled(enabled: boolean): void {
 		this.notificationSoundEnabled = enabled;
+	}
+
+	setVerboseFooterEnabled(enabled: boolean): void {
+		this.verboseFooterEnabled = enabled;
 	}
 
 	/**
@@ -125,7 +130,7 @@ export class FooterComponent implements Component {
 		const extensionStatuses = this.footerData.getExtensionStatuses();
 		const cacheTimerStatusRaw = extensionStatuses.get("cache-timer");
 		const cacheTimerStatus = cacheTimerStatusRaw ? sanitizeStatusText(cacheTimerStatusRaw) : "";
-		const hotkeysHints = ["Ctrl+K • /hotkeys", "/hotkeys", "Ctrl+K"];
+		const hotkeysHints = ["/hotkeys"];
 		const firstLineMinPadding = 2;
 		const firstLineRightParts = cacheTimerStatus ? [cacheTimerStatus] : [];
 		if (this.notificationSoundEnabled) {
@@ -155,10 +160,12 @@ export class FooterComponent implements Component {
 
 		// Build stats line
 		const statsParts = [];
-		if (totalInput) statsParts.push(`↑${formatTokens(totalInput)}`);
-		if (totalOutput) statsParts.push(`↓${formatTokens(totalOutput)}`);
-		if (totalCacheRead) statsParts.push(`Cache ${formatTokens(totalCacheRead)}`);
-		if (totalCacheWrite) statsParts.push(`W${formatTokens(totalCacheWrite)}`);
+		if (this.verboseFooterEnabled) {
+			if (totalInput) statsParts.push(`↑${formatTokens(totalInput)}`);
+			if (totalOutput) statsParts.push(`↓${formatTokens(totalOutput)}`);
+			if (totalCacheRead) statsParts.push(`Cache ${formatTokens(totalCacheRead)}`);
+			if (totalCacheWrite) statsParts.push(`W${formatTokens(totalCacheWrite)}`);
+		}
 
 		// Show cost with "(sub)" indicator if using OAuth subscription
 		const usingSubscription = displayModel ? this.session.modelRegistry.isUsingOAuth(displayModel) : false;
@@ -168,7 +175,7 @@ export class FooterComponent implements Component {
 		}
 
 		// Per-prompt cost annotation (opt-in via show_token_cost preference, #1515)
-		if (process.env.GSD_SHOW_TOKEN_COST === "1") {
+		if (this.verboseFooterEnabled && process.env.GSD_SHOW_TOKEN_COST === "1") {
 			const lastTurnCost = this.session.getLastTurnCost();
 			if (lastTurnCost > 0) {
 				statsParts.push(`(last: ${formatPromptCost(lastTurnCost)})`);

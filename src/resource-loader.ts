@@ -153,6 +153,25 @@ function collectFileEntries(dir: string, root: string, out: string[]): void {
   }
 }
 
+function hasMissingResourceEntries(srcDir: string, destDir: string): boolean {
+  if (!existsSync(srcDir)) return false
+  if (!existsSync(destDir)) return true
+
+  for (const entry of readdirSync(srcDir, { withFileTypes: true })) {
+    const srcPath = join(srcDir, entry.name)
+    const destPath = join(destDir, entry.name)
+
+    if (!existsSync(destPath)) return true
+    if (entry.isDirectory() && hasMissingResourceEntries(srcPath, destPath)) return true
+  }
+
+  return false
+}
+
+function hasMissingManagedResources(agentDir: string): boolean {
+  return hasMissingResourceEntries(bundledExtensionsDir, join(agentDir, 'extensions'))
+    || hasMissingResourceEntries(join(resourcesDir, 'agents'), join(agentDir, 'agents'))
+}
 
 export function getNewerManagedResourceVersion(agentDir: string, currentVersion: string): string | null {
   const managedVersion = readManagedResourceVersion(agentDir)
@@ -223,7 +242,14 @@ function syncResourceDir(srcDir: string, destDir: string): void {
     for (const entry of readdirSync(srcDir, { withFileTypes: true })) {
       if (entry.isDirectory()) {
         const target = join(destDir, entry.name)
-        if (existsSync(target)) rmSync(target, { recursive: true, force: true })
+        if (existsSync(target)) {
+          try {
+            rmSync(target, { recursive: true, force: true })
+          } catch {
+            // Retry once — macOS can create .DS_Store mid-deletion causing ENOTEMPTY
+            try { rmSync(target, { recursive: true, force: true }) } catch { /* non-fatal */ }
+          }
+        }
       }
     }
     try {
@@ -420,7 +446,8 @@ export function initResources(agentDir: string): void {
     // Version matches — check content fingerprint for same-version staleness.
     const currentHash = computeResourceFingerprint()
     const hasStaleExtensionFiles = hasStaleCompiledExtensionSiblings(join(agentDir, 'extensions'))
-    if (manifest.contentHash && manifest.contentHash === currentHash && !hasStaleExtensionFiles) {
+    const hasMissingResources = hasMissingManagedResources(agentDir)
+    if (manifest.contentHash && manifest.contentHash === currentHash && !hasStaleExtensionFiles && !hasMissingResources) {
       return
     }
   }

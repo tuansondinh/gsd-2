@@ -12,6 +12,7 @@ export interface InteractiveModeStateHost {
 	settingsManager: any;
 	pendingTools: Map<string, any>;
 	collapsedToolSummaryLine?: any;
+	collapsedToolCallsExpanded: boolean;
 	toolOutputExpanded: boolean;
 	hideThinkingBlock: boolean;
 	notificationSoundEnabled: boolean;

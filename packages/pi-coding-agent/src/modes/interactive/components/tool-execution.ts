@@ -396,8 +396,8 @@ export class ToolExecutionComponent extends Container {
         return Date.now() - this.startTime;
     }
 
-    shouldHideWhenCollapsed(): boolean {
-        return !this.isPartial && shouldCollapse(this.toolName, this.result?.isError ?? false);
+    shouldHideWhenCollapsed(collapseToolCalls = true): boolean {
+        return collapseToolCalls && !this.isPartial && shouldCollapse(this.toolName, this.result?.isError ?? false);
     }
 
     setRenderMode(mode: "minimal" | "normal"): void {
