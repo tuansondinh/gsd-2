@@ -51,6 +51,14 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
         host.collapsedToolSummaryLine = undefined;
     };
 
+    const clearPendingCollapsedToolSummaries = (): void => {
+        for (const child of host.chatContainer.children) {
+            if (child instanceof ToolSummaryLine && child.hasPendingTools()) {
+                child.clearPendingTools();
+            }
+        }
+    };
+
     // Tools that always render as their own visible row, never folded into a summary line
     const ALWAYS_DIRECT_TOOLS = new Set([
         "bash", "bg_shell",
@@ -94,14 +102,13 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
         return undefined;
     };
 
-    const appendCollapsedToolSummary = (
+    const findOrCreateSummaryForPending = (
         toolName: string,
-        elapsed: number,
         anchor?: { render: (width: number) => string[] },
     ): ToolSummaryLine => {
         let summary = findAdjacentCollapsedToolSummary(toolName, anchor);
         if (!summary) {
-            summary = new ToolSummaryLine();
+            summary = new ToolSummaryLine(host.ui);
             summary.setHidden(host.collapsedToolCallsExpanded);
             if (anchor) {
                 const anchorIndex = host.chatContainer.children.indexOf(anchor);
@@ -115,6 +122,24 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
             }
         }
         host.collapsedToolSummaryLine = summary;
+        return summary;
+    };
+
+    const findCollapsedSummaryByPendingTool = (toolCallId: string): ToolSummaryLine | undefined => {
+        for (const child of host.chatContainer.children) {
+            if (child instanceof ToolSummaryLine && child.hasPendingTool(toolCallId)) {
+                return child;
+            }
+        }
+        return undefined;
+    };
+
+    const appendCollapsedToolSummary = (
+        toolName: string,
+        elapsed: number,
+        anchor?: { render: (width: number) => string[] },
+    ): ToolSummaryLine => {
+        const summary = findOrCreateSummaryForPending(toolName, anchor);
         summary.addTool(toolName, elapsed);
         return summary;
     };
@@ -252,12 +277,15 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
                                 if (adjacentSummary) {
                                     component.setIndented(true);
                                 }
+                                const summary = findOrCreateSummaryForPending(content.name, component);
+                                summary.addPendingTool(content.id, content.name, content.arguments ?? {});
                             }
                             component.setHidden(shouldHide);
                             host.pendingTools.set(content.id, component);
                             host.updateEditorExpandHint();
                         } else {
                             host.pendingTools.get(content.id)?.updateArgs(content.arguments);
+                            findCollapsedSummaryByPendingTool(content.id)?.updatePendingToolArgs(content.id, content.arguments ?? {});
                         }
                     } else if (content.type === "serverToolUse") {
                         if (!host.pendingTools.has(content.id)) {
@@ -282,6 +310,8 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
                                 if (adjacentSummary) {
                                     component.setIndented(true);
                                 }
+                                const summary = findOrCreateSummaryForPending(content.name, component);
+                                summary.addPendingTool(content.id, content.name, content.input ?? {});
                             }
                             component.setHidden(shouldHide);
                             host.pendingTools.set(content.id, component);
@@ -332,6 +362,7 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
                         component.updateResult({ content: [{ type: "text", text: errorMessage }], isError: true });
                     }
                     host.pendingTools.clear();
+                    clearPendingCollapsedToolSummaries();
                 } else {
                     host.playNotificationSoundOnAgentEnd = true;
                     for (const [, component] of host.pendingTools.entries()) {
@@ -375,6 +406,8 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
                     if (adjacentSummary) {
                         component.setIndented(true);
                     }
+                    const summary = findOrCreateSummaryForPending(event.toolName, component);
+                    summary.addPendingTool(event.toolCallId, event.toolName, event.args ?? {});
                 }
                 component.setHidden(shouldHide);
                 host.pendingTools.set(event.toolCallId, component);
@@ -428,11 +461,13 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
                 component.updateResult({ ...event.result, isError: event.isError });
                 const collapseToolCalls = host.settingsManager.getCollapseToolCalls?.() ?? false;
                 if (collapseToolCalls && shouldCollapse(event.toolName, event.isError) && !ALWAYS_DIRECT_TOOLS.has(event.toolName)) {
+                    findCollapsedSummaryByPendingTool(event.toolCallId)?.removePendingTool(event.toolCallId);
                     appendCollapsedToolSummary(event.toolName, component.getElapsed(), component);
                     component.setHidden(!host.collapsedToolCallsExpanded);
                     component.setIndented(false);
                     host.updateEditorExpandHint();
                 } else {
+                    findCollapsedSummaryByPendingTool(event.toolCallId)?.removePendingTool(event.toolCallId);
                     component.setHidden(false);
                     resetCollapsedToolSummary();
                 }
@@ -454,6 +489,7 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
                 host.streamingMessage = undefined;
             }
             host.pendingTools.clear();
+            clearPendingCollapsedToolSummaries();
             resetCollapsedToolSummary();
             // Update hint: show expand/collapse if tool outputs exist, else clear
             host.defaultEditor.bottomHint = "";

@@ -113,15 +113,19 @@ function createHost(options: { collapseToolCalls?: boolean; collapsedToolCallsEx
 }
 
 function addPendingTool(host: any, toolCallId: string, elapsed: number): { hidden?: boolean; component: any } {
-    const state: { hidden?: boolean; component: any } = { hidden: false, component: undefined };
+    const state: { hidden?: boolean; component: any; indented?: boolean } = { hidden: false, component: undefined, indented: false };
     const component = {
         render: () => (state.hidden ? [] : ["tool"]),
         updateResult: () => { },
+        updateArgs: () => { },
         setHidden: (hidden: boolean) => {
             state.hidden = hidden;
         },
         isHidden: () => !!state.hidden,
         setArgsComplete: () => { },
+        setIndented: (indented: boolean) => {
+            state.indented = indented;
+        },
         getElapsed: () => elapsed,
     };
     state.component = component;
@@ -175,7 +179,7 @@ describe("chat-controller collapsed tool summary lifecycle", () => {
         assert.equal(summaryLines(host).length, 1);
     });
 
-    it("reveals initially hidden on-error tools when they fail", async () => {
+    it("keeps on-error tools visible when they fail", async () => {
         const host = createHost();
 
         await handleAgentEvent(host, {
@@ -186,7 +190,7 @@ describe("chat-controller collapsed tool summary lifecycle", () => {
         await handleAgentEvent(host, toolStartEvent("tool-1", "bash", { command: "exit 1" }));
         const pending = host.pendingTools.get("tool-1");
         assert.ok(pending);
-        assert.equal(pending.isHidden(), true);
+        assert.equal(pending.isHidden(), false);
 
         await handleAgentEvent(host, {
             type: "tool_execution_end",
@@ -228,7 +232,7 @@ describe("chat-controller collapsed tool summary lifecycle", () => {
         assert.ok(stripAnsi(summaries[0].render(160).join("\n")).includes("reading 2 files · 1.0s"));
     });
 
-    it("does not group web fetches", async () => {
+    it("keeps last grouped tool label visible after completion", async () => {
         const host = createHost();
 
         await handleAgentEvent(host, {
@@ -236,19 +240,35 @@ describe("chat-controller collapsed tool summary lifecycle", () => {
             message: assistantMessage(),
         });
 
-        addPendingTool(host, "tool-1", 200);
+        await handleAgentEvent(host, toolStartEvent("tool-1", "read", { path: "README.md" }));
+        await handleAgentEvent(host, toolEndEvent("tool-1", "read"));
+
+        const summaries = summaryLines(host);
+        assert.equal(summaries.length, 1);
+        assert.ok(stripAnsi(summaries[0].render(160).join("\n")).includes("└ README.md"));
+    });
+
+    it("keeps non-groupable web fetches visible", async () => {
+        const host = createHost();
+
+        await handleAgentEvent(host, {
+            type: "message_start",
+            message: assistantMessage(),
+        });
+
+        const first = addPendingTool(host, "tool-1", 200);
         await handleAgentEvent(host, toolEndEvent("tool-1", "fetch_page"));
 
-        addPendingTool(host, "tool-2", 300);
+        const second = addPendingTool(host, "tool-2", 300);
         await handleAgentEvent(host, toolEndEvent("tool-2", "fetch_page"));
 
         const summaries = summaryLines(host);
-        assert.equal(summaries.length, 2);
-        assert.ok(stripAnsi(summaries[0].render(160).join("\n")).includes("reading 1 page · 0.2s"));
-        assert.ok(stripAnsi(summaries[1].render(160).join("\n")).includes("reading 1 page · 0.3s"));
+        assert.equal(summaries.length, 0);
+        assert.equal(first.hidden, false);
+        assert.equal(second.hidden, false);
     });
 
-    it("keeps different collapsed tool types in separate summaries", async () => {
+    it("groups mixed collapsed file/nav tools into one summary", async () => {
         const host = createHost();
 
         await handleAgentEvent(host, {
@@ -263,9 +283,10 @@ describe("chat-controller collapsed tool summary lifecycle", () => {
         await handleAgentEvent(host, toolEndEvent("tool-2", "find"));
 
         const summaries = summaryLines(host);
-        assert.equal(summaries.length, 2);
-        assert.ok(stripAnsi(summaries[0].render(160).join("\n")).includes("reading 1 file · 0.2s"));
-        assert.ok(stripAnsi(summaries[1].render(160).join("\n")).includes("finding 1 path · 0.3s"));
+        assert.equal(summaries.length, 1);
+        const rendered = stripAnsi(summaries[0].render(160).join("\n"));
+        assert.ok(rendered.includes("reading 1 file"));
+        assert.ok(rendered.includes("finding 1 path"));
     });
 
     it("resets grouping after visible tool result", async () => {
@@ -343,6 +364,32 @@ describe("chat-controller collapsed tool summary lifecycle", () => {
         assert.equal(summaries.length, 2);
         assert.ok(stripAnsi(summaries[0].render(160).join("\n")).includes("0.3s"));
         assert.ok(stripAnsi(summaries[1].render(160).join("\n")).includes("0.4s"));
+    });
+
+    it("stops grouped spinner on aborted assistant message", async () => {
+        const host = createHost();
+
+        await handleAgentEvent(host, {
+            type: "message_start",
+            message: assistantMessage(),
+        });
+
+        await handleAgentEvent(host, toolStartEvent("tool-1", "read", { path: "README.md" }));
+
+        await handleAgentEvent(host, {
+            type: "message_end",
+            message: {
+                ...assistantMessage(),
+                stopReason: "aborted",
+                errorMessage: "Operation aborted",
+            },
+        } as any);
+
+        const summaries = summaryLines(host);
+        assert.equal(summaries.length, 1);
+        const rendered = stripAnsi(summaries[0].render(160).join("\n"));
+        assert.ok(!rendered.includes("…"));
+        assert.ok(rendered.includes("README.md") || rendered === "");
     });
 
     it("keeps collapsed tool calls visible in intermediate mode", async () => {
