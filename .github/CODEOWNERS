@@ -10,7 +10,6 @@
 
 # Core agent orchestration — RFC required, senior review only
 packages/pi-agent-core/             @gsd-build/maintainers
-src/resources/extensions/gsd/       @gsd-build/maintainers
 
 # AI/LLM provider integrations
 packages/pi-ai/                     @gsd-build/maintainers

@@ -230,14 +230,11 @@ jobs:
 
       - name: Run RTK-focused portability tests
         run: >-
-          node --import ./src/resources/extensions/gsd/tests/resolve-ts.mjs
-          --experimental-strip-types --experimental-test-isolation=process --test
+          node --experimental-strip-types --experimental-test-isolation=process --test
           src/tests/rtk.test.ts
           src/tests/rtk-execution-seams.test.ts
           src/tests/postinstall.test.ts
           src/tests/app-smoke.test.ts
-          src/resources/extensions/gsd/tests/custom-verification.test.ts
-          src/resources/extensions/gsd/tests/verification-gate.test.ts
 
       - name: Generate RTK benchmark evidence
         if: matrix.label == 'linux'

@@ -81,10 +81,6 @@ const ALLOW_SHELL_INTERPOLATION: Array<[string, string]> = [
   ["update-cmd.ts", "npm view ${NPM_PACKAGE}"],
   ["update-cmd.ts", "npm install -g ${NPM_PACKAGE}"],
   ["update-check.ts", "npm install -g ${NPM_PACKAGE_NAME}"],
-  // Bundled legacy GSD extension sources are copied into dist-test/src during test compilation.
-  // The interpolated package name is still a constant and not a path derived from user input.
-  ["resources/extensions/gsd/commands-handlers.ts", "npm view ${NPM_PACKAGE}"],
-  ["resources/extensions/gsd/commands-handlers.ts", "npm install -g ${NPM_PACKAGE}"],
 ];
 
 function isAllowlisted(

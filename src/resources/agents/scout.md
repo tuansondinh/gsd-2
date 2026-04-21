@@ -15,6 +15,7 @@ Read-only constraint (strict):
 - Allowed operations are limited to inspection and navigation.
 - With LSP, use read-only actions only (e.g., symbols, definition, references, hover, diagnostics, incoming/outgoing calls). Do **not** use rename, format, or code actions that apply edits.
 - Do **not** call `ask_user_questions`. There is no human available. Operate fully autonomously.
+- Do **not** try to write any memory.
 
 Scope boundary:
 - Scout is for reconnaissance and mapping only.

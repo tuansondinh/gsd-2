@@ -6,7 +6,6 @@
  * - isAllLocalChain() aggregate check
  * - Auto-detection sets PI_OFFLINE when all models are local
  * - Validation rejects remote models with --offline flag
- * - Network error codes in INFRA_ERROR_CODES
  * - Web search tool filtered when PI_OFFLINE is set
  *
  * Fixes #2341
@@ -72,46 +71,6 @@ test("isAllLocalChain returns false for empty list", () => {
 	const models: Array<{ baseUrl: string }> = [];
 	// Empty => false (no models means we can't guarantee local)
 	assert.strictEqual(models.length === 0 ? false : models.every((m) => isLocalModel(m)), false);
-});
-
-// ─── INFRA_ERROR_CODES includes network errors ─────────────────────────────
-
-test("INFRA_ERROR_CODES includes ECONNREFUSED", async () => {
-	const { INFRA_ERROR_CODES } = await import(
-		"../../src/resources/extensions/gsd/auto/infra-errors.ts"
-	);
-	assert.strictEqual(INFRA_ERROR_CODES.has("ECONNREFUSED"), true);
-});
-
-test("INFRA_ERROR_CODES includes ENOTFOUND", async () => {
-	const { INFRA_ERROR_CODES } = await import(
-		"../../src/resources/extensions/gsd/auto/infra-errors.ts"
-	);
-	assert.strictEqual(INFRA_ERROR_CODES.has("ENOTFOUND"), true);
-});
-
-test("INFRA_ERROR_CODES includes ENETUNREACH", async () => {
-	const { INFRA_ERROR_CODES } = await import(
-		"../../src/resources/extensions/gsd/auto/infra-errors.ts"
-	);
-	assert.strictEqual(INFRA_ERROR_CODES.has("ENETUNREACH"), true);
-});
-
-// ─── isInfrastructureError detects network errors in offline mode ───────────
-
-test("isInfrastructureError returns code for ECONNREFUSED when offline", async () => {
-	const { isInfrastructureError } = await import(
-		"../../src/resources/extensions/gsd/auto/infra-errors.ts"
-	);
-	const savedOffline = process.env.PI_OFFLINE;
-	process.env.PI_OFFLINE = "1";
-	try {
-		const err = Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" });
-		assert.strictEqual(isInfrastructureError(err), "ECONNREFUSED");
-	} finally {
-		if (savedOffline === undefined) delete process.env.PI_OFFLINE;
-		else process.env.PI_OFFLINE = savedOffline;
-	}
 });
 
 // ─── Web search filtering when PI_OFFLINE set ──────────────────────────────

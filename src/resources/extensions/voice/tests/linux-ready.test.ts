@@ -8,8 +8,41 @@
  *   - linuxPython venv detection
  */
 
-import { createTestContext } from "../../gsd/tests/test-helpers.ts";
 import { diagnoseSounddeviceError, ensureVoiceVenv } from "../linux-ready.ts";
+
+function createTestContext() {
+	let passed = 0;
+	let failed = 0;
+
+	function assertEq<T>(actual: T, expected: T, message: string): void {
+		if (JSON.stringify(actual) === JSON.stringify(expected)) {
+			passed++;
+		} else {
+			failed++;
+			console.error(`  FAIL: ${message} — expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+		}
+	}
+
+	function assertTrue(condition: boolean, message: string): void {
+		if (condition) {
+			passed++;
+		} else {
+			failed++;
+			console.error(`  FAIL: ${message}`);
+		}
+	}
+
+	function report(): void {
+		console.log(`\nResults: ${passed} passed, ${failed} failed`);
+		if (failed > 0) {
+			process.exit(1);
+		} else {
+			console.log("All tests passed");
+		}
+	}
+
+	return { assertEq, assertTrue, report };
+}
 
 const { assertEq, assertTrue, report } = createTestContext();
 
